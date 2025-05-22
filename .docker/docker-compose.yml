@@ -1,0 +1,92 @@
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: .docker/backend.Dockerfile
+      target: development
+    container_name: devbridge_backend
+    environment:
+      PORT: 8080
+      GO_ENV: development
+      ALLOWED_ORIGINS: http://localhost:3000,http://frontend:3000
+      DATABASE_URL: postgres://devbridge_user:devbridge_password@postgres:5432/devbridge?sslmode=disable
+    ports:
+      - "8080:8080"
+      - "2345:2345"
+    volumes:
+      - ../backend:/app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - devbridge
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: .docker/frontend.Dockerfile
+      target: development
+    container_name: devbridge_frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080/api/v1
+      INTERNAL_API_URL: http://backend:8080/api/v1
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../frontend:/app
+    working_dir: /app
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - devbridge
+
+  adminer:
+    image: adminer:latest
+    container_name: devbridge_adminer
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    ports:
+      - "8081:8080"
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    networks:
+      - devbridge
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: devbridge_postgres
+    environment:
+      POSTGRES_DB: devbridge
+      POSTGRES_USER: devbridge_user
+      POSTGRES_PASSWORD: devbridge_password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../backend/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U devbridge_user -d devbridge"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - devbridge
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  devbridge:
+    driver: bridge
+    name: devbridge_network
