@@ -1,6 +1,6 @@
 'use client'
 
-import { useUsers } from '@/hooks/useUsers'
+import { useUsers } from '@/hooks/useUser'
 import UserCard from './UserCard'
 
 export default function UsersList() {
