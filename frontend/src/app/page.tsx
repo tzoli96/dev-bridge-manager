@@ -1,4 +1,5 @@
-import HealthCheck from '@/components/HealthCheck'
+import HealthCheck from '../components/HealthCheck'
+import Link from 'next/link'
 
 export default function Home() {
   return (
@@ -13,6 +14,27 @@ export default function Home() {
             </p>
             <div className="inline-block bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded">
               🚀 Frontend is running with Next.js 15 + Turbopack!
+            </div>
+          </div>
+
+          {/* Navigation */}
+          <div className="flex justify-center mb-12">
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <h2 className="text-lg font-semibold mb-4 text-center">Quick Navigation</h2>
+              <div className="grid grid-cols-2 gap-4">
+                <Link
+                    href="/auth"
+                    className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors text-center"
+                >
+                  🔐 Login / Register
+                </Link>
+                <Link
+                    href="/users"
+                    className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors text-center"
+                >
+                  👥 View Users
+                </Link>
+              </div>
             </div>
           </div>
 

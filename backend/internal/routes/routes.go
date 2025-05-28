@@ -12,8 +12,11 @@ func SetupRoutes(app *fiber.App) {
 	SetupHealthRoutes(v1)
 
 	// Setup route groups
-	SetupAPIRoutes(v1)   // API endpoints under /api/v1
-	SetupUsersRoutes(v1) // Users endpoints
+	SetupAPIRoutes(v1)        // API endpoints under /api/v1
+	SetupAuthRoutes(v1)       // Auth endpoints
+	SetupUsersRoutes(v1)      // Users endpoints
+	SetupRoleRoutes(v1)       // Role endpoints
+	SetupPermissionRoutes(v1) // Permission endpoints
 }
 
 func SetupAPIRoutes(api fiber.Router) {
@@ -25,6 +28,11 @@ func SetupAPIRoutes(api fiber.Router) {
 				"GET /health - Health check",
 				"GET /ping - Ping test",
 				"GET /api/v1 - API info",
+				"GET /api/v1/users - Get all users",
+				"GET /api/v1/users/:id - Get user by ID",
+				"POST /api/v1/auth/register - User registration",
+				"POST /api/v1/auth/login - User login",
+				"GET /api/v1/auth/me - Current user (protected)",
 				"GET /api/v1/users - Get all users",
 				"GET /api/v1/users/:id - Get user by ID",
 			},

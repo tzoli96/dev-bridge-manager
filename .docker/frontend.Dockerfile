@@ -14,7 +14,7 @@ RUN pnpm install
 COPY frontend/ ./
 
 EXPOSE 3000
-CMD ["pnpm", "dev"]
+CMD ["sh", "-c", "pnpm install && pnpm dev"]
 
 # Build stage
 FROM node:22-alpine AS builder
@@ -52,4 +52,4 @@ RUN chown -R appuser:appuser .
 USER appuser
 EXPOSE 3000
 
-CMD ["pnpm", "start"]
+CMD tail -f /dev/null
