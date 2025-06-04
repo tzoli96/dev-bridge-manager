@@ -89,4 +89,3 @@ volumes:
 networks:
   devbridge:
     driver: bridge
-    name: devbridge_network

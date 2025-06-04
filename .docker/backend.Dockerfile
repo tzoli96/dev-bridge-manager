@@ -1,5 +1,5 @@
 # Development stage
-FROM golang:1.23-alpine AS development
+FROM golang:alpine AS development
 
 RUN apk add --no-cache git ca-certificates curl bash
 
@@ -16,7 +16,7 @@ EXPOSE 2345
 CMD ["air"]
 
 # Build stage
-FROM golang:1.23-alpine AS builder
+FROM golang:alpine AS builder
 
 RUN apk add --no-cache git ca-certificates
 
