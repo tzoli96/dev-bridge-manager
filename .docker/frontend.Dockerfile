@@ -1,7 +1,7 @@
 # Development stage
 FROM node:22-alpine AS development
 
-RUN npm install -g pnpm
+RUN npm install -g pnpm@latest
 RUN apk add --no-cache curl bash
 
 WORKDIR /app
@@ -19,7 +19,7 @@ CMD ["sh", "-c", "pnpm install && pnpm dev"]
 # Build stage
 FROM node:22-alpine AS builder
 
-RUN npm install -g pnpm
+RUN npm install -g pnpm@latest
 
 WORKDIR /app
 
@@ -34,7 +34,7 @@ RUN pnpm build
 # Production stage
 FROM node:22-alpine
 
-RUN npm install -g pnpm && \
+RUN npm install -g pnpm@latest && \
     adduser -D -s /bin/sh appuser
 
 WORKDIR /app

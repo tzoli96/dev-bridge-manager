@@ -1,82 +1,107 @@
 'use client'
 
 import { useUsers } from '@/hooks/useUser'
-import UserCard from './UserCard'
+import { PermissionGuard } from '@/components/auth/PermissionGuard'
+import { usePermissions } from '@/hooks/usePermissions'
 
 export default function UsersList() {
-    const { users, loading, error, refetch } = useUsers()
+    const { users, loading, error } = useUsers()
+    const { hasPermission, user: currentUser } = usePermissions()
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center p-8">
+            <div className="flex justify-center items-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                <span className="ml-2 text-gray-600">Loading users...</span>
+                <span className="ml-2">Loading users...</span>
             </div>
         )
     }
 
     if (error) {
         return (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h3 className="text-red-800 font-semibold">Error loading users</h3>
-                        <p className="text-red-600 text-sm mt-1">{error}</p>
-                    </div>
-                    <button
-                        onClick={refetch}
-                        className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors"
-                    >
-                        Retry
-                    </button>
-                </div>
-            </div>
-        )
-    }
-
-    if (users.length === 0) {
-        return (
-            <div className="text-center p-8">
-                <div className="text-gray-500 text-lg">No users found</div>
-                <button
-                    onClick={refetch}
-                    className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-                >
-                    Refresh
-                </button>
+            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded">
+                Error: {error}
             </div>
         )
     }
 
     return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-2xl font-bold text-gray-900">
-                        Team Members
-                    </h2>
-                    <p className="text-gray-600 mt-1">
-                        {users.length} {users.length === 1 ? 'member' : 'members'} found
-                    </p>
-                </div>
-                <button
-                    onClick={refetch}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2"
-                >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Refresh
-                </button>
-            </div>
-
-            {/* Users Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="bg-white shadow rounded-lg overflow-hidden">
+            <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        User
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Role
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Position
+                    </th>
+                    <PermissionGuard permissions={['users.update', 'users.delete']}>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                            Actions
+                        </th>
+                    </PermissionGuard>
+                </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
                 {users.map((user) => (
-                    <UserCard key={user.id} user={user} />
+                    <tr key={user.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                                <div className="flex-shrink-0 h-10 w-10">
+                                    <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
+                                            <span className="text-white font-medium">
+                                                {user.name.charAt(0).toUpperCase()}
+                                            </span>
+                                    </div>
+                                </div>
+                                <div className="ml-4">
+                                    <div className="text-sm font-medium text-gray-900">
+                                        {user.name}
+                                        {user.id === currentUser?.id && (
+                                            <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                                                    You
+                                                </span>
+                                        )}
+                                    </div>
+                                    <div className="text-sm text-gray-500">{user.email}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                                <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                    {user.role?.display_name || 'No Role'}
+                                </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {user.position || '-'}
+                        </td>
+                        <PermissionGuard permissions={['users.update', 'users.delete']}>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                                <PermissionGuard permission="users.update">
+                                    <button className="text-blue-600 hover:text-blue-900">
+                                        Edit
+                                    </button>
+                                </PermissionGuard>
+
+                                <PermissionGuard permission="users.delete">
+                                    <>
+                                        {user.id !== currentUser?.id && (
+                                            <button className="text-red-600 hover:text-red-900">
+                                                Delete
+                                            </button>
+                                        )}
+                                    </>
+                                </PermissionGuard>
+                            </td>
+                        </PermissionGuard>
+                    </tr>
                 ))}
-            </div>
+                </tbody>
+            </table>
         </div>
     )
 }

@@ -104,6 +104,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         apiClient.removeAuthToken()
     }
 
+    const hasPermission = (permission: string): boolean => {
+        return user?.permissions?.includes(permission) || false;
+    };
+
+    const hasAnyPermission = (permissions: string[]): boolean => {
+        if (!user?.permissions) return false;
+        return permissions.some(permission => user.permissions.includes(permission));
+    };
+
+    const hasRole = (role: string): boolean => {
+        return user?.role?.name === role;
+    };
+
+    const canAccess = (requiredPermissions: string | string[]): boolean => {
+        if (!requiredPermissions) return true;
+
+        if (typeof requiredPermissions === 'string') {
+            return hasPermission(requiredPermissions);
+        }
+
+        return hasAnyPermission(requiredPermissions);
+    };
+
     const value: AuthContextType = {
         user,
         token,
@@ -111,10 +134,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         register,
         logout,
         loading,
-        isAuthenticated: !!token && !!user
+        isAuthenticated: !!token && !!user,
+        hasPermission,
+        hasAnyPermission,
+        hasRole,
+        canAccess
     }
 
-    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthContextType {

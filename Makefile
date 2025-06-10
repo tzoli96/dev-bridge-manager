@@ -28,7 +28,11 @@ help:
 # Development environment
 dev:
 	@echo "🏗️  Starting development environment..."
-	docker-compose -f $(COMPOSE_FILE) up --build
+	docker-compose -f $(COMPOSE_FILE) up -d
+
+dev-build:
+	@echo "🏗️  Building development environment..."
+	docker-compose -f $(COMPOSE_FILE) build
 
 # Build production backend image
 build-backend:
