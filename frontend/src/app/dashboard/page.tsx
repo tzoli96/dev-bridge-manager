@@ -3,11 +3,15 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '../../contexts/AuthContext'
+import EditProfileModal from '@/components/EditProfileModal'
+import ChangePasswordModal from '@/components/ChangePasswordModal'
 
 export default function DashboardPage() {
     const { user, isAuthenticated, logout, loading } = useAuth()
     const router = useRouter()
     const [activeTab, setActiveTab] = useState('dashboard')
+    const [showEditProfile, setShowEditProfile] = useState(false)
+    const [showChangePassword, setShowChangePassword] = useState(false)
 
     useEffect(() => {
         if (!loading && !isAuthenticated) {
@@ -324,13 +328,40 @@ export default function DashboardPage() {
                                 </div>
                             </div>
 
+                        <EditProfileModal
+                            isOpen={showEditProfile}
+                            onClose={() => setShowEditProfile(false)}
+                            onSuccess={() => {
+                                console.log('Profile updated successfully')
+                            }}
+                        />
+
                             {hasPermission('profile.update') && (
-                                <div className="mt-6">
-                                    <button className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors">
+                                <div className="mt-6 space-x-3">
+                                    <button
+                                        onClick={() => setShowEditProfile(true)}
+                                        className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                                    >
                                         Edit Profile
+                                    </button>
+                                    <button
+                                        onClick={() => setShowChangePassword(true)}
+                                        className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors"
+                                    >
+                                        Change Password
                                     </button>
                                 </div>
                             )}
+
+                            {/* Change Password Modal */}
+                            <ChangePasswordModal
+                                isOpen={showChangePassword}
+                                onClose={() => setShowChangePassword(false)}
+                                onSuccess={() => {
+                                    console.log('Password changed successfully, user will be logged out')
+                                }}
+                            />
+
                         </div>
 
                         {/* Permissions - Development mode only */}

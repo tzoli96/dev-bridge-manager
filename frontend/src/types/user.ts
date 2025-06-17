@@ -5,6 +5,12 @@ export interface User {
     position: string
     created_at: string
     updated_at: string
+    role?: {
+        id: number
+        name: string
+        display_name: string
+    }
+    permissions?: string[]
 }
 
 export interface UsersResponse {

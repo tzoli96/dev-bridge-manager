@@ -104,6 +104,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         apiClient.removeAuthToken()
     }
 
+    // ÚJ: setUser metódus - user adatok frissítése
+    const updateUser = (userData: User): void => {
+        setUser(userData)
+        AuthService.saveUser(userData)
+    }
+
     const hasPermission = (permission: string): boolean => {
         return user?.permissions?.includes(permission) || false;
     };
@@ -138,7 +144,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         hasPermission,
         hasAnyPermission,
         hasRole,
-        canAccess
+        canAccess,
+        setUser: updateUser // ÚJ metódus hozzáadása
     }
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

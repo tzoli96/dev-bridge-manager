@@ -48,4 +48,14 @@ func SetupUsersRoutes(api fiber.Router) {
 		middleware.RequirePermission("profile.read"),
 		userHandler.GetProfile,
 	)
+
+	users.Put("/profile/me",
+		middleware.RequirePermission("profile.update"),
+		userHandler.UpdateProfile,
+	)
+
+	users.Put("/profile/password",
+		middleware.RequirePermission("profile.update"),
+		userHandler.ChangePassword,
+	)
 }

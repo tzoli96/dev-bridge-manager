@@ -37,6 +37,18 @@ type UserListResponse struct {
 	User    *UserResponse  `json:"user,omitempty"`
 }
 
+type UpdateProfileRequest struct {
+	Name     string `json:"name,omitempty" validate:"min=2"`
+	Email    string `json:"email,omitempty" validate:"email"`
+	Position string `json:"position,omitempty"`
+}
+
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password" validate:"required"`
+	NewPassword     string `json:"new_password" validate:"required,min=6"`
+	ConfirmPassword string `json:"confirm_password" validate:"required"`
+}
+
 func NewUsersHandler() *UsersHandler {
 	return &UsersHandler{}
 }
@@ -372,5 +384,139 @@ func (h *UserHandler) GetProfile(c *fiber.Ctx) error {
 			},
 			Permissions: user.GetPermissions(),
 		},
+	})
+}
+
+// UpdateProfile updates the current user's profile
+func (h *UserHandler) UpdateProfile(c *fiber.Ctx) error {
+	currentUserID := c.Locals("userID").(uint)
+
+	var req UpdateProfileRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(UserListResponse{
+			Success: false,
+			Message: "Invalid request body",
+		})
+	}
+
+	if req.Name == "" && req.Email == "" && req.Position == "" {
+		return c.Status(400).JSON(UserListResponse{
+			Success: false,
+			Message: "At least one field must be provided",
+		})
+	}
+
+	if req.Email != "" {
+		var existingUser models.User
+		if err := database.GetDB().Where("email = ? AND id != ?", req.Email, currentUserID).First(&existingUser).Error; err == nil {
+			return c.Status(409).JSON(UserListResponse{
+				Success: false,
+				Message: "Email already in use by another user",
+			})
+		}
+	}
+
+	updates := make(map[string]interface{})
+	if req.Name != "" {
+		updates["name"] = req.Name
+	}
+	if req.Email != "" {
+		updates["email"] = req.Email
+	}
+	if req.Position != "" {
+		updates["position"] = req.Position
+	}
+
+	if err := database.GetDB().Model(&models.User{}).Where("id = ?", currentUserID).Updates(updates).Error; err != nil {
+		return c.Status(500).JSON(UserListResponse{
+			Success: false,
+			Message: "Failed to update profile",
+		})
+	}
+
+	user, err := h.permissionService.GetUserWithPermissions(currentUserID)
+	if err != nil {
+		return c.Status(500).JSON(UserListResponse{
+			Success: false,
+			Message: "Profile updated but failed to load updated data",
+		})
+	}
+
+	return c.JSON(UserListResponse{
+		Success: true,
+		Message: "Profile updated successfully",
+		User: &UserResponse{
+			ID:       user.ID,
+			Name:     user.Name,
+			Email:    user.Email,
+			Position: user.Position,
+			Role: RoleInfo{
+				ID:          user.Role.ID,
+				Name:        user.Role.Name,
+				DisplayName: user.Role.DisplayName,
+			},
+			Permissions: user.GetPermissions(),
+		},
+	})
+}
+
+func (h *UserHandler) ChangePassword(c *fiber.Ctx) error {
+	currentUserID := c.Locals("userID").(uint)
+
+	var req ChangePasswordRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(UserListResponse{
+			Success: false,
+			Message: "Invalid request body",
+		})
+	}
+
+	if req.NewPassword != req.ConfirmPassword {
+		return c.Status(400).JSON(UserListResponse{
+			Success: false,
+			Message: "Password confirmation does not match",
+		})
+	}
+
+	user, err := h.permissionService.GetUserWithPermissions(currentUserID)
+	if err != nil {
+		return c.Status(404).JSON(UserListResponse{
+			Success: false,
+			Message: "User not found",
+		})
+	}
+
+	if !user.CheckPassword(req.CurrentPassword) {
+		return c.Status(400).JSON(UserListResponse{
+			Success: false,
+			Message: "Current password is incorrect",
+		})
+	}
+
+	if user.CheckPassword(req.NewPassword) {
+		return c.Status(400).JSON(UserListResponse{
+			Success: false,
+			Message: "New password must be different from current password",
+		})
+	}
+
+	tempUser := models.User{Password: req.NewPassword}
+	if err := tempUser.HashPassword(); err != nil {
+		return c.Status(500).JSON(UserListResponse{
+			Success: false,
+			Message: "Failed to process new password",
+		})
+	}
+
+	if err := database.GetDB().Model(&models.User{}).Where("id = ?", currentUserID).Update("password", tempUser.Password).Error; err != nil {
+		return c.Status(500).JSON(UserListResponse{
+			Success: false,
+			Message: "Failed to update password",
+		})
+	}
+
+	return c.JSON(UserListResponse{
+		Success: true,
+		Message: "Password changed successfully. Please log in again.",
 	})
 }

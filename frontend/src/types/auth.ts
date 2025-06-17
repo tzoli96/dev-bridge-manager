@@ -23,6 +23,7 @@ export interface AuthContextType {
     hasAnyPermission: (permissions: string[]) => boolean;
     hasRole: (role: string) => boolean;
     canAccess: (requiredPermissions: string | string[]) => boolean;
+    setUser: (user: User) => void;
 }
 
 export interface AuthResponse {
@@ -42,14 +43,4 @@ export interface RegisterRequest {
     email: string
     password: string
     position: string
-}
-
-export interface AuthContextType {
-    user: User | null
-    token: string | null
-    login: (email: string, password: string) => Promise<void>
-    register: (data: RegisterRequest) => Promise<void>
-    logout: () => void
-    loading: boolean
-    isAuthenticated: boolean
 }

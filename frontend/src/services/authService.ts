@@ -21,7 +21,7 @@ export class AuthService {
 
             // Handle different error types
             if (error.response?.status === 401) {
-                throw new Error('Invalid email or password')
+                throw new Error('Please check your email and password')
             } else if (error.response?.status === 400) {
                 throw new Error('Please check your email and password')
             } else if (error.message) {
