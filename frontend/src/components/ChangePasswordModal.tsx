@@ -1,3 +1,5 @@
+'use client'
+
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { UsersService, ChangePasswordRequest } from '@/services/usersService'

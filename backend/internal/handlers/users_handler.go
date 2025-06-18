@@ -15,6 +15,21 @@ type UserHandler struct {
 	permissionService *services.PermissionService
 }
 
+type RoleInfo struct {
+	ID          uint   `json:"id"`
+	Name        string `json:"name"`
+	DisplayName string `json:"display_name"`
+}
+
+type UserResponse struct {
+	ID          uint     `json:"id"`
+	Name        string   `json:"name"`
+	Email       string   `json:"email"`
+	Position    string   `json:"position"`
+	Role        RoleInfo `json:"role"`
+	Permissions []string `json:"permissions,omitempty"`
+}
+
 type CreateUserRequest struct {
 	Name     string `json:"name" validate:"required,min=2"`
 	Email    string `json:"email" validate:"required,email"`
@@ -28,6 +43,7 @@ type UpdateUserRequest struct {
 	Email    string `json:"email,omitempty"`
 	Position string `json:"position,omitempty"`
 	RoleName string `json:"role_name,omitempty"`
+	Password string `json:"password,omitempty" validate:"omitempty,min=6"` // ÚJ: opcionális jelszó
 }
 
 type UserListResponse struct {
@@ -183,7 +199,15 @@ func (h *UserHandler) CreateUser(c *fiber.Ctx) error {
 		})
 	}
 
-	// Check if user already exists
+	// Input validáció
+	if req.Name == "" || req.Email == "" || req.Password == "" || req.RoleName == "" {
+		return c.Status(400).JSON(UserListResponse{
+			Success: false,
+			Message: "Name, email, password and role are required",
+		})
+	}
+
+	// Email egyediség ellenőrzése
 	var existingUser models.User
 	if err := database.GetDB().Where("email = ?", req.Email).First(&existingUser).Error; err == nil {
 		return c.Status(409).JSON(UserListResponse{
@@ -192,7 +216,7 @@ func (h *UserHandler) CreateUser(c *fiber.Ctx) error {
 		})
 	}
 
-	// Get role
+	// Role létezésének ellenőrzése
 	var role models.Role
 	if err := database.GetDB().Where("name = ? AND is_active = ?", req.RoleName, true).First(&role).Error; err != nil {
 		return c.Status(400).JSON(UserListResponse{
@@ -201,7 +225,7 @@ func (h *UserHandler) CreateUser(c *fiber.Ctx) error {
 		})
 	}
 
-	// Create user
+	// User létrehozása
 	user := models.User{
 		Name:     req.Name,
 		Email:    req.Email,
@@ -210,6 +234,7 @@ func (h *UserHandler) CreateUser(c *fiber.Ctx) error {
 		RoleID:   role.ID,
 	}
 
+	// Jelszó hash-elése
 	if err := user.HashPassword(); err != nil {
 		return c.Status(500).JSON(UserListResponse{
 			Success: false,
@@ -217,6 +242,7 @@ func (h *UserHandler) CreateUser(c *fiber.Ctx) error {
 		})
 	}
 
+	// User mentése adatbázisba
 	if err := database.GetDB().Create(&user).Error; err != nil {
 		return c.Status(500).JSON(UserListResponse{
 			Success: false,
@@ -224,7 +250,7 @@ func (h *UserHandler) CreateUser(c *fiber.Ctx) error {
 		})
 	}
 
-	// Load user with role for response
+	// User újratöltése role-lal együtt
 	if err := database.GetDB().Preload("Role").First(&user, user.ID).Error; err != nil {
 		return c.Status(500).JSON(UserListResponse{
 			Success: false,
@@ -267,7 +293,15 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 		})
 	}
 
-	// Check permissions
+	// Legalább egy mező legyen megadva
+	if req.Name == "" && req.Email == "" && req.Position == "" && req.RoleName == "" && req.Password == "" {
+		return c.Status(400).JSON(UserListResponse{
+			Success: false,
+			Message: "At least one field must be provided",
+		})
+	}
+
+	// Permission ellenőrzés - csak admin frissíthet másokat
 	currentUserID := c.Locals("userID").(uint)
 	if currentUserID != uint(userID) {
 		hasPermission, err := h.permissionService.CheckUserPermission(currentUserID, "users.update")
@@ -279,7 +313,18 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 		}
 	}
 
-	// Build updates map
+	// Email egyediség ellenőrzése (ha új email van megadva)
+	if req.Email != "" {
+		var existingUser models.User
+		if err := database.GetDB().Where("email = ? AND id != ?", req.Email, userID).First(&existingUser).Error; err == nil {
+			return c.Status(409).JSON(UserListResponse{
+				Success: false,
+				Message: "Email already in use by another user",
+			})
+		}
+	}
+
+	// Frissítendő mezők összeállítása
 	updates := make(map[string]interface{})
 	if req.Name != "" {
 		updates["name"] = req.Name
@@ -291,7 +336,7 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 		updates["position"] = req.Position
 	}
 
-	// Handle role update (only if user has permission)
+	// Role frissítés (admin jogosultságot igényel)
 	if req.RoleName != "" {
 		hasRolePermission, err := h.permissionService.CheckUserPermission(currentUserID, "users.update")
 		if err != nil || !hasRolePermission {
@@ -311,7 +356,19 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 		updates["role_id"] = role.ID
 	}
 
-	// Update user
+	// Jelszó frissítés (ha meg van adva)
+	if req.Password != "" {
+		tempUser := models.User{Password: req.Password}
+		if err := tempUser.HashPassword(); err != nil {
+			return c.Status(500).JSON(UserListResponse{
+				Success: false,
+				Message: "Failed to process new password",
+			})
+		}
+		updates["password"] = tempUser.Password
+	}
+
+	// User frissítése
 	if err := database.GetDB().Model(&models.User{}).Where("id = ?", userID).Updates(updates).Error; err != nil {
 		return c.Status(500).JSON(UserListResponse{
 			Success: false,
@@ -319,9 +376,29 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 		})
 	}
 
+	// Frissített user lekérése role-lal együtt
+	var updatedUser models.User
+	if err := database.GetDB().Preload("Role").First(&updatedUser, userID).Error; err != nil {
+		return c.Status(500).JSON(UserListResponse{
+			Success: false,
+			Message: "User updated but failed to load details",
+		})
+	}
+
 	return c.JSON(UserListResponse{
 		Success: true,
 		Message: "User updated successfully",
+		User: &UserResponse{
+			ID:       updatedUser.ID,
+			Name:     updatedUser.Name,
+			Email:    updatedUser.Email,
+			Position: updatedUser.Position,
+			Role: RoleInfo{
+				ID:          updatedUser.Role.ID,
+				Name:        updatedUser.Role.Name,
+				DisplayName: updatedUser.Role.DisplayName,
+			},
+		},
 	})
 }
 
@@ -335,7 +412,7 @@ func (h *UserHandler) DeleteUser(c *fiber.Ctx) error {
 		})
 	}
 
-	// Prevent self-deletion
+	// Self-deletion prevention
 	currentUserID := c.Locals("userID").(uint)
 	if currentUserID == uint(userID) {
 		return c.Status(400).JSON(UserListResponse{
@@ -344,6 +421,16 @@ func (h *UserHandler) DeleteUser(c *fiber.Ctx) error {
 		})
 	}
 
+	// Ellenőrizzük, hogy a user létezik-e
+	var user models.User
+	if err := database.GetDB().First(&user, userID).Error; err != nil {
+		return c.Status(404).JSON(UserListResponse{
+			Success: false,
+			Message: "User not found",
+		})
+	}
+
+	// User törlése
 	if err := database.GetDB().Delete(&models.User{}, userID).Error; err != nil {
 		return c.Status(500).JSON(UserListResponse{
 			Success: false,

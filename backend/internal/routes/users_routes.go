@@ -8,54 +8,50 @@ import (
 
 func SetupUsersRoutes(api fiber.Router) {
 	usersHandler := handlers.NewUsersHandler()
-
-	users := api.Group("/users")
-	users.Get("/", usersHandler.GetUsers)
-	users.Get("/:id", usersHandler.GetUser)
-
 	userHandler := handlers.NewUserHandler()
 
-	users.Use(middleware.JWTMiddleware())
+	// PUBLIC ENDPOINTS (middleware nélkül)
+	api.Get("/users", usersHandler.GetUsers)    // GET /api/v1/users (public lista)
+	api.Get("/users/:id", usersHandler.GetUser) // GET /api/v1/users/123 (public user)
 
-	// User endpoints with permission-based access
-	users.Get("/",
-		middleware.RequirePermission("users.list"),
-		userHandler.GetAllUsers,
-	)
-
-	users.Post("/",
-		middleware.RequirePermission("users.create"),
-		userHandler.CreateUser,
-	)
-
-	users.Get("/:id",
-		middleware.RequireAnyPermission("users.read", "profile.read"),
-		userHandler.GetUser,
-	)
-
-	users.Put("/:id",
-		middleware.RequireAnyPermission("users.update", "profile.update"),
-		userHandler.UpdateUser,
-	)
-
-	users.Delete("/:id",
-		middleware.RequirePermission("users.delete"),
-		userHandler.DeleteUser,
-	)
+	// PROTECTED ENDPOINTS (külön group)
+	protected := api.Group("/users", middleware.JWTMiddleware())
 
 	// Profile endpoints
-	users.Get("/profile/me",
+	protected.Get("/profile/me",
 		middleware.RequirePermission("profile.read"),
 		userHandler.GetProfile,
 	)
 
-	users.Put("/profile/me",
+	protected.Put("/profile/me",
 		middleware.RequirePermission("profile.update"),
 		userHandler.UpdateProfile,
 	)
 
-	users.Put("/profile/password",
+	protected.Put("/profile/password",
 		middleware.RequirePermission("profile.update"),
 		userHandler.ChangePassword,
+	)
+
+	// Admin CRUD műveletek
+	protected.Post("/",
+		middleware.RequirePermission("users.create"),
+		userHandler.CreateUser,
+	)
+
+	protected.Put("/:id",
+		middleware.RequirePermission("users.update"),
+		userHandler.UpdateUser,
+	)
+
+	protected.Delete("/:id",
+		middleware.RequirePermission("users.delete"),
+		userHandler.DeleteUser,
+	)
+
+	// Admin user részletek (ha kell külön védett verzió)
+	protected.Get("/:id/details",
+		middleware.RequirePermission("users.read"),
+		userHandler.GetUser,
 	)
 }

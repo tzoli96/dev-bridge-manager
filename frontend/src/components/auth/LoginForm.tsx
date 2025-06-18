@@ -83,19 +83,6 @@ export default function LoginForm({ onSuccess, onToggleForm }: LoginFormProps) {
                     </button>
                 </form>
 
-                {onToggleForm && (
-                    <div className="mt-4 text-center">
-                        <p className="text-sm text-gray-600">
-                            Don't have an account?{' '}
-                            <button
-                                onClick={onToggleForm}
-                                className="text-blue-600 hover:text-blue-800 font-medium"
-                            >
-                                Sign up
-                            </button>
-                        </p>
-                    </div>
-                )}
             </div>
         </div>
     )

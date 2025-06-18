@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import LoginForm from '../../components/auth/LoginForm'
-import RegisterForm from '../../components/auth/RegisterForm'
 
 export default function AuthPage() {
     const [isLogin, setIsLogin] = useState(true)
@@ -21,12 +20,7 @@ export default function AuthPage() {
                         onSuccess={handleAuthSuccess}
                         onToggleForm={() => setIsLogin(false)}
                     />
-                ) : (
-                    <RegisterForm
-                        onSuccess={handleAuthSuccess}
-                        onToggleForm={() => setIsLogin(true)}
-                    />
-                )}
+                ) : null}
             </div>
         </div>
     )

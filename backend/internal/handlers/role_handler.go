@@ -43,16 +43,16 @@ func NewRoleHandler() *RoleHandler {
 func (h *RoleHandler) GetAllRoles(c *fiber.Ctx) error {
 	roles, err := h.permissionService.GetAllRoles()
 	if err != nil {
-		return c.Status(500).JSON(RoleResponse{
-			Success: false,
-			Message: "Failed to fetch roles",
+		return c.Status(500).JSON(fiber.Map{
+			"success": false,
+			"message": "Failed to fetch roles",
 		})
 	}
 
-	return c.JSON(RoleResponse{
-		Success: true,
-		Message: "Roles retrieved successfully",
-		Roles:   roles,
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Roles retrieved successfully",
+		"roles":   roles,
 	})
 }
 
