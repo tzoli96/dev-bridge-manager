@@ -10,6 +10,10 @@ import EditUserModal from '@/components/EditUserModal'
 import { useUsers } from '@/hooks/useUser'
 import { UsersService } from '@/services/usersService'
 import { User } from '@/types/user'
+import { useProjects } from '@/hooks/useProjects'
+import { ProjectsService, Project } from '@/services/projectsService'
+import CreateProjectModal from '@/components/CreateProjectModal'
+import EditProjectModal from '@/components/EditProjectModal'
 
 export default function DashboardPage() {
     const { user, isAuthenticated, logout, loading } = useAuth()
@@ -22,8 +26,17 @@ export default function DashboardPage() {
     const [selectedUser, setSelectedUser] = useState<User | null>(null)
     const [deleting, setDeleting] = useState<number | null>(null)
 
+    // Project-related state
+    const [showCreateProject, setShowCreateProject] = useState(false)
+    const [showEditProject, setShowEditProject] = useState(false)
+    const [selectedProject, setSelectedProject] = useState<Project | null>(null)
+    const [deletingProject, setDeletingProject] = useState<number | null>(null)
+
     // Users data for the users tab
     const { users, loading: usersLoading, error: usersError, refetch: refetchUsers, debugInfo } = useUsers()
+
+    // Projects data for the projects tab
+    const { projects, loading: projectsLoading, error: projectsError, refetch: refetchProjects } = useProjects()
 
     useEffect(() => {
         if (!loading && !isAuthenticated) {
@@ -52,6 +65,39 @@ export default function DashboardPage() {
     // Helper function to check if user has any of the permissions
     const hasAnyPermission = (permissions: string[]) => {
         return permissions.some(permission => hasPermission(permission))
+    }
+
+    // Helper function to check if user is admin (can manage projects)
+    const isAdmin = () => {
+        return user?.role?.name === 'admin' || user?.role?.name === 'super_admin'
+    }
+
+    // Handle project deletion
+    const handleDeleteProject = async (projectId: number) => {
+        if (!confirm('Are you sure you want to delete this project?')) {
+            return
+        }
+
+        try {
+            setDeletingProject(projectId)
+            await ProjectsService.deleteProject(projectId)
+            await refetchProjects()
+        } catch (error: any) {
+            alert(`Failed to delete project: ${error.message}`)
+        } finally {
+            setDeletingProject(null)
+        }
+    }
+
+    // Handle project edit
+    const handleEditProject = (projectToEdit: Project) => {
+        setSelectedProject(projectToEdit)
+        setShowEditProject(true)
+    }
+
+    // Handle successful project operations
+    const handleProjectOperationSuccess = async () => {
+        await refetchProjects()
     }
 
     // Handle user deletion
@@ -140,6 +186,22 @@ export default function DashboardPage() {
                             </button>
                         )}
 
+                        {/* Projects tab - show for everyone who can see projects */}
+                        <button
+                            onClick={() => setActiveTab('projects')}
+                            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                                activeTab === 'projects'
+                                    ? 'border-blue-500 text-blue-600'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                            }`}
+                        >
+                            Projects {projects && projects.length > 0 && (
+                            <span className="ml-1 bg-green-100 text-green-600 px-2 py-0.5 rounded-full text-xs">
+                                    {projects.length}
+                                </span>
+                        )}
+                        </button>
+
                         {/* Admin tab - only show for admin roles */}
                         {hasAnyPermission(['system.settings', 'roles.list']) && (
                             <button
@@ -198,6 +260,14 @@ export default function DashboardPage() {
                                     </div>
                                 )}
 
+                                {/* Projects Card */}
+                                <div className="bg-indigo-50 rounded-lg p-4">
+                                    <h3 className="font-medium text-indigo-900">Projects</h3>
+                                    <p className="text-indigo-700 text-sm mt-1">
+                                        {projects?.length || 0} active projects
+                                    </p>
+                                </div>
+
                                 {/* Admin Card - conditional */}
                                 {hasAnyPermission(['system.settings', 'roles.list']) && (
                                     <div className="bg-purple-50 rounded-lg p-4">
@@ -229,6 +299,24 @@ export default function DashboardPage() {
                                     >
                                         <div className="font-medium">Manage Team</div>
                                         <div className="text-sm text-gray-600">View {users?.length || 0} team members</div>
+                                    </button>
+                                )}
+
+                                <button
+                                    onClick={() => setActiveTab('projects')}
+                                    className="bg-gray-100 hover:bg-gray-200 p-4 rounded-lg text-left transition-colors"
+                                >
+                                    <div className="font-medium">View Projects</div>
+                                    <div className="text-sm text-gray-600">{projects?.length || 0} projects available</div>
+                                </button>
+
+                                {isAdmin() && (
+                                    <button
+                                        onClick={() => setShowCreateProject(true)}
+                                        className="bg-indigo-100 hover:bg-indigo-200 p-4 rounded-lg text-left transition-colors"
+                                    >
+                                        <div className="font-medium text-indigo-800">Add Project</div>
+                                        <div className="text-sm text-indigo-600">Create new project</div>
                                     </button>
                                 )}
 
@@ -429,6 +517,140 @@ export default function DashboardPage() {
                     </div>
                 )}
 
+                {/* Projects Tab */}
+                {activeTab === 'projects' && (
+                    <div className="space-y-6">
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <h2 className="text-lg font-semibold">Projects</h2>
+                                <p className="text-gray-600">View and manage project portfolio</p>
+                            </div>
+                            {isAdmin() && (
+                                <button
+                                    onClick={() => setShowCreateProject(true)}
+                                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                                >
+                                    Create New Project
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Loading State */}
+                        {projectsLoading && (
+                            <div className="flex justify-center items-center py-8">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                                <span className="ml-2">Loading projects...</span>
+                            </div>
+                        )}
+
+                        {/* Error State */}
+                        {projectsError && (
+                            <div className="space-y-4">
+                                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded">
+                                    <div className="font-medium">Error loading projects:</div>
+                                    <div>{projectsError}</div>
+                                </div>
+                                <button
+                                    onClick={refetchProjects}
+                                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                                >
+                                    Try Again
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Empty State */}
+                        {!projectsLoading && !projectsError && (!projects || projects.length === 0) && (
+                            <div className="bg-white shadow rounded-lg p-8 text-center">
+                                <div className="text-gray-500 mb-4">
+                                    <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                    </svg>
+                                </div>
+                                <h3 className="text-lg font-medium text-gray-900 mb-2">No projects found</h3>
+                                <p className="text-gray-500 mb-4">There are no projects to display.</p>
+                                {isAdmin() ? (
+                                    <button
+                                        onClick={() => setShowCreateProject(true)}
+                                        className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                                    >
+                                        Create First Project
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={refetchProjects}
+                                        className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                                    >
+                                        Refresh
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Projects Grid */}
+                        {!projectsLoading && !projectsError && projects && projects.length > 0 && (
+                            <div className="space-y-4">
+                                {/* Projects count info */}
+                                <div className="bg-gray-50 px-6 py-3 rounded-lg">
+                                    <p className="text-sm text-gray-600">
+                                        Showing {projects.length} project{projects.length !== 1 ? 's' : ''}
+                                    </p>
+                                </div>
+
+                                {/* Projects Grid Layout */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {projects.map((project) => (
+                                        <div key={project.id} className="bg-white shadow rounded-lg p-6 hover:shadow-md transition-shadow">
+                                            <div className="flex justify-between items-start mb-3">
+                                                <h3 className="text-lg font-semibold text-gray-900 truncate">
+                                                    {project.name}
+                                                </h3>
+                                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                                    project.status === 'active' ? 'bg-green-100 text-green-800' :
+                                                        project.status === 'completed' ? 'bg-blue-100 text-blue-800' :
+                                                            project.status === 'on-hold' ? 'bg-yellow-100 text-yellow-800' :
+                                                                'bg-red-100 text-red-800'
+                                                }`}>
+                                                    {project.status}
+                                                </span>
+                                            </div>
+
+                                            {project.description && (
+                                                <p className="text-gray-600 text-sm mb-4 line-clamp-3">
+                                                    {project.description}
+                                                </p>
+                                            )}
+
+                                            <div className="text-xs text-gray-500 mb-4">
+                                                <div>Created by: <span className="font-medium">{project.created_by_name}</span></div>
+                                                <div>Created: <span className="font-medium">{new Date(project.created_at).toLocaleDateString()}</span></div>
+                                            </div>
+
+                                            {isAdmin() && (
+                                                <div className="flex space-x-2 pt-4 border-t">
+                                                    <button
+                                                        onClick={() => handleEditProject(project)}
+                                                        className="flex-1 text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors"
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteProject(project.id)}
+                                                        disabled={deletingProject === project.id}
+                                                        className="flex-1 text-red-600 hover:text-red-800 disabled:opacity-50 text-sm font-medium transition-colors"
+                                                    >
+                                                        {deletingProject === project.id ? 'Deleting...' : 'Delete'}
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* Admin Tab */}
                 {activeTab === 'admin' && hasAnyPermission(['system.settings', 'roles.list']) && (
                     <div className="space-y-6">
@@ -574,6 +796,22 @@ export default function DashboardPage() {
                     setSelectedUser(null)
                 }}
                 onSuccess={handleUserOperationSuccess}
+            />
+
+            <CreateProjectModal
+                isOpen={showCreateProject}
+                onClose={() => setShowCreateProject(false)}
+                onSuccess={handleProjectOperationSuccess}
+            />
+
+            <EditProjectModal
+                isOpen={showEditProject}
+                project={selectedProject}
+                onClose={() => {
+                    setShowEditProject(false)
+                    setSelectedProject(null)
+                }}
+                onSuccess={handleProjectOperationSuccess}
             />
         </div>
     )

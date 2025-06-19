@@ -17,6 +17,7 @@ func SetupRoutes(app *fiber.App) {
 	SetupUsersRoutes(v1)      // Users endpoints
 	SetupRoleRoutes(v1)       // Role endpoints
 	SetupPermissionRoutes(v1) // Permission endpoints
+	SetupProjectRoutes(v1)    // Project endpoints - ÚJ!
 }
 
 func SetupAPIRoutes(api fiber.Router) {
@@ -35,6 +36,11 @@ func SetupAPIRoutes(api fiber.Router) {
 				"GET /api/v1/auth/me - Current user (protected)",
 				"GET /api/v1/users - Get all users",
 				"GET /api/v1/users/:id - Get user by ID",
+				"GET /api/v1/projects - Get all projects (protected)",
+				"GET /api/v1/projects/:id - Get project by ID (protected)",
+				"POST /api/v1/projects - Create project (admin only)",
+				"PUT /api/v1/projects/:id - Update project (admin only)",
+				"DELETE /api/v1/projects/:id - Delete project (admin only)",
 			},
 		})
 	})

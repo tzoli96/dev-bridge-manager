@@ -4,6 +4,7 @@ import (
 	"dev-bridge-manager/internal/database"
 	"dev-bridge-manager/internal/models"
 	"dev-bridge-manager/internal/services"
+	"dev-bridge-manager/internal/types"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
@@ -13,21 +14,6 @@ type UsersHandler struct{}
 
 type UserHandler struct {
 	permissionService *services.PermissionService
-}
-
-type RoleInfo struct {
-	ID          uint   `json:"id"`
-	Name        string `json:"name"`
-	DisplayName string `json:"display_name"`
-}
-
-type UserResponse struct {
-	ID          uint     `json:"id"`
-	Name        string   `json:"name"`
-	Email       string   `json:"email"`
-	Position    string   `json:"position"`
-	Role        RoleInfo `json:"role"`
-	Permissions []string `json:"permissions,omitempty"`
 }
 
 type CreateUserRequest struct {
@@ -44,13 +30,6 @@ type UpdateUserRequest struct {
 	Position string `json:"position,omitempty"`
 	RoleName string `json:"role_name,omitempty"`
 	Password string `json:"password,omitempty" validate:"omitempty,min=6"` // ÚJ: opcionális jelszó
-}
-
-type UserListResponse struct {
-	Success bool           `json:"success"`
-	Message string         `json:"message"`
-	Users   []UserResponse `json:"users,omitempty"`
-	User    *UserResponse  `json:"user,omitempty"`
 }
 
 type UpdateProfileRequest struct {
@@ -113,20 +92,20 @@ func NewUserHandler() *UserHandler {
 func (h *UserHandler) GetAllUsers(c *fiber.Ctx) error {
 	var users []models.User
 	if err := database.GetDB().Preload("Role").Find(&users).Error; err != nil {
-		return c.Status(500).JSON(UserListResponse{
+		return c.Status(500).JSON(types.UserListResponse{
 			Success: false,
 			Message: "Failed to fetch users",
 		})
 	}
 
-	var userResponses []UserResponse
+	var userResponses []types.UserResponse
 	for _, user := range users {
-		userResponses = append(userResponses, UserResponse{
+		userResponses = append(userResponses, types.UserResponse{
 			ID:       user.ID,
 			Name:     user.Name,
 			Email:    user.Email,
 			Position: user.Position,
-			Role: RoleInfo{
+			Role: types.RoleInfo{
 				ID:          user.Role.ID,
 				Name:        user.Role.Name,
 				DisplayName: user.Role.DisplayName,
@@ -134,7 +113,7 @@ func (h *UserHandler) GetAllUsers(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.JSON(UserListResponse{
+	return c.JSON(types.UserListResponse{
 		Success: true,
 		Message: "Users retrieved successfully",
 		Users:   userResponses,
@@ -145,7 +124,7 @@ func (h *UserHandler) GetAllUsers(c *fiber.Ctx) error {
 func (h *UserHandler) GetUser(c *fiber.Ctx) error {
 	userID, err := strconv.ParseUint(c.Params("id"), 10, 32)
 	if err != nil {
-		return c.Status(400).JSON(UserListResponse{
+		return c.Status(400).JSON(types.UserListResponse{
 			Success: false,
 			Message: "Invalid user ID",
 		})
@@ -156,7 +135,7 @@ func (h *UserHandler) GetUser(c *fiber.Ctx) error {
 	if currentUserID != uint(userID) {
 		hasPermission, err := h.permissionService.CheckUserPermission(currentUserID, "users.read")
 		if err != nil || !hasPermission {
-			return c.Status(403).JSON(UserListResponse{
+			return c.Status(403).JSON(types.UserListResponse{
 				Success: false,
 				Message: "Insufficient permissions",
 			})
@@ -165,21 +144,21 @@ func (h *UserHandler) GetUser(c *fiber.Ctx) error {
 
 	user, err := h.permissionService.GetUserWithPermissions(uint(userID))
 	if err != nil {
-		return c.Status(404).JSON(UserListResponse{
+		return c.Status(404).JSON(types.UserListResponse{
 			Success: false,
 			Message: "User not found",
 		})
 	}
 
-	return c.JSON(UserListResponse{
+	return c.JSON(types.UserListResponse{
 		Success: true,
 		Message: "User retrieved successfully",
-		User: &UserResponse{
+		User: &types.UserResponse{
 			ID:       user.ID,
 			Name:     user.Name,
 			Email:    user.Email,
 			Position: user.Position,
-			Role: RoleInfo{
+			Role: types.RoleInfo{
 				ID:          user.Role.ID,
 				Name:        user.Role.Name,
 				DisplayName: user.Role.DisplayName,
@@ -193,7 +172,7 @@ func (h *UserHandler) GetUser(c *fiber.Ctx) error {
 func (h *UserHandler) CreateUser(c *fiber.Ctx) error {
 	var req CreateUserRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(UserListResponse{
+		return c.Status(400).JSON(types.UserListResponse{
 			Success: false,
 			Message: "Invalid request body",
 		})
@@ -201,7 +180,7 @@ func (h *UserHandler) CreateUser(c *fiber.Ctx) error {
 
 	// Input validáció
 	if req.Name == "" || req.Email == "" || req.Password == "" || req.RoleName == "" {
-		return c.Status(400).JSON(UserListResponse{
+		return c.Status(400).JSON(types.UserListResponse{
 			Success: false,
 			Message: "Name, email, password and role are required",
 		})
@@ -210,7 +189,7 @@ func (h *UserHandler) CreateUser(c *fiber.Ctx) error {
 	// Email egyediség ellenőrzése
 	var existingUser models.User
 	if err := database.GetDB().Where("email = ?", req.Email).First(&existingUser).Error; err == nil {
-		return c.Status(409).JSON(UserListResponse{
+		return c.Status(409).JSON(types.UserListResponse{
 			Success: false,
 			Message: "User with this email already exists",
 		})
@@ -219,7 +198,7 @@ func (h *UserHandler) CreateUser(c *fiber.Ctx) error {
 	// Role létezésének ellenőrzése
 	var role models.Role
 	if err := database.GetDB().Where("name = ? AND is_active = ?", req.RoleName, true).First(&role).Error; err != nil {
-		return c.Status(400).JSON(UserListResponse{
+		return c.Status(400).JSON(types.UserListResponse{
 			Success: false,
 			Message: "Invalid role specified",
 		})
@@ -236,7 +215,7 @@ func (h *UserHandler) CreateUser(c *fiber.Ctx) error {
 
 	// Jelszó hash-elése
 	if err := user.HashPassword(); err != nil {
-		return c.Status(500).JSON(UserListResponse{
+		return c.Status(500).JSON(types.UserListResponse{
 			Success: false,
 			Message: "Failed to process password",
 		})
@@ -244,7 +223,7 @@ func (h *UserHandler) CreateUser(c *fiber.Ctx) error {
 
 	// User mentése adatbázisba
 	if err := database.GetDB().Create(&user).Error; err != nil {
-		return c.Status(500).JSON(UserListResponse{
+		return c.Status(500).JSON(types.UserListResponse{
 			Success: false,
 			Message: "Failed to create user",
 		})
@@ -252,21 +231,21 @@ func (h *UserHandler) CreateUser(c *fiber.Ctx) error {
 
 	// User újratöltése role-lal együtt
 	if err := database.GetDB().Preload("Role").First(&user, user.ID).Error; err != nil {
-		return c.Status(500).JSON(UserListResponse{
+		return c.Status(500).JSON(types.UserListResponse{
 			Success: false,
 			Message: "User created but failed to load details",
 		})
 	}
 
-	return c.Status(201).JSON(UserListResponse{
+	return c.Status(201).JSON(types.UserListResponse{
 		Success: true,
 		Message: "User created successfully",
-		User: &UserResponse{
+		User: &types.UserResponse{
 			ID:       user.ID,
 			Name:     user.Name,
 			Email:    user.Email,
 			Position: user.Position,
-			Role: RoleInfo{
+			Role: types.RoleInfo{
 				ID:          user.Role.ID,
 				Name:        user.Role.Name,
 				DisplayName: user.Role.DisplayName,
@@ -279,7 +258,7 @@ func (h *UserHandler) CreateUser(c *fiber.Ctx) error {
 func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 	userID, err := strconv.ParseUint(c.Params("id"), 10, 32)
 	if err != nil {
-		return c.Status(400).JSON(UserListResponse{
+		return c.Status(400).JSON(types.UserListResponse{
 			Success: false,
 			Message: "Invalid user ID",
 		})
@@ -287,7 +266,7 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 
 	var req UpdateUserRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(UserListResponse{
+		return c.Status(400).JSON(types.UserListResponse{
 			Success: false,
 			Message: "Invalid request body",
 		})
@@ -295,7 +274,7 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 
 	// Legalább egy mező legyen megadva
 	if req.Name == "" && req.Email == "" && req.Position == "" && req.RoleName == "" && req.Password == "" {
-		return c.Status(400).JSON(UserListResponse{
+		return c.Status(400).JSON(types.UserListResponse{
 			Success: false,
 			Message: "At least one field must be provided",
 		})
@@ -306,7 +285,7 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 	if currentUserID != uint(userID) {
 		hasPermission, err := h.permissionService.CheckUserPermission(currentUserID, "users.update")
 		if err != nil || !hasPermission {
-			return c.Status(403).JSON(UserListResponse{
+			return c.Status(403).JSON(types.UserListResponse{
 				Success: false,
 				Message: "Insufficient permissions",
 			})
@@ -317,7 +296,7 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 	if req.Email != "" {
 		var existingUser models.User
 		if err := database.GetDB().Where("email = ? AND id != ?", req.Email, userID).First(&existingUser).Error; err == nil {
-			return c.Status(409).JSON(UserListResponse{
+			return c.Status(409).JSON(types.UserListResponse{
 				Success: false,
 				Message: "Email already in use by another user",
 			})
@@ -340,7 +319,7 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 	if req.RoleName != "" {
 		hasRolePermission, err := h.permissionService.CheckUserPermission(currentUserID, "users.update")
 		if err != nil || !hasRolePermission {
-			return c.Status(403).JSON(UserListResponse{
+			return c.Status(403).JSON(types.UserListResponse{
 				Success: false,
 				Message: "Insufficient permissions to update role",
 			})
@@ -348,7 +327,7 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 
 		var role models.Role
 		if err := database.GetDB().Where("name = ? AND is_active = ?", req.RoleName, true).First(&role).Error; err != nil {
-			return c.Status(400).JSON(UserListResponse{
+			return c.Status(400).JSON(types.UserListResponse{
 				Success: false,
 				Message: "Invalid role specified",
 			})
@@ -360,7 +339,7 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 	if req.Password != "" {
 		tempUser := models.User{Password: req.Password}
 		if err := tempUser.HashPassword(); err != nil {
-			return c.Status(500).JSON(UserListResponse{
+			return c.Status(500).JSON(types.UserListResponse{
 				Success: false,
 				Message: "Failed to process new password",
 			})
@@ -370,7 +349,7 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 
 	// User frissítése
 	if err := database.GetDB().Model(&models.User{}).Where("id = ?", userID).Updates(updates).Error; err != nil {
-		return c.Status(500).JSON(UserListResponse{
+		return c.Status(500).JSON(types.UserListResponse{
 			Success: false,
 			Message: "Failed to update user",
 		})
@@ -379,21 +358,21 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 	// Frissített user lekérése role-lal együtt
 	var updatedUser models.User
 	if err := database.GetDB().Preload("Role").First(&updatedUser, userID).Error; err != nil {
-		return c.Status(500).JSON(UserListResponse{
+		return c.Status(500).JSON(types.UserListResponse{
 			Success: false,
 			Message: "User updated but failed to load details",
 		})
 	}
 
-	return c.JSON(UserListResponse{
+	return c.JSON(types.UserListResponse{
 		Success: true,
 		Message: "User updated successfully",
-		User: &UserResponse{
+		User: &types.UserResponse{
 			ID:       updatedUser.ID,
 			Name:     updatedUser.Name,
 			Email:    updatedUser.Email,
 			Position: updatedUser.Position,
-			Role: RoleInfo{
+			Role: types.RoleInfo{
 				ID:          updatedUser.Role.ID,
 				Name:        updatedUser.Role.Name,
 				DisplayName: updatedUser.Role.DisplayName,
@@ -406,7 +385,7 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 func (h *UserHandler) DeleteUser(c *fiber.Ctx) error {
 	userID, err := strconv.ParseUint(c.Params("id"), 10, 32)
 	if err != nil {
-		return c.Status(400).JSON(UserListResponse{
+		return c.Status(400).JSON(types.UserListResponse{
 			Success: false,
 			Message: "Invalid user ID",
 		})
@@ -415,7 +394,7 @@ func (h *UserHandler) DeleteUser(c *fiber.Ctx) error {
 	// Self-deletion prevention
 	currentUserID := c.Locals("userID").(uint)
 	if currentUserID == uint(userID) {
-		return c.Status(400).JSON(UserListResponse{
+		return c.Status(400).JSON(types.UserListResponse{
 			Success: false,
 			Message: "Cannot delete your own account",
 		})
@@ -424,7 +403,7 @@ func (h *UserHandler) DeleteUser(c *fiber.Ctx) error {
 	// Ellenőrizzük, hogy a user létezik-e
 	var user models.User
 	if err := database.GetDB().First(&user, userID).Error; err != nil {
-		return c.Status(404).JSON(UserListResponse{
+		return c.Status(404).JSON(types.UserListResponse{
 			Success: false,
 			Message: "User not found",
 		})
@@ -432,13 +411,13 @@ func (h *UserHandler) DeleteUser(c *fiber.Ctx) error {
 
 	// User törlése
 	if err := database.GetDB().Delete(&models.User{}, userID).Error; err != nil {
-		return c.Status(500).JSON(UserListResponse{
+		return c.Status(500).JSON(types.UserListResponse{
 			Success: false,
 			Message: "Failed to delete user",
 		})
 	}
 
-	return c.JSON(UserListResponse{
+	return c.JSON(types.UserListResponse{
 		Success: true,
 		Message: "User deleted successfully",
 	})
@@ -450,21 +429,21 @@ func (h *UserHandler) GetProfile(c *fiber.Ctx) error {
 
 	user, err := h.permissionService.GetUserWithPermissions(userID)
 	if err != nil {
-		return c.Status(404).JSON(UserListResponse{
+		return c.Status(404).JSON(types.UserListResponse{
 			Success: false,
 			Message: "User not found",
 		})
 	}
 
-	return c.JSON(UserListResponse{
+	return c.JSON(types.UserListResponse{
 		Success: true,
 		Message: "Profile retrieved successfully",
-		User: &UserResponse{
+		User: &types.UserResponse{
 			ID:       user.ID,
 			Name:     user.Name,
 			Email:    user.Email,
 			Position: user.Position,
-			Role: RoleInfo{
+			Role: types.RoleInfo{
 				ID:          user.Role.ID,
 				Name:        user.Role.Name,
 				DisplayName: user.Role.DisplayName,
@@ -480,14 +459,14 @@ func (h *UserHandler) UpdateProfile(c *fiber.Ctx) error {
 
 	var req UpdateProfileRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(UserListResponse{
+		return c.Status(400).JSON(types.UserListResponse{
 			Success: false,
 			Message: "Invalid request body",
 		})
 	}
 
 	if req.Name == "" && req.Email == "" && req.Position == "" {
-		return c.Status(400).JSON(UserListResponse{
+		return c.Status(400).JSON(types.UserListResponse{
 			Success: false,
 			Message: "At least one field must be provided",
 		})
@@ -496,7 +475,7 @@ func (h *UserHandler) UpdateProfile(c *fiber.Ctx) error {
 	if req.Email != "" {
 		var existingUser models.User
 		if err := database.GetDB().Where("email = ? AND id != ?", req.Email, currentUserID).First(&existingUser).Error; err == nil {
-			return c.Status(409).JSON(UserListResponse{
+			return c.Status(409).JSON(types.UserListResponse{
 				Success: false,
 				Message: "Email already in use by another user",
 			})
@@ -515,7 +494,7 @@ func (h *UserHandler) UpdateProfile(c *fiber.Ctx) error {
 	}
 
 	if err := database.GetDB().Model(&models.User{}).Where("id = ?", currentUserID).Updates(updates).Error; err != nil {
-		return c.Status(500).JSON(UserListResponse{
+		return c.Status(500).JSON(types.UserListResponse{
 			Success: false,
 			Message: "Failed to update profile",
 		})
@@ -523,21 +502,21 @@ func (h *UserHandler) UpdateProfile(c *fiber.Ctx) error {
 
 	user, err := h.permissionService.GetUserWithPermissions(currentUserID)
 	if err != nil {
-		return c.Status(500).JSON(UserListResponse{
+		return c.Status(500).JSON(types.UserListResponse{
 			Success: false,
 			Message: "Profile updated but failed to load updated data",
 		})
 	}
 
-	return c.JSON(UserListResponse{
+	return c.JSON(types.UserListResponse{
 		Success: true,
 		Message: "Profile updated successfully",
-		User: &UserResponse{
+		User: &types.UserResponse{
 			ID:       user.ID,
 			Name:     user.Name,
 			Email:    user.Email,
 			Position: user.Position,
-			Role: RoleInfo{
+			Role: types.RoleInfo{
 				ID:          user.Role.ID,
 				Name:        user.Role.Name,
 				DisplayName: user.Role.DisplayName,
@@ -552,14 +531,14 @@ func (h *UserHandler) ChangePassword(c *fiber.Ctx) error {
 
 	var req ChangePasswordRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(UserListResponse{
+		return c.Status(400).JSON(types.UserListResponse{
 			Success: false,
 			Message: "Invalid request body",
 		})
 	}
 
 	if req.NewPassword != req.ConfirmPassword {
-		return c.Status(400).JSON(UserListResponse{
+		return c.Status(400).JSON(types.UserListResponse{
 			Success: false,
 			Message: "Password confirmation does not match",
 		})
@@ -567,21 +546,21 @@ func (h *UserHandler) ChangePassword(c *fiber.Ctx) error {
 
 	user, err := h.permissionService.GetUserWithPermissions(currentUserID)
 	if err != nil {
-		return c.Status(404).JSON(UserListResponse{
+		return c.Status(404).JSON(types.UserListResponse{
 			Success: false,
 			Message: "User not found",
 		})
 	}
 
 	if !user.CheckPassword(req.CurrentPassword) {
-		return c.Status(400).JSON(UserListResponse{
+		return c.Status(400).JSON(types.UserListResponse{
 			Success: false,
 			Message: "Current password is incorrect",
 		})
 	}
 
 	if user.CheckPassword(req.NewPassword) {
-		return c.Status(400).JSON(UserListResponse{
+		return c.Status(400).JSON(types.UserListResponse{
 			Success: false,
 			Message: "New password must be different from current password",
 		})
@@ -589,20 +568,20 @@ func (h *UserHandler) ChangePassword(c *fiber.Ctx) error {
 
 	tempUser := models.User{Password: req.NewPassword}
 	if err := tempUser.HashPassword(); err != nil {
-		return c.Status(500).JSON(UserListResponse{
+		return c.Status(500).JSON(types.UserListResponse{
 			Success: false,
 			Message: "Failed to process new password",
 		})
 	}
 
 	if err := database.GetDB().Model(&models.User{}).Where("id = ?", currentUserID).Update("password", tempUser.Password).Error; err != nil {
-		return c.Status(500).JSON(UserListResponse{
+		return c.Status(500).JSON(types.UserListResponse{
 			Success: false,
 			Message: "Failed to update password",
 		})
 	}
 
-	return c.JSON(UserListResponse{
+	return c.JSON(types.UserListResponse{
 		Success: true,
 		Message: "Password changed successfully. Please log in again.",
 	})

@@ -4,6 +4,7 @@ import (
 	"dev-bridge-manager/internal/database"
 	"dev-bridge-manager/internal/models"
 	"dev-bridge-manager/internal/services"
+	"dev-bridge-manager/internal/types"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -25,28 +26,6 @@ type LoginRequest struct {
 	Password string `json:"password" validate:"required"`
 }
 
-type AuthResponse struct {
-	Success bool          `json:"success"`
-	Message string        `json:"message"`
-	Token   string        `json:"token,omitempty"`
-	User    *UserResponse `json:"user,omitempty"`
-}
-
-type UserResponse struct {
-	ID          uint     `json:"id"`
-	Name        string   `json:"name"`
-	Email       string   `json:"email"`
-	Position    string   `json:"position"`
-	Role        RoleInfo `json:"role"`
-	Permissions []string `json:"permissions"`
-}
-
-type RoleInfo struct {
-	ID          uint   `json:"id"`
-	Name        string `json:"name"`
-	DisplayName string `json:"display_name"`
-}
-
 func NewAuthHandler() *AuthHandler {
 	return &AuthHandler{
 		authService:       services.NewAuthService(),
@@ -58,7 +37,7 @@ func NewAuthHandler() *AuthHandler {
 func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	var req RegisterRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(AuthResponse{
+		return c.Status(400).JSON(types.AuthResponse{
 			Success: false,
 			Message: "Invalid request body",
 		})
@@ -67,7 +46,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	// Check if user already exists
 	var existingUser models.User
 	if err := database.GetDB().Where("email = ?", req.Email).First(&existingUser).Error; err == nil {
-		return c.Status(409).JSON(AuthResponse{
+		return c.Status(409).JSON(types.AuthResponse{
 			Success: false,
 			Message: "User with this email already exists",
 		})
@@ -76,7 +55,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	// Get default role (user)
 	var defaultRole models.Role
 	if err := database.GetDB().Where("name = ?", "user").First(&defaultRole).Error; err != nil {
-		return c.Status(500).JSON(AuthResponse{
+		return c.Status(500).JSON(types.AuthResponse{
 			Success: false,
 			Message: "Default role not found",
 		})
@@ -89,7 +68,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		// Check if current user has permission to assign roles
 		currentUserID, ok := c.Locals("userID").(uint)
 		if !ok {
-			return c.Status(403).JSON(AuthResponse{
+			return c.Status(403).JSON(types.AuthResponse{
 				Success: false,
 				Message: "Only authenticated users with proper permissions can assign roles",
 			})
@@ -97,7 +76,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 
 		hasPermission, err := h.permissionService.CheckUserPermission(currentUserID, "users.create")
 		if err != nil || !hasPermission {
-			return c.Status(403).JSON(AuthResponse{
+			return c.Status(403).JSON(types.AuthResponse{
 				Success: false,
 				Message: "Insufficient permissions to assign roles",
 			})
@@ -106,7 +85,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		// Get the requested role
 		var requestedRole models.Role
 		if err := database.GetDB().Where("name = ? AND is_active = ?", req.RoleName, true).First(&requestedRole).Error; err != nil {
-			return c.Status(400).JSON(AuthResponse{
+			return c.Status(400).JSON(types.AuthResponse{
 				Success: false,
 				Message: "Invalid role specified",
 			})
@@ -125,7 +104,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 
 	// Hash password
 	if err := user.HashPassword(); err != nil {
-		return c.Status(500).JSON(AuthResponse{
+		return c.Status(500).JSON(types.AuthResponse{
 			Success: false,
 			Message: "Failed to process password",
 		})
@@ -133,7 +112,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 
 	// Save to database
 	if err := database.GetDB().Create(&user).Error; err != nil {
-		return c.Status(500).JSON(AuthResponse{
+		return c.Status(500).JSON(types.AuthResponse{
 			Success: false,
 			Message: "Failed to create user",
 		})
@@ -142,7 +121,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	// Load user with role and permissions for response
 	userWithRole, err := h.permissionService.GetUserWithPermissions(user.ID)
 	if err != nil {
-		return c.Status(500).JSON(AuthResponse{
+		return c.Status(500).JSON(types.AuthResponse{
 			Success: false,
 			Message: "User created but failed to load details",
 		})
@@ -151,22 +130,22 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	// Generate token
 	token, err := h.authService.GenerateToken(user.ID, user.Email, user.Name)
 	if err != nil {
-		return c.Status(500).JSON(AuthResponse{
+		return c.Status(500).JSON(types.AuthResponse{
 			Success: false,
 			Message: "Failed to generate token",
 		})
 	}
 
-	return c.Status(201).JSON(AuthResponse{
+	return c.Status(201).JSON(types.AuthResponse{
 		Success: true,
 		Message: "User registered successfully",
 		Token:   token,
-		User: &UserResponse{
+		User: &types.UserResponse{
 			ID:       userWithRole.ID,
 			Name:     userWithRole.Name,
 			Email:    userWithRole.Email,
 			Position: userWithRole.Position,
-			Role: RoleInfo{
+			Role: types.RoleInfo{
 				ID:          userWithRole.Role.ID,
 				Name:        userWithRole.Role.Name,
 				DisplayName: userWithRole.Role.DisplayName,
@@ -180,7 +159,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	var req LoginRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(AuthResponse{
+		return c.Status(400).JSON(types.AuthResponse{
 			Success: false,
 			Message: "Invalid request body",
 		})
@@ -189,7 +168,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	// Find user by email with role
 	var user models.User
 	if err := database.GetDB().Preload("Role.Permissions").Where("email = ?", req.Email).First(&user).Error; err != nil {
-		return c.Status(401).JSON(AuthResponse{
+		return c.Status(401).JSON(types.AuthResponse{
 			Success: false,
 			Message: "Invalid credentials",
 		})
@@ -197,7 +176,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 
 	// Check password
 	if !user.CheckPassword(req.Password) {
-		return c.Status(401).JSON(AuthResponse{
+		return c.Status(401).JSON(types.AuthResponse{
 			Success: false,
 			Message: "Invalid credentials",
 		})
@@ -205,7 +184,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 
 	// Check if role is active
 	if !user.Role.IsActive {
-		return c.Status(403).JSON(AuthResponse{
+		return c.Status(403).JSON(types.AuthResponse{
 			Success: false,
 			Message: "Account is deactivated",
 		})
@@ -214,22 +193,22 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	// Generate token
 	token, err := h.authService.GenerateToken(user.ID, user.Email, user.Name)
 	if err != nil {
-		return c.Status(500).JSON(AuthResponse{
+		return c.Status(500).JSON(types.AuthResponse{
 			Success: false,
 			Message: "Failed to generate token",
 		})
 	}
 
-	return c.JSON(AuthResponse{
+	return c.JSON(types.AuthResponse{
 		Success: true,
 		Message: "Login successful",
 		Token:   token,
-		User: &UserResponse{
+		User: &types.UserResponse{
 			ID:       user.ID,
 			Name:     user.Name,
 			Email:    user.Email,
 			Position: user.Position,
-			Role: RoleInfo{
+			Role: types.RoleInfo{
 				ID:          user.Role.ID,
 				Name:        user.Role.Name,
 				DisplayName: user.Role.DisplayName,
@@ -245,21 +224,21 @@ func (h *AuthHandler) Me(c *fiber.Ctx) error {
 
 	userWithRole, err := h.permissionService.GetUserWithPermissions(userID)
 	if err != nil {
-		return c.Status(404).JSON(AuthResponse{
+		return c.Status(404).JSON(types.AuthResponse{
 			Success: false,
 			Message: "User not found",
 		})
 	}
 
-	return c.JSON(AuthResponse{
+	return c.JSON(types.AuthResponse{
 		Success: true,
 		Message: "User info retrieved",
-		User: &UserResponse{
+		User: &types.UserResponse{
 			ID:       userWithRole.ID,
 			Name:     userWithRole.Name,
 			Email:    userWithRole.Email,
 			Position: userWithRole.Position,
-			Role: RoleInfo{
+			Role: types.RoleInfo{
 				ID:          userWithRole.Role.ID,
 				Name:        userWithRole.Role.Name,
 				DisplayName: userWithRole.Role.DisplayName,
@@ -273,7 +252,7 @@ func (h *AuthHandler) Me(c *fiber.Ctx) error {
 func (h *AuthHandler) RefreshToken(c *fiber.Ctx) error {
 	authHeader := c.Get("Authorization")
 	if authHeader == "" {
-		return c.Status(401).JSON(AuthResponse{
+		return c.Status(401).JSON(types.AuthResponse{
 			Success: false,
 			Message: "Authorization header required",
 		})
@@ -282,13 +261,13 @@ func (h *AuthHandler) RefreshToken(c *fiber.Ctx) error {
 	tokenString := authHeader[7:] // Remove "Bearer " prefix
 	newToken, err := h.authService.RefreshToken(tokenString)
 	if err != nil {
-		return c.Status(401).JSON(AuthResponse{
+		return c.Status(401).JSON(types.AuthResponse{
 			Success: false,
 			Message: "Invalid or expired token",
 		})
 	}
 
-	return c.JSON(AuthResponse{
+	return c.JSON(types.AuthResponse{
 		Success: true,
 		Message: "Token refreshed successfully",
 		Token:   newToken,
