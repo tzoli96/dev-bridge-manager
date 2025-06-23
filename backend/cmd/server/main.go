@@ -41,7 +41,7 @@ func main() {
 
 	// Global middleware
 	app.Use(logger.New())
-	app.Use(middleware.CORS()) // ← Csak ez, remove cors.New()!
+	app.Use(middleware.CORS())
 	app.Use(recover.New())
 
 	// Setup all routes
