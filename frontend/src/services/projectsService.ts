@@ -32,17 +32,17 @@ export interface ProjectsResponse {
 }
 
 export class ProjectsService {
-    private static baseUrl = '/projects'  // Eltávolítottam a /api/v1 részt
+    private static baseUrl = '/projects'
 
     static async getAllProjects(): Promise<Project[]> {
         try {
             const response = await apiClient.get<ProjectsResponse>(this.baseUrl)
 
-            if (response.data.success && response.data.projects) {
-                return response.data.projects
+            if (response.success && response.projects) {
+                return response.projects
             }
 
-            throw new Error(response.data.message || 'Failed to fetch projects')
+            throw new Error(response.message || 'Failed to fetch projects')
         } catch (error: any) {
             console.error('Error fetching projects:', error)
             throw new Error(error.response?.data?.message || error.message || 'Failed to fetch projects')
@@ -53,11 +53,11 @@ export class ProjectsService {
         try {
             const response = await apiClient.get<ProjectsResponse>(`${this.baseUrl}/${id}`)
 
-            if (response.data.success && response.data.project) {
-                return response.data.project
+            if (response.success && response.project) {
+                return response.project
             }
 
-            throw new Error(response.data.message || 'Failed to fetch project')
+            throw new Error(response.message || 'Failed to fetch project')
         } catch (error: any) {
             console.error('Error fetching project:', error)
             throw new Error(error.response?.data?.message || error.message || 'Failed to fetch project')
@@ -68,11 +68,11 @@ export class ProjectsService {
         try {
             const response = await apiClient.post<ProjectsResponse>(this.baseUrl, projectData)
 
-            if (response.data.success && response.data.project) {
-                return response.data.project
+            if (response.success && response.project) {
+                return response.project
             }
 
-            throw new Error(response.data.message || 'Failed to create project')
+            throw new Error(response.message || 'Failed to create project')
         } catch (error: any) {
             console.error('Error creating project:', error)
             throw new Error(error.response?.data?.message || error.message || 'Failed to create project')
@@ -83,11 +83,11 @@ export class ProjectsService {
         try {
             const response = await apiClient.put<ProjectsResponse>(`${this.baseUrl}/${id}`, projectData)
 
-            if (response.data.success && response.data.project) {
-                return response.data.project
+            if (response.success && response.project) {
+                return response.project
             }
 
-            throw new Error(response.data.message || 'Failed to update project')
+            throw new Error(response.message || 'Failed to update project')
         } catch (error: any) {
             console.error('Error updating project:', error)
             throw new Error(error.response?.data?.message || error.message || 'Failed to update project')
@@ -98,8 +98,8 @@ export class ProjectsService {
         try {
             const response = await apiClient.delete<ProjectsResponse>(`${this.baseUrl}/${id}`)
 
-            if (!response.data.success) {
-                throw new Error(response.data.message || 'Failed to delete project')
+            if (!response.success) {
+                throw new Error(response.message || 'Failed to delete project')
             }
         } catch (error: any) {
             console.error('Error deleting project:', error)
