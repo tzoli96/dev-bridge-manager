@@ -5,7 +5,7 @@ import { useProjects } from '@/hooks/useProjects'
 import { useModals } from '@/components/dashboard/DashboardModals'
 import { ProjectsService, Project } from '@/services/projectsService'
 import { isAdmin } from '@/utils/permissions'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import ProjectsGrid from '@/components/dashboard/ProjectsGrid'
 import EmptyState from '@/components/ui/EmptyState'
 import ErrorState from '@/components/ui/ErrorState'
@@ -17,7 +17,7 @@ interface ProjectsTabProps {
 
 export default function ProjectsTab({ user }: ProjectsTabProps) {
     const { projects, loading, error, refetch } = useProjects()
-    const { setShowCreateProject, setShowEditProject, setSelectedProject } = useModals()
+    const { setShowCreateProject, setShowEditProject, setSelectedProject, setOnProjectUpdated } = useModals()
     const [deleting, setDeleting] = useState<number | null>(null)
 
     const handleDeleteProject = async (projectId: number) => {
@@ -38,6 +38,19 @@ export default function ProjectsTab({ user }: ProjectsTabProps) {
         setSelectedProject(project)
         setShowEditProject(true)
     }
+
+    // Ez a funkció hívódik meg a modal sikeres mentése után
+    const handleProjectUpdated = async () => {
+        await refetch() // Frissítjük a projektek listáját
+    }
+
+    // Regisztráljuk a callback függvényt a modal context-ben
+    useEffect(() => {
+        setOnProjectUpdated(() => handleProjectUpdated)
+
+        // Cleanup function
+        return () => setOnProjectUpdated(undefined)
+    }, [setOnProjectUpdated, refetch])
 
     if (loading) return <LoadingState message="Loading projects..." />
     if (error) return <ErrorState error={error} onRetry={refetch} />

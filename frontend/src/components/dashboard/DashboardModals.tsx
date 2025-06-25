@@ -35,6 +35,12 @@ interface ModalContextType {
     setShowEditProject: (show: boolean) => void
     selectedProject: Project | null
     setSelectedProject: (project: Project | null) => void
+
+    // Callback functions for refreshing data
+    onProjectUpdated?: () => void
+    setOnProjectUpdated: (callback: (() => void) | undefined) => void
+    onUserUpdated?: () => void
+    setOnUserUpdated: (callback: (() => void) | undefined) => void
 }
 
 const ModalContext = createContext<ModalContextType | null>(null)
@@ -55,6 +61,10 @@ export function ModalProvider({ children }: { children: ReactNode }) {
     const [showEditProject, setShowEditProject] = useState(false)
     const [selectedProject, setSelectedProject] = useState<Project | null>(null)
 
+    // Callback functions for data refreshing
+    const [onProjectUpdated, setOnProjectUpdated] = useState<(() => void) | undefined>(undefined)
+    const [onUserUpdated, setOnUserUpdated] = useState<(() => void) | undefined>(undefined)
+
     return (
         <ModalContext.Provider value={{
             showEditProfile, setShowEditProfile,
@@ -64,7 +74,9 @@ export function ModalProvider({ children }: { children: ReactNode }) {
             selectedUser, setSelectedUser,
             showCreateProject, setShowCreateProject,
             showEditProject, setShowEditProject,
-            selectedProject, setSelectedProject
+            selectedProject, setSelectedProject,
+            onProjectUpdated, setOnProjectUpdated,
+            onUserUpdated, setOnUserUpdated
         }}>
             {children}
         </ModalContext.Provider>
@@ -78,7 +90,8 @@ export default function DashboardModals() {
         showCreateUser, setShowCreateUser,
         showEditUser, setShowEditUser, selectedUser, setSelectedUser,
         showCreateProject, setShowCreateProject,
-        showEditProject, setShowEditProject, selectedProject, setSelectedProject
+        showEditProject, setShowEditProject, selectedProject, setSelectedProject,
+        onProjectUpdated, onUserUpdated
     } = useModals()
 
     return (
@@ -98,7 +111,10 @@ export default function DashboardModals() {
             <CreateUserModal
                 isOpen={showCreateUser}
                 onClose={() => setShowCreateUser(false)}
-                onSuccess={() => console.log('User created')}
+                onSuccess={() => {
+                    console.log('User created')
+                    if (onUserUpdated) onUserUpdated()
+                }}
             />
 
             <EditUserModal
@@ -108,13 +124,19 @@ export default function DashboardModals() {
                     setShowEditUser(false)
                     setSelectedUser(null)
                 }}
-                onSuccess={() => console.log('User updated')}
+                onSuccess={() => {
+                    console.log('User updated')
+                    if (onUserUpdated) onUserUpdated()
+                }}
             />
 
             <CreateProjectModal
                 isOpen={showCreateProject}
                 onClose={() => setShowCreateProject(false)}
-                onSuccess={() => console.log('Project created')}
+                onSuccess={() => {
+                    console.log('Project created')
+                    if (onProjectUpdated) onProjectUpdated()
+                }}
             />
 
             <EditProjectModal
@@ -124,7 +146,10 @@ export default function DashboardModals() {
                     setShowEditProject(false)
                     setSelectedProject(null)
                 }}
-                onSuccess={() => console.log('Project updated')}
+                onSuccess={() => {
+                    console.log('Project updated')
+                    if (onProjectUpdated) onProjectUpdated()
+                }}
             />
         </>
     )
