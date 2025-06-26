@@ -7,10 +7,18 @@ interface ProjectsGridProps {
     user: User | null
     onEditProject: (project: Project) => void
     onDeleteProject: (projectId: number) => void
+    onManageTeam: (project: Project) => void // New prop
     deleting: number | null
 }
 
-export default function ProjectsGrid({ projects, user, onEditProject, onDeleteProject, deleting }: ProjectsGridProps) {
+export default function ProjectsGrid({
+                                         projects,
+                                         user,
+                                         onEditProject,
+                                         onDeleteProject,
+                                         onManageTeam, // New prop
+                                         deleting
+                                     }: ProjectsGridProps) {
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'active': return 'bg-green-100 text-green-800'
@@ -51,23 +59,34 @@ export default function ProjectsGrid({ projects, user, onEditProject, onDeletePr
                             <div>Created: <span className="font-medium">{new Date(project.created_at).toLocaleDateString()}</span></div>
                         </div>
 
-                        {isAdmin(user) && (
-                            <div className="flex space-x-2 pt-4 border-t">
-                                <button
-                                    onClick={() => onEditProject(project)}
-                                    className="flex-1 text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors"
-                                >
-                                    Edit
-                                </button>
-                                <button
-                                    onClick={() => onDeleteProject(project.id)}
-                                    disabled={deleting === project.id}
-                                    className="flex-1 text-red-600 hover:text-red-800 disabled:opacity-50 text-sm font-medium transition-colors"
-                                >
-                                    {deleting === project.id ? 'Deleting...' : 'Delete'}
-                                </button>
-                            </div>
-                        )}
+                        <div className="flex flex-col space-y-2 pt-4 border-t">
+                            {/* Team Management - Available for all users */}
+                            <button
+                                onClick={() => onManageTeam(project)}
+                                className="text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors text-left"
+                            >
+                                👥 Manage Team
+                            </button>
+
+                            {/* Admin-only actions */}
+                            {isAdmin(user) && (
+                                <div className="flex space-x-2 pt-2 border-t">
+                                    <button
+                                        onClick={() => onEditProject(project)}
+                                        className="flex-1 text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors"
+                                    >
+                                        Edit
+                                    </button>
+                                    <button
+                                        onClick={() => onDeleteProject(project.id)}
+                                        disabled={deleting === project.id}
+                                        className="flex-1 text-red-600 hover:text-red-800 disabled:opacity-50 text-sm font-medium transition-colors"
+                                    >
+                                        {deleting === project.id ? 'Deleting...' : 'Delete'}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 ))}
             </div>

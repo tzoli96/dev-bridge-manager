@@ -7,6 +7,7 @@ import { ProjectsService, Project } from '@/services/projectsService'
 import { isAdmin } from '@/utils/permissions'
 import { useState, useEffect } from 'react'
 import ProjectsGrid from '@/components/dashboard/ProjectsGrid'
+import ProjectAssignmentModal from '@/components/dashboard/ProjectAssignmentModal'
 import EmptyState from '@/components/ui/EmptyState'
 import ErrorState from '@/components/ui/ErrorState'
 import LoadingState from '@/components/ui/LoadingState'
@@ -19,6 +20,10 @@ export default function ProjectsTab({ user }: ProjectsTabProps) {
     const { projects, loading, error, refetch } = useProjects()
     const { setShowCreateProject, setShowEditProject, setSelectedProject, setOnProjectUpdated } = useModals()
     const [deleting, setDeleting] = useState<number | null>(null)
+
+    // Team management state
+    const [showTeamModal, setShowTeamModal] = useState(false)
+    const [selectedProjectForTeam, setSelectedProjectForTeam] = useState<Project | null>(null)
 
     const handleDeleteProject = async (projectId: number) => {
         if (!confirm('Are you sure you want to delete this project?')) return
@@ -37,6 +42,16 @@ export default function ProjectsTab({ user }: ProjectsTabProps) {
     const handleEditProject = (project: Project) => {
         setSelectedProject(project)
         setShowEditProject(true)
+    }
+
+    const handleManageTeam = (project: Project) => {
+        setSelectedProjectForTeam(project)
+        setShowTeamModal(true)
+    }
+
+    const handleCloseTeamModal = () => {
+        setShowTeamModal(false)
+        setSelectedProjectForTeam(null)
     }
 
     // Ez a funkció hívódik meg a modal sikeres mentése után
@@ -88,9 +103,18 @@ export default function ProjectsTab({ user }: ProjectsTabProps) {
                     user={user}
                     onEditProject={handleEditProject}
                     onDeleteProject={handleDeleteProject}
+                    onManageTeam={handleManageTeam}
                     deleting={deleting}
                 />
             )}
+
+            {/* Team Management Modal */}
+            <ProjectAssignmentModal
+                isOpen={showTeamModal}
+                project={selectedProjectForTeam}
+                currentUser={user}
+                onClose={handleCloseTeamModal}
+            />
         </div>
     )
 }

@@ -12,12 +12,13 @@ func SetupRoutes(app *fiber.App) {
 	SetupHealthRoutes(v1)
 
 	// Setup route groups
-	SetupAPIRoutes(v1)        // API endpoints under /api/v1
-	SetupAuthRoutes(v1)       // Auth endpoints
-	SetupUsersRoutes(v1)      // Users endpoints
-	SetupRoleRoutes(v1)       // Role endpoints
-	SetupPermissionRoutes(v1) // Permission endpoints
-	SetupProjectRoutes(v1)    // Project endpoints - ÚJ!
+	SetupAPIRoutes(v1)               // API endpoints under /api/v1
+	SetupAuthRoutes(v1)              // Auth endpoints
+	SetupUsersRoutes(v1)             // Users endpoints
+	SetupRoleRoutes(v1)              // Role endpoints
+	SetupPermissionRoutes(v1)        // Permission endpoints
+	SetupProjectRoutes(v1)           // Project endpoints - ÚJ!
+	SetupProjectAssignmentRoutes(v1) // Project endpoints - ÚJ!
 }
 
 func SetupAPIRoutes(api fiber.Router) {
