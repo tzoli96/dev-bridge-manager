@@ -39,18 +39,14 @@ export default function ProjectAssignmentModal({ isOpen, project, currentUser, o
             setLoading(true)
             setError(null)
 
-            console.log('🔍 [ProjectAssignmentModal] Fetching data for project:', project.id)
-
             const [assignmentsData, usersData] = await Promise.all([
                 ProjectAssignmentService.getProjectAssignments(project.id),
                 UsersService.getAllUsers()
             ])
 
-            console.log('🔍 [ProjectAssignmentModal] Assignments:', assignmentsData)
-            console.log('🔍 [ProjectAssignmentModal] Users:', usersData)
 
-            setAssignments(assignmentsData || [])  // Biztosítjuk hogy array legyen
-            setAllUsers(usersData || [])         // Biztosítjuk hogy array legyen
+            setAssignments(assignmentsData || [])
+            setAllUsers(usersData || [])
 
             // Available users = users not assigned to this project
             const assignedUserIds = new Set((assignmentsData || []).map(a => a.user_id))
