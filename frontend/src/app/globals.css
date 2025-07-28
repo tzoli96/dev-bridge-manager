@@ -24,3 +24,36 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Add cursor pointer to all interactive elements */
+a, 
+button, 
+[role="button"],
+.clickable,
+input[type="submit"],
+input[type="button"],
+input[type="reset"],
+select,
+summary,
+.cursor-pointer {
+  cursor: pointer;
+}
+
+/* Preserve not-allowed cursor for disabled elements */
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled,
+a.disabled,
+.disabled {
+  cursor: not-allowed;
+}
+
+/* Add smooth transitions to interactive elements */
+a, 
+button,
+input,
+select,
+textarea {
+  transition: all 0.2s ease-in-out;
+}
