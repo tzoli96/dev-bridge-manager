@@ -19,6 +19,7 @@ func SetupRoutes(app *fiber.App) {
 	SetupPermissionRoutes(v1)        // Permission endpoints
 	SetupProjectRoutes(v1)           // Project endpoints - ÚJ!
 	SetupProjectAssignmentRoutes(v1) // Project endpoints - ÚJ!
+	SetupKanbanRoutes(v1)            // Kanban board/task/comment/time-entry endpoints - ÚJ!
 }
 
 func SetupAPIRoutes(api fiber.Router) {
