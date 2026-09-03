@@ -21,12 +21,15 @@ interface UseTasksReturn {
     updateTask: (taskId: string, data: UpdateTaskData) => Promise<Task>;
     deleteTask: (taskId: string) => Promise<void>;
     moveTask: (taskId: string, data: MoveTaskData) => Promise<Task>;
+    removeFromBoard: (taskId: string) => Promise<void>;
+    placeOnBoard: (taskId: string, targetBoardId: string, columnId: string) => Promise<Task>;
     setFilters: (filters: TaskFilters) => void;
     setSortOptions: (options: TaskSortOptions) => void;
     getTasksByColumn: (columnId: string) => Task[];
+    getTask: (taskId: string) => Task | undefined;
 }
 
-export const useTasks = (projectId: string): UseTasksReturn => {
+export const useTasks = (projectId: string, boardId?: string): UseTasksReturn => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [filters, setFilters] = useState<TaskFilters>({});
@@ -121,13 +124,17 @@ export const useTasks = (projectId: string): UseTasksReturn => {
             .sort((a, b) => a.position - b.position);
     }, [filteredTasks]);
 
+    const getTask = useCallback((taskId: string): Task | undefined => {
+        return tasks.find(task => task.id === taskId);
+    }, [tasks]);
+
     // CRUD műveletek
     const createTask = useCallback(async (data: CreateTaskData): Promise<Task> => {
         setIsLoading(true);
         setError(null);
 
         try {
-            const task = await taskService.createTask(projectId, data);
+            const task = await taskService.createTask(projectId, { ...data, boardId: boardId ?? data.boardId });
             addTask(task);
             return task;
         } catch (err) {
@@ -137,7 +144,7 @@ export const useTasks = (projectId: string): UseTasksReturn => {
         } finally {
             setIsLoading(false);
         }
-    }, [projectId, addTask]);
+    }, [projectId, boardId, addTask]);
 
     const updateTask = useCallback(async (
         taskId: string,
@@ -179,11 +186,13 @@ export const useTasks = (projectId: string): UseTasksReturn => {
         taskId: string,
         data: MoveTaskData
     ): Promise<Task> => {
+        if (!boardId) throw new Error('moveTask requires a boardId');
+
         // Optimistic update
         moveTaskInStore(taskId, data.columnId, data.position);
 
         try {
-            const task = await taskService.moveTask(projectId, taskId, data);
+            const task = await taskService.moveTask(projectId, boardId, taskId, data);
             updateTaskInStore(task);
             return task;
         } catch (err) {
@@ -193,7 +202,33 @@ export const useTasks = (projectId: string): UseTasksReturn => {
             setError(errorMessage);
             throw err;
         }
-    }, [projectId, moveTaskInStore, updateTaskInStore]);
+    }, [projectId, boardId, moveTaskInStore, updateTaskInStore]);
+
+    const removeFromBoard = useCallback(async (taskId: string): Promise<void> => {
+        if (!boardId) throw new Error('removeFromBoard requires a boardId');
+
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            await taskService.removePlacement(projectId, boardId, taskId);
+            deleteTaskFromStore(taskId);
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'Failed to remove task from board';
+            setError(errorMessage);
+            throw err;
+        } finally {
+            setIsLoading(false);
+        }
+    }, [projectId, boardId, deleteTaskFromStore]);
+
+    const placeOnBoard = useCallback(async (
+        taskId: string,
+        targetBoardId: string,
+        columnId: string
+    ): Promise<Task> => {
+        return taskService.placeTask(projectId, targetBoardId, taskId, { columnId });
+    }, [projectId]);
 
     return {
         tasks: tasks.filter(task => task.projectId === projectId),
@@ -204,8 +239,11 @@ export const useTasks = (projectId: string): UseTasksReturn => {
         updateTask,
         deleteTask,
         moveTask,
+        removeFromBoard,
+        placeOnBoard,
         setFilters,
         setSortOptions,
         getTasksByColumn,
+        getTask,
     };
 };
