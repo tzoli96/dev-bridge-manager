@@ -30,16 +30,6 @@ export interface Board {
     updatedAt: string;
 }
 
-export interface CreateBoardData {
-    name: string;
-    position?: number;
-}
-
-export interface UpdateBoardData {
-    name?: string;
-    position?: number;
-}
-
 export interface KanbanSettings {
     enableWipLimits: boolean;
     enableTimeTracking: boolean;

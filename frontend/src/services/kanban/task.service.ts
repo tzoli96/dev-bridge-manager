@@ -90,31 +90,34 @@ export const taskService = {
     },
 
     /**
-     * Place task on a board in a specific column
+     * Move task within/across columns of a specific board
      */
-    async placeTask(
+    async moveTask(
         projectId: string,
-        taskId: string,
         boardId: string,
-        data: { columnId: string; position: number }
+        taskId: string,
+        data: MoveTaskData
     ): Promise<Task> {
-        return apiClient.put(
-            `/projects/${projectId}/tasks/${taskId}/placement`,
-            { boardId, ...data }
-        );
+        return apiClient.put(`/projects/${projectId}/boards/${boardId}/tasks/${taskId}/move`, data);
     },
 
     /**
-     * Remove task placement from a board
+     * Add an existing task to a board/column as a new placement
      */
-    async removePlacement(
+    async placeTask(
         projectId: string,
+        boardId: string,
         taskId: string,
-        boardId: string
-    ): Promise<void> {
-        return apiClient.delete(
-            `/projects/${projectId}/tasks/${taskId}/placement?boardId=${boardId}`
-        );
+        data: { columnId: string }
+    ): Promise<Task> {
+        return apiClient.post(`/projects/${projectId}/boards/${boardId}/tasks/${taskId}/place`, data);
+    },
+
+    /**
+     * Remove the task's placement from a board only (task survives elsewhere)
+     */
+    async removePlacement(projectId: string, boardId: string, taskId: string): Promise<void> {
+        return apiClient.delete(`/projects/${projectId}/boards/${boardId}/tasks/${taskId}`);
     },
 
     /**

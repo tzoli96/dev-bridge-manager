@@ -1,31 +1,20 @@
 import { apiClient } from '@/lib/api';
-import type { Board, CreateBoardData, UpdateBoardData } from '@/types/kanban';
+import type { Board } from '@/types/kanban';
 
 /**
- * Board service
- * Single Responsibility: board CRUD operations
+ * Board entity service
+ * Single Responsibility: board CRUD API operations
  */
 export const boardService = {
     async listBoards(projectId: string): Promise<Board[]> {
         return apiClient.get(`/projects/${projectId}/boards`);
     },
 
-    async getBoard(projectId: string, boardId: string): Promise<Board> {
-        return apiClient.get(`/projects/${projectId}/boards/${boardId}`);
-    },
-
-    async createBoard(
-        projectId: string,
-        data: CreateBoardData
-    ): Promise<Board> {
+    async createBoard(projectId: string, data: { name: string; position: number }): Promise<Board> {
         return apiClient.post(`/projects/${projectId}/boards`, data);
     },
 
-    async updateBoard(
-        projectId: string,
-        boardId: string,
-        data: UpdateBoardData
-    ): Promise<Board> {
+    async updateBoard(projectId: string, boardId: string, data: { name?: string; position?: number }): Promise<Board> {
         return apiClient.put(`/projects/${projectId}/boards/${boardId}`, data);
     },
 
