@@ -206,16 +206,24 @@ export const useKanbanStore = create<KanbanStore>()(
                 }),
 
                 updateTaskInStore: (updatedTask) => set((state) => {
+                    // Project-scoped update endpoints (e.g. editing a task's title/description,
+                    // or updating its estimate) aren't board-scoped and return columnId: ''.
+                    // Preserve the existing placement so the card doesn't vanish from its column.
+                    const existing = state.tasks.find(task => task.id === updatedTask.id);
+                    const merged = updatedTask.columnId || !existing
+                        ? updatedTask
+                        : { ...updatedTask, columnId: existing.columnId, position: existing.position };
+
                     const taskIndex = state.tasks.findIndex(task => task.id === updatedTask.id);
                     if (taskIndex !== -1) {
-                        state.tasks[taskIndex] = updatedTask;
+                        state.tasks[taskIndex] = merged;
                     }
 
                     // Update in columns
                     state.columns.forEach(column => {
                         const columnTaskIndex = column.tasks.findIndex(task => task.id === updatedTask.id);
                         if (columnTaskIndex !== -1) {
-                            column.tasks[columnTaskIndex] = updatedTask;
+                            column.tasks[columnTaskIndex] = merged;
                         }
                     });
                 }),
