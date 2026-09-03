@@ -101,6 +101,7 @@ export interface CreateTaskData {
     htmlDescription?: string;
     priority: TaskPriority;
     columnId: string;
+    boardId: string;
     assigneeId?: string;
     estimatedHours?: number;
     tags?: string[];

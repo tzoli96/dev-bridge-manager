@@ -14,8 +14,18 @@ export interface KanbanColumn {
 export interface KanbanBoard {
     id: string;
     projectId: string;
+    name: string;
     columns: KanbanColumn[];
     settings: KanbanSettings;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface Board {
+    id: string;
+    projectId: string;
+    name: string;
+    position: number;
     createdAt: string;
     updatedAt: string;
 }
@@ -37,6 +47,14 @@ export interface KanbanPermissions {
     canManageColumns: boolean;
     canViewTimeTracking: boolean;
     canEditTimeTracking: boolean;
+}
+
+export enum ModalType {
+    TASK_EDIT = 'task_edit',
+    COMMENTS = 'comments',
+    TIME_LOG = 'time_log',
+    COLUMN_SETTINGS = 'column_settings',
+    ADD_TO_BOARD = 'add_to_board',
 }
 
 export interface DragState {
