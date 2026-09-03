@@ -90,14 +90,31 @@ export const taskService = {
     },
 
     /**
-     * Move task to different column
+     * Place task on a board in a specific column
      */
-    async moveTask(
+    async placeTask(
         projectId: string,
         taskId: string,
-        data: MoveTaskData
+        boardId: string,
+        data: { columnId: string; position: number }
     ): Promise<Task> {
-        return apiClient.put(`/projects/${projectId}/tasks/${taskId}/move`, data);
+        return apiClient.put(
+            `/projects/${projectId}/tasks/${taskId}/placement`,
+            { boardId, ...data }
+        );
+    },
+
+    /**
+     * Remove task placement from a board
+     */
+    async removePlacement(
+        projectId: string,
+        taskId: string,
+        boardId: string
+    ): Promise<void> {
+        return apiClient.delete(
+            `/projects/${projectId}/tasks/${taskId}/placement?boardId=${boardId}`
+        );
     },
 
     /**
