@@ -141,7 +141,7 @@ func buildTaskDTO(t models.Task, placement *models.TaskPlacement, comments []mod
 func loadTaskDTOs(projectID uint) ([]models.TaskDTO, error) {
 	var tasks []models.Task
 	if err := database.GetDB().Where("project_id = ? AND is_archived = false", projectID).
-		Order("position ASC").Find(&tasks).Error; err != nil {
+		Order("id ASC").Find(&tasks).Error; err != nil {
 		return nil, err
 	}
 	if len(tasks) == 0 {
