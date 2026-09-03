@@ -113,7 +113,7 @@ func (h *KanbanHandler) GetBoard(c *fiber.Ctx) error {
 	})
 }
 
-// UpdateBoard - PUT /api/v1/projects/:id/kanban
+// UpdateBoard - PUT /api/v1/projects/:id/boards/:boardId/kanban
 // The board has no persisted settings/title of its own (columns/tasks are what's
 // real); this simply re-returns the current board so the frontend's optimistic
 // update has something consistent to apply.
@@ -153,7 +153,7 @@ func (h *KanbanHandler) CreateColumn(c *fiber.Ctx) error {
 	return c.Status(201).JSON(columnDTO(column, []models.TaskDTO{}))
 }
 
-// UpdateColumn - PUT /api/v1/projects/:id/kanban/columns/:columnId
+// UpdateColumn - PUT /api/v1/projects/:id/boards/:boardId/kanban/columns/:columnId
 func (h *KanbanHandler) UpdateColumn(c *fiber.Ctx) error {
 	columnID, err := strconv.Atoi(c.Params("columnId"))
 	if err != nil {
@@ -191,7 +191,7 @@ func (h *KanbanHandler) UpdateColumn(c *fiber.Ctx) error {
 	return c.JSON(columnDTO(column, taskDTOs))
 }
 
-// DeleteColumn - DELETE /api/v1/projects/:id/kanban/columns/:columnId
+// DeleteColumn - DELETE /api/v1/projects/:id/boards/:boardId/kanban/columns/:columnId
 func (h *KanbanHandler) DeleteColumn(c *fiber.Ctx) error {
 	columnID, err := strconv.Atoi(c.Params("columnId"))
 	if err != nil {
@@ -235,7 +235,7 @@ func (h *KanbanHandler) DeleteColumn(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true, "message": "Column deleted successfully"})
 }
 
-// ReorderColumns - PUT /api/v1/projects/:id/kanban/columns/reorder
+// ReorderColumns - PUT /api/v1/projects/:id/boards/:boardId/kanban/columns/reorder
 func (h *KanbanHandler) ReorderColumns(c *fiber.Ctx) error {
 	var req models.ReorderColumnsRequest
 	if err := c.BodyParser(&req); err != nil {
