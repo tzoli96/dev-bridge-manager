@@ -55,7 +55,7 @@ type Task struct {
 	Status          string
 	AssigneeID      *uint
 	EstimatedHours  float64
-	Tags            string `gorm:"type:jsonb"`
+	Tags            string     `gorm:"type:jsonb"`
 	DueDate         *time.Time `gorm:"type:date"`
 	IsArchived      bool
 	CreatedBy       uint
