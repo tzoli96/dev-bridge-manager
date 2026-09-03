@@ -46,7 +46,7 @@ export default function BoardPage() {
             <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
-                    <p className="text-gray-500 text-sm">Select a project to see its boards</p>
+                    <p className="text-gray-500 text-sm">Choose a project to open its boards</p>
                 </div>
                 {isAdmin(user) && (
                     <button

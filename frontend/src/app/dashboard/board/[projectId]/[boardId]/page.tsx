@@ -10,10 +10,15 @@ export default function BoardPage() {
     const { projectId, boardId } = useParams<{ projectId: string; boardId: string }>();
 
     return (
-        <div className="space-y-4 p-6">
-            <Link href={`/dashboard/board/${projectId}`} className="text-sm text-blue-600 hover:text-blue-700">
-                ← Back to boards
-            </Link>
+        <div className="h-full flex flex-col">
+            <div className="px-6 pt-4">
+                <Link
+                    href={`/dashboard/board/${projectId}`}
+                    className="text-sm text-gray-500 hover:text-gray-700"
+                >
+                    ← Back to boards
+                </Link>
+            </div>
             <KanbanProvider projectId={projectId} boardId={boardId}>
                 <KanbanBoard />
             </KanbanProvider>
