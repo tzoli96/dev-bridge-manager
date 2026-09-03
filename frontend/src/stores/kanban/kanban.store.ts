@@ -6,13 +6,15 @@ import type {
     TaskComment,
     TimeEntry,
     KanbanBoard,
-    KanbanColumn
+    KanbanColumn,
+    Board
 } from '@/types/kanban';
 
 interface KanbanState {
     // Board state
     board: KanbanBoard | null;
     columns: KanbanColumn[];
+    boards: Board[];
 
     // Tasks state
     tasks: Task[];
@@ -37,6 +39,10 @@ interface KanbanActions {
     setBoard: (board: KanbanBoard) => void;
     updateBoard: (updates: Partial<KanbanBoard>) => void;
     clearBoard: () => void;
+    setBoards: (boards: Board[]) => void;
+    addBoardToStore: (board: Board) => void;
+    updateBoardInStore: (board: Board) => void;
+    removeBoardFromStore: (boardId: string) => void;
 
     // Column actions
     setColumns: (columns: KanbanColumn[]) => void;
@@ -84,6 +90,7 @@ type KanbanStore = KanbanState & KanbanActions;
 const initialState: KanbanState = {
     board: null,
     columns: [],
+    boards: [],
     tasks: [],
     selectedTaskId: null,
     comments: [],
@@ -114,6 +121,25 @@ export const useKanbanStore = create<KanbanStore>()(
                 clearBoard: () => set((state) => {
                     state.board = null;
                     state.columns = [];
+                }),
+
+                setBoards: (boards) => set((state) => {
+                    state.boards = boards;
+                }),
+
+                addBoardToStore: (board) => set((state) => {
+                    state.boards.push(board);
+                }),
+
+                updateBoardInStore: (updatedBoard) => set((state) => {
+                    const boardIndex = state.boards.findIndex(board => board.id === updatedBoard.id);
+                    if (boardIndex !== -1) {
+                        state.boards[boardIndex] = updatedBoard;
+                    }
+                }),
+
+                removeBoardFromStore: (boardId) => set((state) => {
+                    state.boards = state.boards.filter(board => board.id !== boardId);
                 }),
 
                 // Column actions
