@@ -7,6 +7,7 @@ import {
     MessageSquare,
     Timer,
     Trash2,
+    FolderPlus,
     GripVertical,
     User,
     Clock,
@@ -25,7 +26,8 @@ interface TaskCardProps {
     task: Task;
     permissions: KanbanPermissions;
     onEdit: () => void;
-    onDelete: () => void;
+    onRemove: () => void;
+    onAddToBoard: () => void;
     onOpenComments: () => void;
     onOpenTimeLog: () => void;
     onDragStart: () => void;
@@ -57,7 +59,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                                                       task,
                                                       permissions,
                                                       onEdit,
-                                                      onDelete,
+                                                      onRemove,
+                                                      onAddToBoard,
                                                       onOpenComments,
                                                       onOpenTimeLog,
                                                       onDragStart,
@@ -262,18 +265,30 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                 </div>
 
                 {permissions.canDeleteTasks && (
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            if (confirm('Are you sure you want to delete this task?')) {
-                                onDelete();
-                            }
-                        }}
-                        icon={Trash2}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-red-600 hover:bg-red-50"
-                    />
+                    <div className="flex items-center gap-1">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onAddToBoard();
+                            }}
+                            icon={FolderPlus}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        />
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm('Remove this task from this board?')) {
+                                    onRemove();
+                                }
+                            }}
+                            icon={Trash2}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity text-red-600 hover:bg-red-50"
+                        />
+                    </div>
                 )}
             </div>
         </div>

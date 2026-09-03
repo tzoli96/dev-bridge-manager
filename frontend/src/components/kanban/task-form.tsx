@@ -8,23 +8,26 @@ import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { useTasks } from '@/hooks/kanban';
 import { useProject } from '@/hooks/projects/use-project';
 import type { TaskFormData, TaskPriority } from '@/types/kanban';
-import { Save, X } from 'lucide-react';
+import { Save, X, Trash2 } from 'lucide-react';
 
 interface TaskFormProps {
     taskId?: string;
     columnId?: string;
     onSubmit: (data: any) => Promise<void>;
     onCancel: () => void;
+    onDeletePermanently?: () => Promise<void>;
 }
 
 export const TaskForm: React.FC<TaskFormProps> = ({
                                                       taskId,
                                                       columnId,
                                                       onSubmit,
-                                                      onCancel
+                                                      onCancel,
+                                                      onDeletePermanently
                                                   }) => {
     const { getTask } = useTasks(''); // projectId will be from context
     const [isLoading, setIsLoading] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
     const [formData, setFormData] = useState<TaskFormData>({
         title: '',
         description: '',
@@ -70,6 +73,18 @@ export const TaskForm: React.FC<TaskFormProps> = ({
 
     const handleFieldChange = (field: keyof TaskFormData, value: any) => {
         setFormData(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleDeletePermanently = async () => {
+        if (!onDeletePermanently) return;
+        if (!confirm('Delete this task permanently? It will be removed from every board it appears on.')) return;
+
+        setIsDeleting(true);
+        try {
+            await onDeletePermanently();
+        } finally {
+            setIsDeleting(false);
+        }
     };
 
     return (
@@ -133,22 +148,37 @@ export const TaskForm: React.FC<TaskFormProps> = ({
             />
 
             {/* Actions */}
-            <div className="flex items-center justify-end gap-3 pt-4 border-t">
-                <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={onCancel}
-                    icon={X}
-                >
-                    Cancel
-                </Button>
-                <Button
-                    type="submit"
-                    loading={isLoading}
-                    icon={Save}
-                >
-                    {taskId ? 'Update Task' : 'Create Task'}
-                </Button>
+            <div className="flex items-center justify-between gap-3 pt-4 border-t">
+                {taskId && onDeletePermanently ? (
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={handleDeletePermanently}
+                        loading={isDeleting}
+                        icon={Trash2}
+                        className="text-red-600 hover:bg-red-50"
+                    >
+                        Delete permanently
+                    </Button>
+                ) : <div />}
+
+                <div className="flex items-center gap-3">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={onCancel}
+                        icon={X}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        type="submit"
+                        loading={isLoading}
+                        icon={Save}
+                    >
+                        {taskId ? 'Update Task' : 'Create Task'}
+                    </Button>
+                </div>
             </div>
         </form>
     );

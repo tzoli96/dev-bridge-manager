@@ -24,7 +24,8 @@ interface KanbanColumnProps {
     };
     onAddTask: () => void;
     onEditTask: (taskId: string) => void;
-    onDeleteTask: (taskId: string) => void;
+    onRemoveTask: (taskId: string) => void;
+    onAddToBoard: (taskId: string) => void;
     onOpenComments: (taskId: string) => void;
     onOpenTimeLog: (taskId: string) => void;
     onDragStart: (task: Task) => void;
@@ -39,7 +40,8 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
                                                               dragHandlers,
                                                               onAddTask,
                                                               onEditTask,
-                                                              onDeleteTask,
+                                                              onRemoveTask,
+                                                              onAddToBoard,
                                                               onOpenComments,
                                                               onOpenTimeLog,
                                                               onDragStart,
@@ -112,7 +114,8 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
                             task={task}
                             permissions={permissions}
                             onEdit={() => onEditTask(task.id)}
-                            onDelete={() => onDeleteTask(task.id)}
+                            onRemove={() => onRemoveTask(task.id)}
+                            onAddToBoard={() => onAddToBoard(task.id)}
                             onOpenComments={() => onOpenComments(task.id)}
                             onOpenTimeLog={() => onOpenTimeLog(task.id)}
                             onDragStart={() => onDragStart(task)}

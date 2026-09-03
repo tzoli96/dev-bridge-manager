@@ -6,6 +6,8 @@ import { KanbanColumn } from './kanban-column';
 import { TaskForm } from './task-form';
 import { CommentSection } from './comment-section';
 import { TimeTracker } from './time-tracker';
+import { ColumnSettingsModal } from './column-settings-modal';
+import { AddToBoardModal } from './add-to-board-modal';
 import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
 import { useKanban, useTasks, useDragDrop } from '@/hooks/kanban';
@@ -17,11 +19,11 @@ import { Plus, Settings } from 'lucide-react';
  * Single Responsibility: Kanban board koordinálása és layout
  */
 export const KanbanBoard: React.FC = () => {
-    const { projectId } = useParams<{ projectId: string }>();
+    const { projectId, boardId } = useParams<{ projectId: string; boardId: string }>();
 
     // Hook-ok
-    const { columns, isLoading, error, permissions } = useKanban(projectId);
-    const { getTasksByColumn, createTask, updateTask, deleteTask, moveTask } = useTasks(projectId);
+    const { board, columns, isLoading, error, permissions } = useKanban(projectId, boardId);
+    const { getTasksByColumn, createTask, updateTask, deleteTask, moveTask, removeFromBoard } = useTasks(projectId, boardId);
     const dragDrop = useDragDrop();
 
     // Modal state
@@ -49,6 +51,15 @@ export const KanbanBoard: React.FC = () => {
     const handleOpenTimeLog = (taskId: string) => {
         if (!permissions.canViewTimeTracking) return;
         setActiveModal({ type: ModalType.TIME_LOG, taskId });
+    };
+
+    const handleOpenSettings = () => {
+        if (!permissions.canManageColumns) return;
+        setActiveModal({ type: ModalType.COLUMN_SETTINGS });
+    };
+
+    const handleAddToBoard = (taskId: string) => {
+        setActiveModal({ type: ModalType.ADD_TO_BOARD, taskId });
     };
 
     const handleTaskMove = async (result: any) => {
@@ -92,13 +103,13 @@ export const KanbanBoard: React.FC = () => {
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Kanban Board</h1>
+                    <h1 className="text-2xl font-bold text-gray-900">{board?.name ?? 'Kanban Board'}</h1>
                     <p className="text-gray-600 mt-1">Manage your project tasks</p>
                 </div>
 
                 <div className="flex items-center gap-2">
                     {permissions.canManageColumns && (
-                        <Button variant="ghost" icon={Settings}>
+                        <Button variant="ghost" icon={Settings} onClick={handleOpenSettings}>
                             Settings
                         </Button>
                     )}
@@ -126,7 +137,8 @@ export const KanbanBoard: React.FC = () => {
                             }}
                             onAddTask={() => handleAddTask(column.id)}
                             onEditTask={handleEditTask}
-                            onDeleteTask={deleteTask}
+                            onRemoveTask={removeFromBoard}
+                            onAddToBoard={handleAddToBoard}
                             onOpenComments={handleOpenComments}
                             onOpenTimeLog={handleOpenTimeLog}
                             onDragStart={(task) => dragDrop.startDrag(task, column.id)}
@@ -150,11 +162,15 @@ export const KanbanBoard: React.FC = () => {
                         if (activeModal.taskId) {
                             await updateTask(activeModal.taskId, data);
                         } else if (activeModal.columnId) {
-                            await createTask({ ...data, columnId: activeModal.columnId });
+                            await createTask({ ...data, columnId: activeModal.columnId, boardId });
                         }
                         closeModal();
                     }}
                     onCancel={closeModal}
+                    onDeletePermanently={activeModal.taskId ? async () => {
+                        await deleteTask(activeModal.taskId!);
+                        closeModal();
+                    } : undefined}
                 />
             </Modal>
 
@@ -177,6 +193,31 @@ export const KanbanBoard: React.FC = () => {
             >
                 {activeModal.taskId && (
                     <TimeTracker taskId={activeModal.taskId} />
+                )}
+            </Modal>
+
+            <Modal
+                isOpen={activeModal.type === ModalType.COLUMN_SETTINGS}
+                onClose={closeModal}
+                title="Column Settings"
+                size="lg"
+            >
+                <ColumnSettingsModal projectId={projectId} boardId={boardId} />
+            </Modal>
+
+            <Modal
+                isOpen={activeModal.type === ModalType.ADD_TO_BOARD}
+                onClose={closeModal}
+                title="Add to another board"
+                size="md"
+            >
+                {activeModal.taskId && (
+                    <AddToBoardModal
+                        projectId={projectId}
+                        currentBoardId={boardId}
+                        taskId={activeModal.taskId}
+                        onDone={closeModal}
+                    />
                 )}
             </Modal>
         </div>
