@@ -7,11 +7,12 @@ import { cn } from '@/lib/utils';
 interface RichTextEditorProps {
     content: string;
     onChange: (html: string, text: string) => void;
+    onBlur?: () => void;
     placeholder?: string;
     minHeight?: string;
 }
 
-export const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, placeholder, minHeight = '100px' }) => {
+export const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, onBlur, placeholder, minHeight = '100px' }) => {
     const editorRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -65,6 +66,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChang
                 ref={editorRef}
                 contentEditable
                 onInput={emitChange}
+                onBlur={onBlur}
                 data-placeholder={placeholder}
                 className={cn(
                     'p-3 text-sm text-gray-900 focus:outline-none prose prose-sm max-w-none',
