@@ -66,10 +66,7 @@ func (h *TaskCommentHandler) CreateComment(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"success": false, "message": "Error creating comment"})
 	}
 
-	preview := comment.Content
-	if len(preview) > 80 {
-		preview = preview[:80] + "…"
-	}
+	preview := commentPreview(comment.Content)
 	logActivity(comment.TaskID, comment.UserID, "comment_added", "", "", preview)
 
 	users := loadUsersByIDs([]uint{comment.UserID})
@@ -122,10 +119,7 @@ func (h *TaskCommentHandler) DeleteComment(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"success": false, "message": "Error deleting comment"})
 	}
 
-	preview := comment.Content
-	if len(preview) > 80 {
-		preview = preview[:80] + "…"
-	}
+	preview := commentPreview(comment.Content)
 	logActivity(comment.TaskID, currentUserID(c), "comment_deleted", "", "", preview)
 
 	return c.JSON(fiber.Map{"success": true, "message": "Comment deleted successfully"})

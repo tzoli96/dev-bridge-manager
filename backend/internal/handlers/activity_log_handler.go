@@ -52,6 +52,18 @@ func tagNamesFromJSON(raw string) string {
 	return strings.Join(names, ", ")
 }
 
+// commentPreview truncates a comment's content to at most 80 runes for
+// display in the activity log, appending an ellipsis when truncated.
+// Rune-safe: slicing on bytes can cut a multi-byte UTF-8 character in half
+// and produce invalid UTF-8 that Postgres rejects on insert.
+func commentPreview(s string) string {
+	r := []rune(s)
+	if len(r) > 80 {
+		return string(r[:80]) + "…"
+	}
+	return s
+}
+
 func assigneeName(id *uint, users map[uint]models.User) string {
 	if id == nil {
 		return ""

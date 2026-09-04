@@ -283,7 +283,9 @@ func (h *TaskHandler) MoveTask(c *fiber.Ctx) error {
 	for _, col := range cols {
 		titleByID[col.ID] = col.Title
 	}
-	logActivity(task.ID, currentUserID(c), "moved", "", titleByID[oldColumnID], titleByID[columnID])
+	if oldColumnID != columnID {
+		logActivity(task.ID, currentUserID(c), "moved", "", titleByID[oldColumnID], titleByID[columnID])
+	}
 
 	return c.JSON(loadSingleTaskDTO(task, &placement))
 }

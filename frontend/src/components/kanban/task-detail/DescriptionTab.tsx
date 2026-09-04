@@ -75,6 +75,15 @@ export const DescriptionTab: React.FC<DescriptionTabProps> = ({ taskId, onDelete
 
     if (!task) return null;
 
+    const handleTitleBlur = () => {
+        if (!title.trim()) {
+            setTitle(task.title);
+            setStatus((s) => ({ ...s, title: 'error' }));
+            return;
+        }
+        save('title', { title });
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex items-center gap-2">
@@ -83,7 +92,7 @@ export const DescriptionTab: React.FC<DescriptionTabProps> = ({ taskId, onDelete
                         label="Task Title"
                         value={title}
                         onChange={setTitle}
-                        onBlur={() => save('title', { title })}
+                        onBlur={handleTitleBlur}
                         required
                     />
                 </div>
