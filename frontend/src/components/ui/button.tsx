@@ -1,105 +1,72 @@
-import React from 'react';
-import { cn } from '@/lib/utils';
+import * as React from "react"
+import { cva, type VariantProps } from "class-variance-authority"
+import { cn } from "cn"
+import { Slot } from "radix-ui"
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-    variant?: 'primary' | 'secondary' | 'ghost' | 'outline' | 'success' | 'danger';
-    size?: 'sm' | 'md' | 'lg';
-    icon?: React.ReactNode;
-    loading?: boolean;
-    children?: React.ReactNode;
-    ripple?: boolean;
+const buttonVariants = cva(
+  "group/button inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  {
+    variants: {
+      variant: {
+        primary: "bg-primary text-primary-foreground hover:bg-primary/80",
+        secondary:
+          "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)]",
+        ghost:
+          "hover:bg-muted hover:text-foreground dark:hover:bg-muted/50",
+        outline:
+          "border-border bg-background hover:bg-muted hover:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
+        success:
+          "bg-green-600 text-white hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600",
+        danger:
+          "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
+      },
+      size: {
+        sm: "h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] [&_svg:not([class*='size-'])]:size-3.5",
+        md: "h-8 gap-1.5 px-2.5",
+        lg: "h-9 gap-1.5 px-4 text-base",
+        "icon-sm": "size-7 rounded-[min(var(--radius-md),12px)] p-0",
+      },
+    },
+    defaultVariants: { variant: "primary", size: "md" },
+  }
+)
+
+interface ButtonProps
+  extends React.ComponentProps<"button">,
+    VariantProps<typeof buttonVariants> {
+  icon?: React.ElementType
+  loading?: boolean
+  asChild?: boolean
 }
 
-export const Button: React.FC<ButtonProps> = ({
-                                                  variant = 'primary',
-                                                  size = 'md',
-                                                  icon,
-                                                  loading = false,
-                                                  children,
-                                                  className,
-                                                  disabled,
-                                                  ripple = true,
-                                                  onClick,
-                                                  ...props
-                                              }) => {
-    // Ref for ripple effect
-    const buttonRef = React.useRef<HTMLButtonElement>(null);
+function Button({
+  className,
+  variant = "primary",
+  size = "md",
+  icon: Icon,
+  loading = false,
+  disabled,
+  asChild = false,
+  children,
+  ...props
+}: ButtonProps) {
+  const Comp = asChild ? Slot.Root : "button"
 
-    // Handle click with ripple effect
-    const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-        if (ripple && !disabled && !loading && buttonRef.current) {
-            const button = buttonRef.current;
-            const rect = button.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            
-            const ripple = document.createElement('span');
-            ripple.style.position = 'absolute';
-            ripple.style.left = `${x}px`;
-            ripple.style.top = `${y}px`;
-            ripple.style.transform = 'translate(-50%, -50%) scale(0)';
-            ripple.style.width = '0';
-            ripple.style.height = '0';
-            ripple.style.borderRadius = '50%';
-            ripple.style.backgroundColor = 'rgba(255, 255, 255, 0.4)';
-            ripple.style.pointerEvents = 'none';
-            ripple.style.transition = 'all 0.6s ease-out';
-            
-            button.appendChild(ripple);
-            
-            // Trigger animation
-            setTimeout(() => {
-                const size = Math.max(button.offsetWidth, button.offsetHeight) * 2;
-                ripple.style.width = `${size}px`;
-                ripple.style.height = `${size}px`;
-                ripple.style.transform = 'translate(-50%, -50%) scale(1)';
-                ripple.style.opacity = '0';
-            }, 10);
-            
-            // Remove ripple after animation
-            setTimeout(() => {
-                ripple.remove();
-            }, 600);
-        }
-        
-        // Call original onClick handler
-        if (onClick) onClick(e);
-    };
+  return (
+    <Comp
+      data-slot="button"
+      className={cn(buttonVariants({ variant, size, className }))}
+      disabled={disabled || loading}
+      {...props}
+    >
+      {loading ? (
+        <div className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+      ) : (
+        Icon && <Icon />
+      )}
+      {children}
+    </Comp>
+  )
+}
 
-    const baseClasses = 'inline-flex items-center justify-center gap-2 rounded-lg font-medium relative overflow-hidden transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
-
-    const variantClasses = {
-        primary: 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md active:shadow-inner active:scale-[0.98] focus:ring-blue-500',
-        secondary: 'bg-gray-500 text-white hover:bg-gray-600 hover:shadow-md active:shadow-inner active:scale-[0.98] focus:ring-gray-500',
-        ghost: 'text-gray-500 hover:bg-gray-100 active:bg-gray-200 active:scale-[0.98] focus:ring-gray-300',
-        outline: 'border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 active:bg-gray-100 active:scale-[0.98] focus:ring-gray-400',
-        success: 'bg-green-600 text-white hover:bg-green-700 hover:shadow-md active:shadow-inner active:scale-[0.98] focus:ring-green-500',
-        danger: 'bg-red-600 text-white hover:bg-red-700 hover:shadow-md active:shadow-inner active:scale-[0.98] focus:ring-red-500',
-    };
-
-    const sizeClasses = {
-        sm: 'p-2 text-sm',
-        md: 'px-4 py-2 text-sm',
-        lg: 'px-6 py-3 text-base'
-    };
-
-    return (
-        <button
-            ref={buttonRef}
-            className={cn(
-                baseClasses,
-                variantClasses[variant],
-                sizeClasses[size],
-                className
-            )}
-            disabled={disabled || loading}
-            onClick={handleClick}
-            {...props}
-        >
-            {loading ? (
-                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-            ) : icon}
-            {children}
-        </button>
-    );
-};
+export { Button, buttonVariants }

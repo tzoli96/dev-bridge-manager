@@ -1,37 +1,45 @@
-'use client';
+"use client"
 
-import React from 'react';
-import { cn } from '@/lib/utils';
+import * as React from "react"
+import { cn } from "cn"
+import { Tabs as TabsPrimitive } from "radix-ui"
+import type { LucideIcon } from "lucide-react"
 
 export interface TabItem {
-    id: string;
-    label: string;
+  id: string
+  label: string
+  icon?: LucideIcon
 }
 
 interface TabsProps {
-    tabs: TabItem[];
-    activeTab: string;
-    onChange: (tabId: string) => void;
+  tabs: TabItem[]
+  activeTab: string
+  onChange: (id: string) => void
+  className?: string
 }
 
-export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onChange }) => {
-    return (
-        <div className="flex border-b border-gray-200 px-6">
-            {tabs.map((tab) => (
-                <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => onChange(tab.id)}
-                    className={cn(
-                        'px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors',
-                        activeTab === tab.id
-                            ? 'border-blue-600 text-blue-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700'
-                    )}
-                >
-                    {tab.label}
-                </button>
-            ))}
-        </div>
-    );
-};
+export function Tabs({ tabs, activeTab, onChange, className }: TabsProps) {
+  return (
+    <TabsPrimitive.Root
+      value={activeTab}
+      onValueChange={onChange}
+      className={cn("w-full", className)}
+    >
+      <TabsPrimitive.List className="flex gap-1 border-b px-6">
+        {tabs.map(({ id, label, icon: Icon }) => (
+          <TabsPrimitive.Trigger
+            key={id}
+            value={id}
+            className={cn(
+              "flex items-center gap-1.5 border-b-2 border-transparent px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground",
+              "data-active:border-primary data-active:text-foreground"
+            )}
+          >
+            {Icon && <Icon className="size-4" />}
+            {label}
+          </TabsPrimitive.Trigger>
+        ))}
+      </TabsPrimitive.List>
+    </TabsPrimitive.Root>
+  )
+}
