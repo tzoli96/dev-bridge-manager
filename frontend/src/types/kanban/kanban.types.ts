@@ -51,7 +51,7 @@ export interface KanbanPermissions {
 
 export enum ModalType {
     TASK_EDIT = 'task_edit',
-    COMMENTS = 'comments',
+    TASK_DETAIL = 'task_detail',
     TIME_LOG = 'time_log',
     COLUMN_SETTINGS = 'column_settings',
     ADD_TO_BOARD = 'add_to_board',

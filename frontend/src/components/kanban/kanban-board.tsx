@@ -4,10 +4,10 @@ import React from 'react';
 import { useParams } from 'next/navigation';
 import { KanbanColumn } from './kanban-column';
 import { TaskForm } from './task-form';
-import { CommentSection } from './comment-section';
 import { TimeTracker } from './time-tracker';
 import { ColumnSettingsModal } from './column-settings-modal';
 import { AddToBoardModal } from './add-to-board-modal';
+import { TaskDetailModal, TaskDetailTab } from './task-detail/TaskDetailModal';
 import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
 import { useKanban, useTasks, useDragDrop } from '@/hooks/kanban';
@@ -31,6 +31,7 @@ export const KanbanBoard: React.FC = () => {
         type: ModalType | null;
         taskId?: string;
         columnId?: string;
+        initialTab?: TaskDetailTab;
     }>({ type: null });
 
     // Event handlers
@@ -41,11 +42,11 @@ export const KanbanBoard: React.FC = () => {
 
     const handleEditTask = (taskId: string) => {
         if (!permissions.canEditTasks) return;
-        setActiveModal({ type: ModalType.TASK_EDIT, taskId });
+        setActiveModal({ type: ModalType.TASK_DETAIL, taskId, initialTab: 'description' });
     };
 
     const handleOpenComments = (taskId: string) => {
-        setActiveModal({ type: ModalType.COMMENTS, taskId });
+        setActiveModal({ type: ModalType.TASK_DETAIL, taskId, initialTab: 'comments' });
     };
 
     const handleOpenTimeLog = (taskId: string) => {
@@ -152,38 +153,31 @@ export const KanbanBoard: React.FC = () => {
             <Modal
                 isOpen={activeModal.type === ModalType.TASK_EDIT}
                 onClose={closeModal}
-                title={activeModal.taskId ? 'Edit Task' : 'Create Task'}
+                title="Create Task"
                 size="lg"
             >
                 <TaskForm
-                    taskId={activeModal.taskId}
                     columnId={activeModal.columnId}
                     onSubmit={async (data) => {
-                        if (activeModal.taskId) {
-                            await updateTask(activeModal.taskId, data);
-                        } else if (activeModal.columnId) {
+                        if (activeModal.columnId) {
                             await createTask({ ...data, columnId: activeModal.columnId, boardId });
                         }
                         closeModal();
                     }}
                     onCancel={closeModal}
-                    onDeletePermanently={activeModal.taskId ? async () => {
-                        await deleteTask(activeModal.taskId!);
-                        closeModal();
-                    } : undefined}
                 />
             </Modal>
 
-            <Modal
-                isOpen={activeModal.type === ModalType.COMMENTS}
+            <TaskDetailModal
+                isOpen={activeModal.type === ModalType.TASK_DETAIL}
+                taskId={activeModal.taskId ?? ''}
+                initialTab={activeModal.initialTab ?? 'description'}
                 onClose={closeModal}
-                title="Comments"
-                size="lg"
-            >
-                {activeModal.taskId && (
-                    <CommentSection taskId={activeModal.taskId} />
-                )}
-            </Modal>
+                onDeletePermanently={activeModal.taskId ? async () => {
+                    await deleteTask(activeModal.taskId!);
+                    closeModal();
+                } : undefined}
+            />
 
             <Modal
                 isOpen={activeModal.type === ModalType.TIME_LOG}
