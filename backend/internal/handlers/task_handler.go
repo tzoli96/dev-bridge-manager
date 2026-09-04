@@ -150,6 +150,7 @@ func (h *TaskHandler) UpdateTask(c *fiber.Ctx) error {
 	if err := database.GetDB().First(&task, taskID).Error; err != nil {
 		return c.Status(404).JSON(fiber.Map{"success": false, "message": "Task not found"})
 	}
+	original := task
 
 	var req models.UpdateTaskRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -193,6 +194,7 @@ func (h *TaskHandler) UpdateTask(c *fiber.Ctx) error {
 	if err := database.GetDB().Save(&task).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"success": false, "message": "Error updating task"})
 	}
+	logTaskFieldChanges(original, task, currentUserID(c))
 
 	return c.JSON(loadSingleTaskDTO(task, nil))
 }
@@ -274,6 +276,14 @@ func (h *TaskHandler) MoveTask(c *fiber.Ctx) error {
 
 	task.UpdatedBy = currentUserID(c)
 	db.Save(&task)
+
+	var cols []models.KanbanColumn
+	db.Where("id IN ?", []uint{oldColumnID, columnID}).Find(&cols)
+	titleByID := make(map[uint]string, len(cols))
+	for _, col := range cols {
+		titleByID[col.ID] = col.Title
+	}
+	logActivity(task.ID, currentUserID(c), "moved", "", titleByID[oldColumnID], titleByID[columnID])
 
 	return c.JSON(loadSingleTaskDTO(task, &placement))
 }
