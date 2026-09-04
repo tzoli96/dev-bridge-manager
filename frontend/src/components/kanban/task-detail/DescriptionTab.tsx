@@ -10,6 +10,7 @@ import { useTasks } from '@/hooks/kanban';
 import { useTaskAssignees } from '@/hooks/kanban/use-task-assignees';
 import type { TagLevel, TaskPriority, UpdateTaskData } from '@/types/kanban';
 import { Check, Loader2, AlertCircle, Trash2, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 type FieldStatus = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -53,10 +54,16 @@ export const DescriptionTab: React.FC<DescriptionTabProps> = ({ taskId, onDelete
 
     const Indicator = ({ field }: { field: string }) => {
         const s = status[field] ?? 'idle';
-        if (s === 'saving') return <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" />;
-        if (s === 'saved') return <Check className="w-3.5 h-3.5 text-green-600" />;
-        if (s === 'error') return <AlertCircle className="w-3.5 h-3.5 text-red-600" />;
-        return null;
+        const icon =
+            s === 'saving' ? <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" /> :
+            s === 'saved' ? <Check className="w-3.5 h-3.5 text-green-600" /> :
+            s === 'error' ? <AlertCircle className="w-3.5 h-3.5 text-red-600" /> :
+            null;
+        return (
+            <div className={cn('w-3.5 h-3.5 shrink-0 transition-opacity duration-300', s === 'idle' ? 'opacity-0' : 'opacity-100')}>
+                {icon}
+            </div>
+        );
     };
 
     const commitTags = (next: typeof tags) => {
@@ -85,101 +92,107 @@ export const DescriptionTab: React.FC<DescriptionTabProps> = ({ taskId, onDelete
     };
 
     return (
-        <div className="space-y-6">
-            <div className="flex items-center gap-2">
-                <div className="flex-1">
-                    <Input
-                        label="Task Title"
-                        value={title}
-                        onChange={setTitle}
-                        onBlur={handleTitleBlur}
-                        required
-                    />
-                </div>
-                <Indicator field="title" />
-            </div>
-
-            <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">Description</label>
-                <div className="flex items-start gap-2">
-                    <div className="flex-1">
-                        <RichTextEditor
-                            content={htmlDescription}
-                            onChange={(html, text) => { setHtmlDescription(html); setDescription(text); }}
-                            onBlur={() => save('description', { description, htmlDescription })}
-                            minHeight="120px"
-                        />
-                    </div>
-                    <Indicator field="description" />
-                </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-                <div className="flex items-center gap-2">
-                    <div className="flex-1">
-                        <Select
-                            label="Priority"
-                            value={priority}
-                            onChange={(value) => {
-                                const next = value as TaskPriority;
-                                setPriority(next);
-                                save('priority', { priority: next });
-                            }}
-                            options={[
-                                { value: 'low', label: 'Low' },
-                                { value: 'medium', label: 'Medium' },
-                                { value: 'high', label: 'High' },
-                                { value: 'urgent', label: 'Urgent' },
-                            ]}
-                        />
-                    </div>
-                    <Indicator field="priority" />
-                </div>
+        <div className="space-y-8">
+            <section className="space-y-4">
                 <div className="flex items-center gap-2">
                     <div className="flex-1">
                         <Input
-                            label="Estimated Hours"
-                            type="number"
-                            min="0"
-                            step="0.5"
-                            value={String(estimatedHours)}
-                            onChange={(v) => setEstimatedHours(Number(v))}
-                            onBlur={() => save('estimatedHours', { estimatedHours })}
+                            label="Task Title"
+                            value={title}
+                            onChange={setTitle}
+                            onBlur={handleTitleBlur}
+                            required
                         />
                     </div>
-                    <Indicator field="estimatedHours" />
+                    <Indicator field="title" />
                 </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-4">
-                <div className="flex items-center gap-2">
-                    <div className="flex-1">
-                        <Input
-                            label="Due Date"
-                            type="date"
-                            value={dueDate}
-                            onChange={(v) => { setDueDate(v); save('dueDate', { dueDate: v }); }}
-                        />
+                <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">Description</label>
+                    <div className="flex items-start gap-2">
+                        <div className="flex-1">
+                            <RichTextEditor
+                                content={htmlDescription}
+                                onChange={(html, text) => { setHtmlDescription(html); setDescription(text); }}
+                                onBlur={() => save('description', { description, htmlDescription })}
+                                minHeight="120px"
+                            />
+                        </div>
+                        <Indicator field="description" />
                     </div>
-                    <Indicator field="dueDate" />
                 </div>
-                <div className="flex items-center gap-2">
-                    <div className="flex-1">
-                        <Select
-                            label="Assignee"
-                            value={assigneeId}
-                            onChange={(value) => { setAssigneeId(value); save('assignee', { assigneeId: value }); }}
-                            options={[
-                                { value: '', label: 'Unassigned' },
-                                ...assignees.map((a) => ({ value: String(a.user_id), label: a.user_name })),
-                            ]}
-                        />
-                    </div>
-                    <Indicator field="assignee" />
-                </div>
-            </div>
+            </section>
 
-            <div className="space-y-2">
+            <section className="space-y-4 rounded-xl bg-gray-50 p-4">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Details</h3>
+
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center gap-2">
+                        <div className="flex-1">
+                            <Select
+                                label="Priority"
+                                value={priority}
+                                onChange={(value) => {
+                                    const next = value as TaskPriority;
+                                    setPriority(next);
+                                    save('priority', { priority: next });
+                                }}
+                                options={[
+                                    { value: 'low', label: 'Low' },
+                                    { value: 'medium', label: 'Medium' },
+                                    { value: 'high', label: 'High' },
+                                    { value: 'urgent', label: 'Urgent' },
+                                ]}
+                            />
+                        </div>
+                        <Indicator field="priority" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="flex-1">
+                            <Input
+                                label="Estimated Hours"
+                                type="number"
+                                min="0"
+                                step="0.5"
+                                value={String(estimatedHours)}
+                                onChange={(v) => setEstimatedHours(Number(v))}
+                                onBlur={() => save('estimatedHours', { estimatedHours })}
+                            />
+                        </div>
+                        <Indicator field="estimatedHours" />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center gap-2">
+                        <div className="flex-1">
+                            <Input
+                                label="Due Date"
+                                type="date"
+                                value={dueDate}
+                                onChange={(v) => { setDueDate(v); save('dueDate', { dueDate: v }); }}
+                            />
+                        </div>
+                        <Indicator field="dueDate" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="flex-1">
+                            <Select
+                                label="Assignee"
+                                value={assigneeId}
+                                onChange={(value) => { setAssigneeId(value); save('assignee', { assigneeId: value }); }}
+                                options={[
+                                    { value: '', label: 'Unassigned' },
+                                    ...assignees.map((a) => ({ value: String(a.user_id), label: a.user_name })),
+                                ]}
+                            />
+                        </div>
+                        <Indicator field="assignee" />
+                    </div>
+                </div>
+            </section>
+
+            <section className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700">Tags</label>
                 <div className="flex flex-wrap items-center gap-2 p-2 border rounded-lg border-gray-300 focus-within:ring-blue-500 focus-within:border-blue-500">
                     {tags.map((tag) => (
@@ -199,7 +212,7 @@ export const DescriptionTab: React.FC<DescriptionTabProps> = ({ taskId, onDelete
                         placeholder="Add tag…"
                     />
                 </div>
-            </div>
+            </section>
 
             {onDeletePermanently && (
                 <div className="pt-4 border-t">
