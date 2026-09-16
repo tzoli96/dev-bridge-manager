@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
 )
 
 type KanbanHandler struct{}
@@ -69,6 +70,7 @@ func columnDTO(c models.KanbanColumn, tasks []models.TaskDTO) models.KanbanColum
 		Color:     c.Color,
 		Position:  c.Position,
 		MaxTasks:  c.MaxTasks,
+		IsDone:    c.IsDone,
 		Tasks:     colTasks,
 		CreatedAt: c.CreatedAt,
 		UpdatedAt: c.UpdatedAt,
@@ -182,8 +184,24 @@ func (h *KanbanHandler) UpdateColumn(c *fiber.Ctx) error {
 	if req.MaxTasks != nil {
 		column.MaxTasks = req.MaxTasks
 	}
+	if req.IsDone != nil {
+		column.IsDone = *req.IsDone
+	}
 
-	if err := database.GetDB().Save(&column).Error; err != nil {
+	var err2 error
+	if req.IsDone != nil && *req.IsDone {
+		err2 = database.GetDB().Transaction(func(tx *gorm.DB) error {
+			if err := tx.Model(&models.KanbanColumn{}).
+				Where("board_id = ? AND id != ?", column.BoardID, column.ID).
+				Update("is_done", false).Error; err != nil {
+				return err
+			}
+			return tx.Save(&column).Error
+		})
+	} else {
+		err2 = database.GetDB().Save(&column).Error
+	}
+	if err2 != nil {
 		return c.Status(500).JSON(fiber.Map{"success": false, "message": "Error updating column"})
 	}
 
