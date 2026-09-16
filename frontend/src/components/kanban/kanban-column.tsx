@@ -3,7 +3,7 @@
 import React from 'react';
 import { TaskCard } from './task-card';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Inbox, Plus } from 'lucide-react';
 import type {
     KanbanColumn as Column,
     Task,
@@ -51,60 +51,53 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
     const canAddTask = permissions.canCreateTasks && !isWipLimitReached;
 
     return (
-        <div className="w-80 bg-gray-50 rounded-lg flex flex-col">
+        <div className="w-80 flex-shrink-0 flex flex-col">
             {/* Column Header */}
-            <div className="p-4 border-b border-gray-200">
-                <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                        <div className={cn("w-3 h-3 rounded-full", column.color)} />
-                        <h3 className="font-semibold text-gray-900">{column.title}</h3>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-            <span className={cn(
-                "px-2 py-1 rounded-full text-xs font-medium",
-                isWipLimitReached
-                    ? "bg-red-100 text-red-800"
-                    : "bg-gray-200 text-gray-700"
-            )}>
-              {column.maxTasks ? `${tasks.length}/${column.maxTasks}` : tasks.length}
-            </span>
-                    </div>
+            <div className="flex items-center justify-between px-1 mb-3">
+                <div className="flex items-center gap-2">
+                    <div className={cn("w-2 h-2 rounded-full", column.color)} />
+                    <h3 className="text-sm font-medium text-foreground">{column.title}</h3>
+                    <span className={cn(
+                        "text-xs tabular-nums",
+                        isWipLimitReached ? "text-destructive font-medium" : "text-muted-foreground"
+                    )}>
+                        {column.maxTasks ? `${tasks.length}/${column.maxTasks}` : tasks.length}
+                    </span>
                 </div>
-
-                {canAddTask && (
-                    <Button
-                        onClick={onAddTask}
-                        variant="ghost"
-                        size="sm"
-                        icon={Plus}
-                        className="w-full justify-start border-2 border-dashed border-gray-300 hover:border-blue-400"
-                    >
-                        Add Task
-                    </Button>
-                )}
-
-                {isWipLimitReached && (
-                    <div className="text-xs text-red-600 mt-2">
-                        WIP limit reached
-                    </div>
-                )}
             </div>
 
             {/* Drop Zone */}
             <div
                 className={cn(
-                    "flex-1 p-4 space-y-3 min-h-[400px] transition-colors",
-                    isHighlighted && "bg-blue-50 border-2 border-blue-300 border-dashed"
+                    "flex-1 rounded-xl bg-muted/40 p-2 space-y-2 min-h-[400px] transition-colors",
+                    isHighlighted && "bg-primary/10 ring-2 ring-primary/30 ring-inset"
                 )}
                 onDragOver={dragHandlers.onDragOver}
                 onDragEnter={dragHandlers.onDragEnter}
                 onDragLeave={dragHandlers.onDragLeave}
                 onDrop={dragHandlers.onDrop}
             >
+                {canAddTask && (
+                    <Button
+                        onClick={onAddTask}
+                        variant="ghost"
+                        size="sm"
+                        icon={Plus}
+                        className="w-full justify-start text-muted-foreground hover:text-foreground"
+                    >
+                        Add task
+                    </Button>
+                )}
+
+                {isWipLimitReached && (
+                    <div className="text-xs text-destructive px-2">
+                        WIP limit reached
+                    </div>
+                )}
+
                 {tasks.length === 0 ? (
-                    <div className="text-center text-gray-500 py-8">
-                        <div className="text-4xl mb-2">📋</div>
+                    <div className="text-center text-muted-foreground py-8">
+                        <Inbox className="mx-auto mb-2 opacity-40" size={28} />
                         <p className="text-sm">No tasks yet</p>
                     </div>
                 ) : (
