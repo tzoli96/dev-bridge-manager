@@ -5,3 +5,4 @@ export { useActivityLog } from './use-activity-log';
 export { useTaskAssignees } from './use-task-assignees';
 export { useTimeEntries } from './use-time-entries';
 export { useDragDrop } from './use-drag-drop';
+export { useAttachments } from './use-attachments';
