@@ -16,6 +16,7 @@ type KanbanColumn struct {
 	Color     string
 	Position  int
 	MaxTasks  *int
+	IsDone    bool
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
@@ -54,6 +55,7 @@ type Task struct {
 	Priority        string
 	Status          string
 	AssigneeID      *uint
+	ParentTaskID    *uint `gorm:"index"`
 	EstimatedHours  float64
 	Tags            string     `gorm:"type:jsonb"`
 	DueDate         *time.Time `gorm:"type:date"`
@@ -98,6 +100,12 @@ type TaskTagDTO struct {
 	ID    string `json:"id"`
 	Name  string `json:"name"`
 	Color string `json:"color"`
+	Level string `json:"level"`
+}
+
+type TagInput struct {
+	Name  string `json:"name" validate:"required"`
+	Level string `json:"level" validate:"omitempty,oneof=low medium high"`
 }
 
 type TaskAssigneeDTO struct {
@@ -133,33 +141,46 @@ type TaskCommentDTO struct {
 	UserID      string          `json:"userId"`
 	User        *TaskUserRefDTO `json:"user,omitempty"`
 	IsEdited    bool            `json:"isEdited"`
+	Attachments []AttachmentDTO `json:"attachments"`
 	CreatedAt   time.Time       `json:"createdAt"`
 	UpdatedAt   time.Time       `json:"updatedAt"`
 }
 
+type SubtaskProgressDTO struct {
+	Total int `json:"total"`
+	Done  int `json:"done"`
+}
+
+type TaskParentRefDTO struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
+}
+
 type TaskDTO struct {
-	ID              string           `json:"id"`
-	Title           string           `json:"title"`
-	Description     string           `json:"description"`
-	HTMLDescription string           `json:"htmlDescription,omitempty"`
-	Priority        string           `json:"priority"`
-	Status          string           `json:"status"`
-	ColumnID        string           `json:"columnId"`
-	ProjectID       string           `json:"projectId"`
-	AssigneeID      string           `json:"assigneeId,omitempty"`
-	Assignee        *TaskAssigneeDTO `json:"assignee,omitempty"`
-	EstimatedHours  float64          `json:"estimatedHours"`
-	LoggedHours     float64          `json:"loggedHours"`
-	Tags            []TaskTagDTO     `json:"tags"`
-	TimeEntries     []TimeEntryDTO   `json:"timeEntries"`
-	Comments        []TaskCommentDTO `json:"comments"`
-	Attachments     []interface{}    `json:"attachments"`
-	Position        int              `json:"position"`
-	DueDate         string           `json:"dueDate,omitempty"`
-	CreatedAt       time.Time        `json:"createdAt"`
-	UpdatedAt       time.Time        `json:"updatedAt"`
-	CreatedBy       string           `json:"createdBy"`
-	UpdatedBy       string           `json:"updatedBy"`
+	ID              string              `json:"id"`
+	Title           string              `json:"title"`
+	Description     string              `json:"description"`
+	HTMLDescription string              `json:"htmlDescription,omitempty"`
+	Priority        string              `json:"priority"`
+	Status          string              `json:"status"`
+	ColumnID        string              `json:"columnId"`
+	ProjectID       string              `json:"projectId"`
+	AssigneeID      string              `json:"assigneeId,omitempty"`
+	Assignee        *TaskAssigneeDTO    `json:"assignee,omitempty"`
+	EstimatedHours  float64             `json:"estimatedHours"`
+	LoggedHours     float64             `json:"loggedHours"`
+	Tags            []TaskTagDTO        `json:"tags"`
+	TimeEntries     []TimeEntryDTO      `json:"timeEntries"`
+	Comments        []TaskCommentDTO    `json:"comments"`
+	Attachments     []AttachmentDTO     `json:"attachments"`
+	Position        int                 `json:"position"`
+	DueDate         string              `json:"dueDate,omitempty"`
+	SubtaskProgress *SubtaskProgressDTO `json:"subtaskProgress,omitempty"`
+	ParentTask      *TaskParentRefDTO   `json:"parentTask,omitempty"`
+	CreatedAt       time.Time           `json:"createdAt"`
+	UpdatedAt       time.Time           `json:"updatedAt"`
+	CreatedBy       string              `json:"createdBy"`
+	UpdatedBy       string              `json:"updatedBy"`
 }
 
 type KanbanColumnDTO struct {
@@ -168,6 +189,7 @@ type KanbanColumnDTO struct {
 	Color     string    `json:"color"`
 	Position  int       `json:"position"`
 	MaxTasks  *int      `json:"maxTasks,omitempty"`
+	IsDone    bool      `json:"isDone"`
 	Tasks     []TaskDTO `json:"tasks"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
@@ -215,27 +237,28 @@ type BoardDTO struct {
 // ---------- Request DTOs ----------
 
 type CreateTaskRequest struct {
-	Title           string   `json:"title" validate:"required,min=1,max=255"`
-	Description     string   `json:"description"`
-	HTMLDescription string   `json:"htmlDescription"`
-	Priority        string   `json:"priority" validate:"omitempty,oneof=low medium high urgent"`
-	BoardID         string   `json:"boardId" validate:"required"`
-	ColumnID        string   `json:"columnId" validate:"required"`
-	AssigneeID      string   `json:"assigneeId"`
-	EstimatedHours  *float64 `json:"estimatedHours"`
-	Tags            []string `json:"tags"`
-	DueDate         string   `json:"dueDate"`
+	Title           string     `json:"title" validate:"required,min=1,max=255"`
+	Description     string     `json:"description"`
+	HTMLDescription string     `json:"htmlDescription"`
+	Priority        string     `json:"priority" validate:"omitempty,oneof=low medium high urgent"`
+	BoardID         string     `json:"boardId" validate:"required"`
+	ColumnID        string     `json:"columnId" validate:"required"`
+	AssigneeID      string     `json:"assigneeId"`
+	ParentTaskID    string     `json:"parentTaskId"`
+	EstimatedHours  *float64   `json:"estimatedHours"`
+	Tags            []TagInput `json:"tags"`
+	DueDate         string     `json:"dueDate"`
 }
 
 type UpdateTaskRequest struct {
-	Title           *string   `json:"title"`
-	Description     *string   `json:"description"`
-	HTMLDescription *string   `json:"htmlDescription"`
-	Priority        *string   `json:"priority" validate:"omitempty,oneof=low medium high urgent"`
-	AssigneeID      *string   `json:"assigneeId"`
-	EstimatedHours  *float64  `json:"estimatedHours"`
-	Tags            *[]string `json:"tags"`
-	DueDate         *string   `json:"dueDate"`
+	Title           *string     `json:"title"`
+	Description     *string     `json:"description"`
+	HTMLDescription *string     `json:"htmlDescription"`
+	Priority        *string     `json:"priority" validate:"omitempty,oneof=low medium high urgent"`
+	AssigneeID      *string     `json:"assigneeId"`
+	EstimatedHours  *float64    `json:"estimatedHours"`
+	Tags            *[]TagInput `json:"tags"`
+	DueDate         *string     `json:"dueDate"`
 }
 
 type MoveTaskRequest struct {
@@ -255,6 +278,7 @@ type UpdateColumnRequest struct {
 	Color    *string `json:"color"`
 	Position *int    `json:"position"`
 	MaxTasks *int    `json:"maxTasks"`
+	IsDone   *bool   `json:"isDone"`
 }
 
 type CreateBoardRequest struct {
@@ -326,21 +350,26 @@ func tagColorFor(name string) string {
 	return tagColorPalette[sum%len(tagColorPalette)]
 }
 
-// TagsToJSON converts plain tag names into the JSONB-stored [{name,color}] representation.
-func TagsToJSON(names []string) string {
+// TagsToJSON converts tag inputs into the JSONB-stored [{name,color,level}] representation.
+func TagsToJSON(inputs []TagInput) string {
 	type tag struct {
 		Name  string `json:"name"`
 		Color string `json:"color"`
+		Level string `json:"level"`
 	}
-	tags := make([]tag, 0, len(names))
+	tags := make([]tag, 0, len(inputs))
 	seen := make(map[string]bool)
-	for _, n := range names {
-		n = strings.TrimSpace(n)
+	for _, in := range inputs {
+		n := strings.TrimSpace(in.Name)
 		if n == "" || seen[n] {
 			continue
 		}
 		seen[n] = true
-		tags = append(tags, tag{Name: n, Color: tagColorFor(n)})
+		level := strings.TrimSpace(in.Level)
+		if level != "low" && level != "medium" && level != "high" {
+			level = "medium"
+		}
+		tags = append(tags, tag{Name: n, Color: tagColorFor(n), Level: level})
 	}
 	b, _ := json.Marshal(tags)
 	return string(b)
@@ -351,6 +380,7 @@ func TagsFromJSON(raw string) []TaskTagDTO {
 	type tag struct {
 		Name  string `json:"name"`
 		Color string `json:"color"`
+		Level string `json:"level"`
 	}
 	var tags []tag
 	if raw != "" {
@@ -358,7 +388,11 @@ func TagsFromJSON(raw string) []TaskTagDTO {
 	}
 	dtos := make([]TaskTagDTO, 0, len(tags))
 	for _, t := range tags {
-		dtos = append(dtos, TaskTagDTO{ID: t.Name, Name: t.Name, Color: t.Color})
+		level := t.Level
+		if level != "low" && level != "medium" && level != "high" {
+			level = "medium"
+		}
+		dtos = append(dtos, TaskTagDTO{ID: t.Name, Name: t.Name, Color: t.Color, Level: level})
 	}
 	return dtos
 }
