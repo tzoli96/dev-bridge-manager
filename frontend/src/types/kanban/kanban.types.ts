@@ -6,6 +6,7 @@ export interface KanbanColumn {
     color: string;
     position: number;
     maxTasks?: number;
+    isDone?: boolean;
     tasks: Task[];
     createdAt: string;
     updatedAt: string;

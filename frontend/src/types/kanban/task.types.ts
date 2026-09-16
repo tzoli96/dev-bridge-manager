@@ -31,6 +31,8 @@ export interface Task {
     attachments: TaskAttachment[];
     position: number;
     dueDate?: string;
+    subtaskProgress?: { total: number; done: number };
+    parentTask?: { id: string; title: string };
     createdAt: string;
     updatedAt: string;
     createdBy: string;
@@ -117,6 +119,7 @@ export interface CreateTaskData {
     columnId: string;
     boardId: string;
     assigneeId?: string;
+    parentTaskId?: string;
     estimatedHours?: number;
     tags?: TagInputData[];
     dueDate?: string;
