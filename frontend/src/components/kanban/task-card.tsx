@@ -11,7 +11,8 @@ import {
     GripVertical,
     Clock,
     Calendar,
-    AlertCircle
+    AlertCircle,
+    ListTree
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ProgressBar } from '@/components/ui/progress-bar';
@@ -31,6 +32,7 @@ interface TaskCardProps {
     onAddToBoard: () => void;
     onOpenComments: () => void;
     onOpenTimeLog: () => void;
+    onOpenParentTask?: () => void;
     onDragStart: () => void;
     onDragEnd: () => void;
 }
@@ -57,6 +59,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                                                       onAddToBoard,
                                                       onOpenComments,
                                                       onOpenTimeLog,
+                                                      onOpenParentTask,
                                                       onDragStart,
                                                       onDragEnd
                                                   }) => {
@@ -129,6 +132,16 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                 )}
             </div>
 
+            {task.parentTask && (
+                <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onOpenParentTask?.(); }}
+                    className="mb-2 text-xs text-muted-foreground hover:text-primary truncate text-left block"
+                >
+                    ↳ {task.parentTask.title}
+                </button>
+            )}
+
             <div className="space-y-2">
                 {/* Tags */}
                 {task.tags.length > 0 && (
@@ -197,6 +210,13 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                             <div className="flex items-center gap-1">
                                 <MessageSquare size={12} />
                                 <span>{task.comments.length}</span>
+                            </div>
+                        )}
+
+                        {task.subtaskProgress && (
+                            <div className="flex items-center gap-1">
+                                <ListTree size={12} />
+                                <span>{task.subtaskProgress.done}/{task.subtaskProgress.total}</span>
                             </div>
                         )}
                     </div>

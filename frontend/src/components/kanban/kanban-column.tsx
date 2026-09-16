@@ -28,6 +28,7 @@ interface KanbanColumnProps {
     onAddToBoard: (taskId: string) => void;
     onOpenComments: (taskId: string) => void;
     onOpenTimeLog: (taskId: string) => void;
+    onOpenParentTask: (taskId: string) => void;
     onDragStart: (task: Task) => void;
     onDragEnd: () => void;
 }
@@ -44,6 +45,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
                                                               onAddToBoard,
                                                               onOpenComments,
                                                               onOpenTimeLog,
+                                                              onOpenParentTask,
                                                               onDragStart,
                                                               onDragEnd
                                                           }) => {
@@ -111,6 +113,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
                             onAddToBoard={() => onAddToBoard(task.id)}
                             onOpenComments={() => onOpenComments(task.id)}
                             onOpenTimeLog={() => onOpenTimeLog(task.id)}
+                            onOpenParentTask={() => task.parentTask && onOpenParentTask(task.parentTask.id)}
                             onDragStart={() => onDragStart(task)}
                             onDragEnd={onDragEnd}
                         />
