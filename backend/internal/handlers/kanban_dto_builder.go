@@ -111,12 +111,65 @@ func taskProjectID(taskID uint) uint {
 	return projectID
 }
 
+// subtaskProgressByParent batch-computes {total, done} subtask counts for every
+// id in parentIDs that has at least one subtask, in a single grouped query.
+// "done" counts subtasks whose current board placement sits in an is_done column;
+// a subtask with no placement, or placed only in non-done columns, counts toward
+// total but not done.
+func subtaskProgressByParent(parentIDs []uint) map[uint]models.SubtaskProgressDTO {
+	result := make(map[uint]models.SubtaskProgressDTO)
+	if len(parentIDs) == 0 {
+		return result
+	}
+
+	type row struct {
+		ParentTaskID uint
+		Total        int
+		Done         int
+	}
+	var rows []row
+	database.GetDB().Raw(`
+		SELECT t.parent_task_id AS parent_task_id,
+		       COUNT(DISTINCT t.id) AS total,
+		       COUNT(DISTINCT t.id) FILTER (
+		           WHERE EXISTS (
+		               SELECT 1 FROM task_placements tp
+		               JOIN kanban_columns kc ON kc.id = tp.column_id
+		               WHERE tp.task_id = t.id AND kc.is_done = true
+		           )
+		       ) AS done
+		FROM tasks t
+		WHERE t.parent_task_id IN ? AND t.is_archived = false
+		GROUP BY t.parent_task_id
+	`, parentIDs).Scan(&rows)
+
+	for _, r := range rows {
+		result[r.ParentTaskID] = models.SubtaskProgressDTO{Total: r.Total, Done: r.Done}
+	}
+	return result
+}
+
+// parentTaskRefsByID batch-loads {id, title} for a set of task ids, used to
+// resolve the parentTask reference on a subtask's own DTO.
+func parentTaskRefsByID(ids []uint) map[uint]models.TaskParentRefDTO {
+	result := make(map[uint]models.TaskParentRefDTO)
+	if len(ids) == 0 {
+		return result
+	}
+	var rows []models.Task
+	database.GetDB().Select("id, title").Where("id IN ?", ids).Find(&rows)
+	for _, t := range rows {
+		result[t.ID] = models.TaskParentRefDTO{ID: models.IDToStr(t.ID), Title: t.Title}
+	}
+	return result
+}
+
 // buildTaskDTO assembles a full TaskDTO from a task row plus its already-loaded
 // comments/time entries (both filtered to this task) and a shared user lookup map.
 // placement is optional: when nil (project-scoped, placement-independent contexts)
 // ColumnID/Position come back as the zero value ("" / 0); otherwise they're sourced
 // from the given board placement.
-func buildTaskDTO(t models.Task, placement *models.TaskPlacement, comments []models.TaskComment, entries []models.TaskTimeEntry, taskAttachments []models.Attachment, commentAttachments map[uint][]models.Attachment, users map[uint]models.User) models.TaskDTO {
+func buildTaskDTO(t models.Task, placement *models.TaskPlacement, comments []models.TaskComment, entries []models.TaskTimeEntry, taskAttachments []models.Attachment, commentAttachments map[uint][]models.Attachment, users map[uint]models.User, subtaskProgress *models.SubtaskProgressDTO, parentTask *models.TaskParentRefDTO) models.TaskDTO {
 	commentDTOs := make([]models.TaskCommentDTO, 0, len(comments))
 	for _, c := range comments {
 		commentDTOs = append(commentDTOs, buildCommentDTO(c, users, t.ProjectID, commentAttachments[c.ID]))
@@ -156,19 +209,21 @@ func buildTaskDTO(t models.Task, placement *models.TaskPlacement, comments []mod
 			}
 			return ""
 		}(),
-		Assignee:       assigneeDTO(t.AssigneeID, users),
-		EstimatedHours: t.EstimatedHours,
-		LoggedHours:    loggedHours,
-		Tags:           models.TagsFromJSON(t.Tags),
-		TimeEntries:    entryDTOs,
-		Comments:       commentDTOs,
-		Attachments:    attachmentDTOs,
-		Position:       position,
-		DueDate:        models.FormatDate(t.DueDate),
-		CreatedAt:      t.CreatedAt,
-		UpdatedAt:      t.UpdatedAt,
-		CreatedBy:      models.IDToStr(t.CreatedBy),
-		UpdatedBy:      models.IDToStr(t.UpdatedBy),
+		Assignee:        assigneeDTO(t.AssigneeID, users),
+		EstimatedHours:  t.EstimatedHours,
+		LoggedHours:     loggedHours,
+		Tags:            models.TagsFromJSON(t.Tags),
+		TimeEntries:     entryDTOs,
+		Comments:        commentDTOs,
+		Attachments:     attachmentDTOs,
+		Position:        position,
+		DueDate:         models.FormatDate(t.DueDate),
+		SubtaskProgress: subtaskProgress,
+		ParentTask:      parentTask,
+		CreatedAt:       t.CreatedAt,
+		UpdatedAt:       t.UpdatedAt,
+		CreatedBy:       models.IDToStr(t.CreatedBy),
+		UpdatedBy:       models.IDToStr(t.UpdatedBy),
 	}
 }
 
@@ -232,9 +287,29 @@ func loadTaskDTOs(projectID uint) ([]models.TaskDTO, error) {
 		}
 	}
 
+	progressByParent := subtaskProgressByParent(taskIDs)
+
+	parentIDs := make([]uint, 0)
+	for _, t := range tasks {
+		if t.ParentTaskID != nil {
+			parentIDs = append(parentIDs, *t.ParentTaskID)
+		}
+	}
+	parentRefs := parentTaskRefsByID(parentIDs)
+
 	dtos := make([]models.TaskDTO, 0, len(tasks))
 	for _, t := range tasks {
-		dtos = append(dtos, buildTaskDTO(t, nil, commentsByTask[t.ID], entriesByTask[t.ID], taskAttachmentsByTask[t.ID], commentAttachmentsByComment, users))
+		var progress *models.SubtaskProgressDTO
+		if p, ok := progressByParent[t.ID]; ok {
+			progress = &p
+		}
+		var parentRef *models.TaskParentRefDTO
+		if t.ParentTaskID != nil {
+			if ref, ok := parentRefs[*t.ParentTaskID]; ok {
+				parentRef = &ref
+			}
+		}
+		dtos = append(dtos, buildTaskDTO(t, nil, commentsByTask[t.ID], entriesByTask[t.ID], taskAttachmentsByTask[t.ID], commentAttachmentsByComment, users, progress, parentRef))
 	}
 	return dtos, nil
 }
@@ -310,10 +385,30 @@ func loadBoardTaskDTOs(boardID uint) ([]models.TaskDTO, error) {
 		}
 	}
 
+	progressByParent := subtaskProgressByParent(rowIDs)
+
+	parentIDs := make([]uint, 0)
+	for _, t := range tasks {
+		if t.ParentTaskID != nil {
+			parentIDs = append(parentIDs, *t.ParentTaskID)
+		}
+	}
+	parentRefs := parentTaskRefsByID(parentIDs)
+
 	dtos := make([]models.TaskDTO, 0, len(tasks))
 	for _, t := range tasks {
 		p := placementByTask[t.ID]
-		dtos = append(dtos, buildTaskDTO(t, &p, commentsByTask[t.ID], entriesByTask[t.ID], taskAttachmentsByTask[t.ID], commentAttachmentsByComment, users))
+		var progress *models.SubtaskProgressDTO
+		if pr, ok := progressByParent[t.ID]; ok {
+			progress = &pr
+		}
+		var parentRef *models.TaskParentRefDTO
+		if t.ParentTaskID != nil {
+			if ref, ok := parentRefs[*t.ParentTaskID]; ok {
+				parentRef = &ref
+			}
+		}
+		dtos = append(dtos, buildTaskDTO(t, &p, commentsByTask[t.ID], entriesByTask[t.ID], taskAttachmentsByTask[t.ID], commentAttachmentsByComment, users, progress, parentRef))
 	}
 	return dtos, nil
 }
@@ -355,5 +450,110 @@ func loadSingleTaskDTO(task models.Task, placement *models.TaskPlacement) models
 		}
 	}
 
-	return buildTaskDTO(task, placement, comments, entries, taskAttachments, commentAttachments, users)
+	progressByParent := subtaskProgressByParent([]uint{task.ID})
+	var progress *models.SubtaskProgressDTO
+	if p, ok := progressByParent[task.ID]; ok {
+		progress = &p
+	}
+
+	var parentRef *models.TaskParentRefDTO
+	if task.ParentTaskID != nil {
+		if ref, ok := parentTaskRefsByID([]uint{*task.ParentTaskID})[*task.ParentTaskID]; ok {
+			parentRef = &ref
+		}
+	}
+
+	return buildTaskDTO(task, placement, comments, entries, taskAttachments, commentAttachments, users, progress, parentRef)
+}
+
+// loadSubtaskDTOs loads all (non-archived) subtasks of a given parent task, each
+// resolved with its earliest known board placement (a subtask is usually placed on
+// exactly one board — if placed on more than one, this only affects the informational
+// columnId shown on the subtask row, not the parent's own subtaskProgress count computed
+// by subtaskProgressByParent above). Subtasks are one level deep only, so every returned
+// DTO's own subtaskProgress is nil.
+func loadSubtaskDTOs(parentTaskID uint) ([]models.TaskDTO, error) {
+	var tasks []models.Task
+	if err := database.GetDB().Where("parent_task_id = ? AND is_archived = false", parentTaskID).
+		Order("id ASC").Find(&tasks).Error; err != nil {
+		return nil, err
+	}
+	if len(tasks) == 0 {
+		return []models.TaskDTO{}, nil
+	}
+
+	taskIDs := make([]uint, len(tasks))
+	userIDs := make([]uint, 0, len(tasks)*2)
+	for i, t := range tasks {
+		taskIDs[i] = t.ID
+		userIDs = append(userIDs, t.CreatedBy, t.UpdatedBy)
+		if t.AssigneeID != nil {
+			userIDs = append(userIDs, *t.AssigneeID)
+		}
+	}
+
+	var placements []models.TaskPlacement
+	database.GetDB().Where("task_id IN ?", taskIDs).Order("id ASC").Find(&placements)
+	placementByTask := make(map[uint]models.TaskPlacement, len(placements))
+	for _, p := range placements {
+		if _, exists := placementByTask[p.TaskID]; !exists {
+			placementByTask[p.TaskID] = p
+		}
+	}
+
+	var comments []models.TaskComment
+	database.GetDB().Where("task_id IN ?", taskIDs).Order("created_at ASC").Find(&comments)
+
+	var entries []models.TaskTimeEntry
+	database.GetDB().Where("task_id IN ?", taskIDs).Order("date DESC").Find(&entries)
+
+	var attachments []models.Attachment
+	database.GetDB().Where("task_id IN ?", taskIDs).Order("created_at ASC").Find(&attachments)
+
+	for _, c := range comments {
+		userIDs = append(userIDs, c.UserID)
+	}
+	for _, e := range entries {
+		userIDs = append(userIDs, e.UserID)
+	}
+	for _, a := range attachments {
+		userIDs = append(userIDs, a.UploadedBy)
+	}
+	users := loadUsersByIDs(userIDs)
+
+	commentsByTask := make(map[uint][]models.TaskComment)
+	for _, c := range comments {
+		commentsByTask[c.TaskID] = append(commentsByTask[c.TaskID], c)
+	}
+	entriesByTask := make(map[uint][]models.TaskTimeEntry)
+	for _, e := range entries {
+		entriesByTask[e.TaskID] = append(entriesByTask[e.TaskID], e)
+	}
+	taskAttachmentsByTask := make(map[uint][]models.Attachment)
+	commentAttachmentsByComment := make(map[uint][]models.Attachment)
+	for _, a := range attachments {
+		if a.CommentID == nil {
+			taskAttachmentsByTask[a.TaskID] = append(taskAttachmentsByTask[a.TaskID], a)
+		} else {
+			commentAttachmentsByComment[*a.CommentID] = append(commentAttachmentsByComment[*a.CommentID], a)
+		}
+	}
+
+	parentRefs := parentTaskRefsByID([]uint{parentTaskID})
+	parentRef, hasParentRef := parentRefs[parentTaskID]
+
+	dtos := make([]models.TaskDTO, 0, len(tasks))
+	for _, t := range tasks {
+		var pt *models.TaskParentRefDTO
+		if hasParentRef {
+			ref := parentRef
+			pt = &ref
+		}
+		var placement *models.TaskPlacement
+		if p, ok := placementByTask[t.ID]; ok {
+			placement = &p
+		}
+		dtos = append(dtos, buildTaskDTO(t, placement, commentsByTask[t.ID], entriesByTask[t.ID], taskAttachmentsByTask[t.ID], commentAttachmentsByComment, users, nil, pt))
+	}
+	return dtos, nil
 }
