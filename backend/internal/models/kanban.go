@@ -100,12 +100,10 @@ type TaskTagDTO struct {
 	ID    string `json:"id"`
 	Name  string `json:"name"`
 	Color string `json:"color"`
-	Level string `json:"level"`
 }
 
 type TagInput struct {
-	Name  string `json:"name" validate:"required"`
-	Level string `json:"level" validate:"omitempty,oneof=low medium high"`
+	Name string `json:"name" validate:"required"`
 }
 
 type TaskAssigneeDTO struct {
@@ -141,7 +139,6 @@ type TaskCommentDTO struct {
 	UserID      string          `json:"userId"`
 	User        *TaskUserRefDTO `json:"user,omitempty"`
 	IsEdited    bool            `json:"isEdited"`
-	Attachments []AttachmentDTO `json:"attachments"`
 	CreatedAt   time.Time       `json:"createdAt"`
 	UpdatedAt   time.Time       `json:"updatedAt"`
 }
@@ -350,12 +347,11 @@ func tagColorFor(name string) string {
 	return tagColorPalette[sum%len(tagColorPalette)]
 }
 
-// TagsToJSON converts tag inputs into the JSONB-stored [{name,color,level}] representation.
+// TagsToJSON converts tag inputs into the JSONB-stored [{name,color}] representation.
 func TagsToJSON(inputs []TagInput) string {
 	type tag struct {
 		Name  string `json:"name"`
 		Color string `json:"color"`
-		Level string `json:"level"`
 	}
 	tags := make([]tag, 0, len(inputs))
 	seen := make(map[string]bool)
@@ -365,11 +361,7 @@ func TagsToJSON(inputs []TagInput) string {
 			continue
 		}
 		seen[n] = true
-		level := strings.TrimSpace(in.Level)
-		if level != "low" && level != "medium" && level != "high" {
-			level = "medium"
-		}
-		tags = append(tags, tag{Name: n, Color: tagColorFor(n), Level: level})
+		tags = append(tags, tag{Name: n, Color: tagColorFor(n)})
 	}
 	b, _ := json.Marshal(tags)
 	return string(b)
@@ -380,7 +372,6 @@ func TagsFromJSON(raw string) []TaskTagDTO {
 	type tag struct {
 		Name  string `json:"name"`
 		Color string `json:"color"`
-		Level string `json:"level"`
 	}
 	var tags []tag
 	if raw != "" {
@@ -388,11 +379,7 @@ func TagsFromJSON(raw string) []TaskTagDTO {
 	}
 	dtos := make([]TaskTagDTO, 0, len(tags))
 	for _, t := range tags {
-		level := t.Level
-		if level != "low" && level != "medium" && level != "high" {
-			level = "medium"
-		}
-		dtos = append(dtos, TaskTagDTO{ID: t.Name, Name: t.Name, Color: t.Color, Level: level})
+		dtos = append(dtos, TaskTagDTO{ID: t.Name, Name: t.Name, Color: t.Color})
 	}
 	return dtos
 }
