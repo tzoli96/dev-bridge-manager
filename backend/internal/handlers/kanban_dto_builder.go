@@ -52,11 +52,7 @@ func assigneeDTO(userID *uint, users map[uint]models.User) *models.TaskAssigneeD
 	return &models.TaskAssigneeDTO{ID: models.IDToStr(u.ID), Name: u.Name, Email: u.Email, Avatar: ""}
 }
 
-func buildCommentDTO(c models.TaskComment, users map[uint]models.User, projectID uint, attachments []models.Attachment) models.TaskCommentDTO {
-	attachmentDTOs := make([]models.AttachmentDTO, 0, len(attachments))
-	for _, a := range attachments {
-		attachmentDTOs = append(attachmentDTOs, buildAttachmentDTO(a, users, projectID))
-	}
+func buildCommentDTO(c models.TaskComment, users map[uint]models.User) models.TaskCommentDTO {
 	return models.TaskCommentDTO{
 		ID:          models.IDToStr(c.ID),
 		TaskID:      models.IDToStr(c.TaskID),
@@ -84,42 +80,15 @@ func buildTimeEntryDTO(e models.TaskTimeEntry, users map[uint]models.User) model
 	}
 }
 
-func buildAttachmentDTO(a models.Attachment, users map[uint]models.User, projectID uint) models.AttachmentDTO {
-	commentID := ""
-	if a.CommentID != nil {
-		commentID = models.IDToStr(*a.CommentID)
-	}
-	return models.AttachmentDTO{
-		ID:           models.IDToStr(a.ID),
-		TaskID:       models.IDToStr(a.TaskID),
-		CommentID:    commentID,
-		OriginalName: a.OriginalName,
-		MimeType:     a.MimeType,
-		Size:         a.Size,
-		UploadedByID: models.IDToStr(a.UploadedBy),
-		UploadedBy:   userRefDTO(a.UploadedBy, users),
-		CreatedAt:    a.CreatedAt,
-		DownloadUrl:  "/projects/" + models.IDToStr(projectID) + "/attachments/" + models.IDToStr(a.ID) + "/download",
-	}
-}
-
-// taskProjectID looks up a task's project id (needed by call sites — comment
-// handlers — that only have a task/comment id in scope, not the full Task row).
-func taskProjectID(taskID uint) uint {
-	var projectID uint
-	database.GetDB().Model(&models.Task{}).Where("id = ?", taskID).Select("project_id").Scan(&projectID)
-	return projectID
-}
-
 // buildTaskDTO assembles a full TaskDTO from a task row plus its already-loaded
 // comments/time entries (both filtered to this task) and a shared user lookup map.
 // placement is optional: when nil (project-scoped, placement-independent contexts)
 // ColumnID/Position come back as the zero value ("" / 0); otherwise they're sourced
 // from the given board placement.
-func buildTaskDTO(t models.Task, placement *models.TaskPlacement, comments []models.TaskComment, entries []models.TaskTimeEntry, taskAttachments []models.Attachment, commentAttachments map[uint][]models.Attachment, users map[uint]models.User) models.TaskDTO {
+func buildTaskDTO(t models.Task, placement *models.TaskPlacement, comments []models.TaskComment, entries []models.TaskTimeEntry, users map[uint]models.User) models.TaskDTO {
 	commentDTOs := make([]models.TaskCommentDTO, 0, len(comments))
 	for _, c := range comments {
-		commentDTOs = append(commentDTOs, buildCommentDTO(c, users, t.ProjectID, commentAttachments[c.ID]))
+		commentDTOs = append(commentDTOs, buildCommentDTO(c, users))
 	}
 
 	entryDTOs := make([]models.TimeEntryDTO, 0, len(entries))
@@ -127,11 +96,6 @@ func buildTaskDTO(t models.Task, placement *models.TaskPlacement, comments []mod
 	for _, e := range entries {
 		entryDTOs = append(entryDTOs, buildTimeEntryDTO(e, users))
 		loggedHours += e.Hours
-	}
-
-	attachmentDTOs := make([]models.AttachmentDTO, 0, len(taskAttachments))
-	for _, a := range taskAttachments {
-		attachmentDTOs = append(attachmentDTOs, buildAttachmentDTO(a, users, t.ProjectID))
 	}
 
 	columnID := ""
@@ -162,7 +126,7 @@ func buildTaskDTO(t models.Task, placement *models.TaskPlacement, comments []mod
 		Tags:           models.TagsFromJSON(t.Tags),
 		TimeEntries:    entryDTOs,
 		Comments:       commentDTOs,
-		Attachments:    attachmentDTOs,
+		Attachments:    []interface{}{},
 		Position:       position,
 		DueDate:        models.FormatDate(t.DueDate),
 		CreatedAt:      t.CreatedAt,
@@ -200,17 +164,11 @@ func loadTaskDTOs(projectID uint) ([]models.TaskDTO, error) {
 	var entries []models.TaskTimeEntry
 	database.GetDB().Where("task_id IN ?", taskIDs).Order("date DESC").Find(&entries)
 
-	var attachments []models.Attachment
-	database.GetDB().Where("task_id IN ?", taskIDs).Order("created_at ASC").Find(&attachments)
-
 	for _, c := range comments {
 		userIDs = append(userIDs, c.UserID)
 	}
 	for _, e := range entries {
 		userIDs = append(userIDs, e.UserID)
-	}
-	for _, a := range attachments {
-		userIDs = append(userIDs, a.UploadedBy)
 	}
 	users := loadUsersByIDs(userIDs)
 
@@ -222,19 +180,10 @@ func loadTaskDTOs(projectID uint) ([]models.TaskDTO, error) {
 	for _, e := range entries {
 		entriesByTask[e.TaskID] = append(entriesByTask[e.TaskID], e)
 	}
-	taskAttachmentsByTask := make(map[uint][]models.Attachment)
-	commentAttachmentsByComment := make(map[uint][]models.Attachment)
-	for _, a := range attachments {
-		if a.CommentID == nil {
-			taskAttachmentsByTask[a.TaskID] = append(taskAttachmentsByTask[a.TaskID], a)
-		} else {
-			commentAttachmentsByComment[*a.CommentID] = append(commentAttachmentsByComment[*a.CommentID], a)
-		}
-	}
 
 	dtos := make([]models.TaskDTO, 0, len(tasks))
 	for _, t := range tasks {
-		dtos = append(dtos, buildTaskDTO(t, nil, commentsByTask[t.ID], entriesByTask[t.ID], taskAttachmentsByTask[t.ID], commentAttachmentsByComment, users))
+		dtos = append(dtos, buildTaskDTO(t, nil, commentsByTask[t.ID], entriesByTask[t.ID], users))
 	}
 	return dtos, nil
 }
@@ -278,17 +227,11 @@ func loadBoardTaskDTOs(boardID uint) ([]models.TaskDTO, error) {
 	var entries []models.TaskTimeEntry
 	database.GetDB().Where("task_id IN ?", rowIDs).Order("date DESC").Find(&entries)
 
-	var attachments []models.Attachment
-	database.GetDB().Where("task_id IN ?", rowIDs).Order("created_at ASC").Find(&attachments)
-
 	for _, c := range comments {
 		userIDs = append(userIDs, c.UserID)
 	}
 	for _, e := range entries {
 		userIDs = append(userIDs, e.UserID)
-	}
-	for _, a := range attachments {
-		userIDs = append(userIDs, a.UploadedBy)
 	}
 	users := loadUsersByIDs(userIDs)
 
@@ -300,20 +243,11 @@ func loadBoardTaskDTOs(boardID uint) ([]models.TaskDTO, error) {
 	for _, e := range entries {
 		entriesByTask[e.TaskID] = append(entriesByTask[e.TaskID], e)
 	}
-	taskAttachmentsByTask := make(map[uint][]models.Attachment)
-	commentAttachmentsByComment := make(map[uint][]models.Attachment)
-	for _, a := range attachments {
-		if a.CommentID == nil {
-			taskAttachmentsByTask[a.TaskID] = append(taskAttachmentsByTask[a.TaskID], a)
-		} else {
-			commentAttachmentsByComment[*a.CommentID] = append(commentAttachmentsByComment[*a.CommentID], a)
-		}
-	}
 
 	dtos := make([]models.TaskDTO, 0, len(tasks))
 	for _, t := range tasks {
 		p := placementByTask[t.ID]
-		dtos = append(dtos, buildTaskDTO(t, &p, commentsByTask[t.ID], entriesByTask[t.ID], taskAttachmentsByTask[t.ID], commentAttachmentsByComment, users))
+		dtos = append(dtos, buildTaskDTO(t, &p, commentsByTask[t.ID], entriesByTask[t.ID], users))
 	}
 	return dtos, nil
 }
@@ -327,9 +261,6 @@ func loadSingleTaskDTO(task models.Task, placement *models.TaskPlacement) models
 	var entries []models.TaskTimeEntry
 	database.GetDB().Where("task_id = ?", task.ID).Order("date DESC").Find(&entries)
 
-	var attachments []models.Attachment
-	database.GetDB().Where("task_id = ?", task.ID).Order("created_at ASC").Find(&attachments)
-
 	userIDs := []uint{task.CreatedBy, task.UpdatedBy}
 	if task.AssigneeID != nil {
 		userIDs = append(userIDs, *task.AssigneeID)
@@ -340,20 +271,7 @@ func loadSingleTaskDTO(task models.Task, placement *models.TaskPlacement) models
 	for _, e := range entries {
 		userIDs = append(userIDs, e.UserID)
 	}
-	for _, a := range attachments {
-		userIDs = append(userIDs, a.UploadedBy)
-	}
 	users := loadUsersByIDs(userIDs)
 
-	taskAttachments := make([]models.Attachment, 0, len(attachments))
-	commentAttachments := make(map[uint][]models.Attachment)
-	for _, a := range attachments {
-		if a.CommentID == nil {
-			taskAttachments = append(taskAttachments, a)
-		} else {
-			commentAttachments[*a.CommentID] = append(commentAttachments[*a.CommentID], a)
-		}
-	}
-
-	return buildTaskDTO(task, placement, comments, entries, taskAttachments, commentAttachments, users)
+	return buildTaskDTO(task, placement, comments, entries, users)
 }
