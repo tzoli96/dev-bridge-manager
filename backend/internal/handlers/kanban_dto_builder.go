@@ -149,6 +149,26 @@ func subtaskProgressByParent(parentIDs []uint) map[uint]models.SubtaskProgressDT
 	return result
 }
 
+// tasksInDoneColumn returns the subset of taskIDs whose current placement (any
+// board) sits in a column flagged is_done, in a single query.
+func tasksInDoneColumn(taskIDs []uint) map[uint]bool {
+	result := make(map[uint]bool)
+	if len(taskIDs) == 0 {
+		return result
+	}
+	var ids []uint
+	database.GetDB().Raw(`
+		SELECT DISTINCT tp.task_id
+		FROM task_placements tp
+		JOIN kanban_columns kc ON kc.id = tp.column_id
+		WHERE tp.task_id IN ? AND kc.is_done = true
+	`, taskIDs).Scan(&ids)
+	for _, id := range ids {
+		result[id] = true
+	}
+	return result
+}
+
 // parentTaskRefsByID batch-loads {id, title} for a set of task ids, used to
 // resolve the parentTask reference on a subtask's own DTO.
 func parentTaskRefsByID(ids []uint) map[uint]models.TaskParentRefDTO {
@@ -542,6 +562,8 @@ func loadSubtaskDTOs(parentTaskID uint) ([]models.TaskDTO, error) {
 	parentRefs := parentTaskRefsByID([]uint{parentTaskID})
 	parentRef, hasParentRef := parentRefs[parentTaskID]
 
+	doneSet := tasksInDoneColumn(taskIDs)
+
 	dtos := make([]models.TaskDTO, 0, len(tasks))
 	for _, t := range tasks {
 		var pt *models.TaskParentRefDTO
@@ -553,7 +575,9 @@ func loadSubtaskDTOs(parentTaskID uint) ([]models.TaskDTO, error) {
 		if p, ok := placementByTask[t.ID]; ok {
 			placement = &p
 		}
-		dtos = append(dtos, buildTaskDTO(t, placement, commentsByTask[t.ID], entriesByTask[t.ID], taskAttachmentsByTask[t.ID], commentAttachmentsByComment, users, nil, pt))
+		dto := buildTaskDTO(t, placement, commentsByTask[t.ID], entriesByTask[t.ID], taskAttachmentsByTask[t.ID], commentAttachmentsByComment, users, nil, pt)
+		dto.IsDoneColumn = doneSet[t.ID]
+		dtos = append(dtos, dto)
 	}
 	return dtos, nil
 }

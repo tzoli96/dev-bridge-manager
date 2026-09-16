@@ -87,14 +87,16 @@ export const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ projec
 
     const sortedColumns = [...columns].sort((a, b) => a.position - b.position);
 
-    const persistColumn = async (columnId: string, updates: Partial<Pick<KanbanColumn, 'title' | 'color' | 'maxTasks' | 'isDone'>>) => {
+    const persistColumn = async (columnId: string, updates: Partial<Pick<KanbanColumn, 'title' | 'color' | 'maxTasks' | 'isDone'>>): Promise<boolean> => {
         setError(null);
         setSavingId(columnId);
         try {
             await kanbanService.updateColumn(projectId, boardId, columnId, updates);
             updateColumnInStore(columnId, updates);
+            return true;
         } catch {
             setError('Failed to update column.');
+            return false;
         } finally {
             setSavingId(null);
         }
@@ -239,8 +241,8 @@ export const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ projec
                                                 return;
                                             }
                                         }
-                                        persistColumn(column.id, { isDone }).then(() => {
-                                            if (isDone) {
+                                        persistColumn(column.id, { isDone }).then((ok) => {
+                                            if (ok && isDone) {
                                                 sortedColumns.forEach((c) => {
                                                     if (c.id !== column.id && c.isDone) updateColumnInStore(c.id, { isDone: false });
                                                 });

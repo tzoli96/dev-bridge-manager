@@ -53,9 +53,6 @@ export const SubtasksTab: React.FC<SubtasksTabProps> = ({ taskId, onOpenSubtask 
         });
     }, [selectedBoardId, boardId, projectId, currentBoardColumns]);
 
-    const isDoneColumn = (columnId: string) =>
-        currentBoardColumns.find((c) => c.id === columnId)?.isDone ?? false;
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!title.trim() || !selectedColumnId) return;
@@ -118,11 +115,11 @@ export const SubtasksTab: React.FC<SubtasksTabProps> = ({ taskId, onOpenSubtask 
                                     )}
                                     <span className={cn(
                                         'text-xs font-medium px-2 py-0.5 rounded-full border',
-                                        isDoneColumn(subtask.columnId)
+                                        subtask.isDoneColumn
                                             ? 'text-success bg-success/10 border-success/20'
                                             : 'text-muted-foreground bg-muted border-border'
                                     )}>
-                                        {isDoneColumn(subtask.columnId) ? 'Done' : 'Not done'}
+                                        {subtask.isDoneColumn ? 'Done' : 'Not done'}
                                     </span>
                                 </span>
                             </button>

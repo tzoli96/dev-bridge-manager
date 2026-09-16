@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { subtaskService } from '@/services/kanban';
+import { subtaskService, taskService } from '@/services/kanban';
+import { useKanbanStore } from '@/stores/kanban';
 import type { Task, CreateTaskData } from '@/types/kanban';
 
 interface UseSubtasksReturn {
@@ -16,6 +17,8 @@ export const useSubtasks = (projectId: string, parentTaskId: string): UseSubtask
     const [subtasks, setSubtasks] = useState<Task[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const addTaskToStore = useKanbanStore((state) => state.addTask);
+    const updateTaskInStore = useKanbanStore((state) => state.updateTaskInStore);
 
     const loadSubtasks = useCallback(async () => {
         setIsLoading(true);
@@ -35,8 +38,10 @@ export const useSubtasks = (projectId: string, parentTaskId: string): UseSubtask
     const addSubtask = useCallback(async (data: CreateTaskData): Promise<Task> => {
         const subtask = await subtaskService.createSubtask(projectId, parentTaskId, data);
         setSubtasks((prev) => [...prev, subtask]);
+        addTaskToStore(subtask);
+        taskService.getTask(projectId, parentTaskId).then(updateTaskInStore).catch(() => {});
         return subtask;
-    }, [projectId, parentTaskId]);
+    }, [projectId, parentTaskId, addTaskToStore, updateTaskInStore]);
 
     return { subtasks, isLoading, error, loadSubtasks, addSubtask };
 };

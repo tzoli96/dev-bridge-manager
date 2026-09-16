@@ -55,6 +55,10 @@ func (h *TaskHandler) GetTask(c *fiber.Ctx) error {
 
 // GetSubtasks - GET /api/v1/projects/:id/tasks/:taskId/subtasks
 func (h *TaskHandler) GetSubtasks(c *fiber.Ctx) error {
+	projectID, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"success": false, "message": "Invalid project ID"})
+	}
 	taskID, err := strconv.Atoi(c.Params("taskId"))
 	if err != nil {
 		return c.Status(400).JSON(fiber.Map{"success": false, "message": "Invalid task ID"})
@@ -62,6 +66,9 @@ func (h *TaskHandler) GetSubtasks(c *fiber.Ctx) error {
 
 	var parent models.Task
 	if err := database.GetDB().First(&parent, taskID).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{"success": false, "message": "Task not found"})
+	}
+	if parent.ProjectID != uint(projectID) {
 		return c.Status(404).JSON(fiber.Map{"success": false, "message": "Task not found"})
 	}
 

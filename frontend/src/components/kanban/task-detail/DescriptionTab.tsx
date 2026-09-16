@@ -219,7 +219,10 @@ export const DescriptionTab: React.FC<DescriptionTabProps> = ({ taskId, onDelete
                     <button
                         type="button"
                         onClick={async () => {
-                            if (!confirm('Delete this task permanently? It will be removed from every board it appears on.')) return;
+                            const subtaskWarning = task.subtaskProgress?.total
+                                ? ` This will also permanently delete its ${task.subtaskProgress.total} subtask${task.subtaskProgress.total === 1 ? '' : 's'}.`
+                                : '';
+                            if (!confirm(`Delete this task permanently? It will be removed from every board it appears on.${subtaskWarning}`)) return;
                             setIsDeleting(true);
                             try { await onDeletePermanently(); } finally { setIsDeleting(false); }
                         }}

@@ -286,7 +286,10 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                             size="sm"
                             onClick={(e) => {
                                 e.stopPropagation();
-                                if (confirm('Remove this task from this board?')) {
+                                const subtaskWarning = task.subtaskProgress?.total
+                                    ? ` This will also permanently delete its ${task.subtaskProgress.total} subtask${task.subtaskProgress.total === 1 ? '' : 's'}.`
+                                    : '';
+                                if (confirm(`Remove this task from this board?${subtaskWarning}`)) {
                                     onRemove();
                                 }
                             }}

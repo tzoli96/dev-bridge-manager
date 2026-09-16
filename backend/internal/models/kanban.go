@@ -161,6 +161,7 @@ type TaskDTO struct {
 	Priority        string              `json:"priority"`
 	Status          string              `json:"status"`
 	ColumnID        string              `json:"columnId"`
+	IsDoneColumn    bool                `json:"isDoneColumn,omitempty"`
 	ProjectID       string              `json:"projectId"`
 	AssigneeID      string              `json:"assigneeId,omitempty"`
 	Assignee        *TaskAssigneeDTO    `json:"assignee,omitempty"`

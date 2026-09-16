@@ -32,6 +32,7 @@ export interface Task {
     position: number;
     dueDate?: string;
     subtaskProgress?: { total: number; done: number };
+    isDoneColumn?: boolean;
     parentTask?: { id: string; title: string };
     createdAt: string;
     updatedAt: string;

@@ -77,7 +77,11 @@ export const TaskForm: React.FC<TaskFormProps> = ({
 
     const handleDeletePermanently = async () => {
         if (!onDeletePermanently) return;
-        if (!confirm('Delete this task permanently? It will be removed from every board it appears on.')) return;
+        const taskForWarning = taskId ? getTask(taskId) : undefined;
+        const subtaskWarning = taskForWarning?.subtaskProgress?.total
+            ? ` This will also permanently delete its ${taskForWarning.subtaskProgress.total} subtask${taskForWarning.subtaskProgress.total === 1 ? '' : 's'}.`
+            : '';
+        if (!confirm(`Delete this task permanently? It will be removed from every board it appears on.${subtaskWarning}`)) return;
 
         setIsDeleting(true);
         try {
