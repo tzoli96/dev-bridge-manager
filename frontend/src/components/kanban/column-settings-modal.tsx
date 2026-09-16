@@ -15,14 +15,14 @@ interface ColumnSettingsModalProps {
 }
 
 const COLUMN_COLORS = [
-    'bg-blue-500',
-    'bg-yellow-500',
-    'bg-purple-500',
-    'bg-green-500',
-    'bg-red-500',
-    'bg-pink-500',
-    'bg-indigo-500',
-    'bg-gray-500',
+    'bg-primary',
+    'bg-warning',
+    'bg-primary',
+    'bg-success',
+    'bg-destructive',
+    'bg-primary',
+    'bg-primary',
+    'bg-muted-foreground/30',
 ];
 
 interface ColumnTitleInputProps {
@@ -66,7 +66,7 @@ const ColorPicker: React.FC<{ value: string; onChange: (color: string) => void }
                 className={cn(
                     'w-5 h-5 rounded-full transition-transform hover:scale-110',
                     color,
-                    value === color && 'ring-2 ring-offset-1 ring-gray-900'
+                    value === color && 'ring-2 ring-offset-1 ring-ring'
                 )}
             />
         ))}
@@ -157,21 +157,21 @@ export const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ projec
     return (
         <div className="space-y-4">
             {error && (
-                <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">
                     {error}
                 </div>
             )}
 
             <div className="space-y-3">
                 {sortedColumns.map((column, index) => (
-                    <div key={column.id} className="border border-gray-200 rounded-lg p-3 space-y-2">
+                    <div key={column.id} className="border border-border rounded-lg p-3 space-y-3">
                         <div className="flex items-center gap-2">
-                            <div className="flex flex-col gap-0.5">
+                            <div className="flex flex-col">
                                 <button
                                     type="button"
                                     disabled={index === 0}
                                     onClick={() => handleMove(index, -1)}
-                                    className="text-gray-400 hover:text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                                    className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                                 >
                                     <ArrowUp size={14} />
                                 </button>
@@ -179,7 +179,7 @@ export const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ projec
                                     type="button"
                                     disabled={index === sortedColumns.length - 1}
                                     onClick={() => handleMove(index, 1)}
-                                    className="text-gray-400 hover:text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                                    className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                                 >
                                     <ArrowDown size={14} />
                                 </button>
@@ -191,41 +191,47 @@ export const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ projec
                                 className="flex-1"
                             />
 
-                            <input
-                                type="number"
-                                min={0}
-                                placeholder="WIP limit"
-                                value={column.maxTasks ?? ''}
-                                onChange={(e) => updateColumnInStore(column.id, {
-                                    maxTasks: e.target.value === '' ? undefined : Number(e.target.value),
-                                })}
-                                onBlur={(e) => persistColumn(column.id, {
-                                    maxTasks: e.target.value === '' ? undefined : Number(e.target.value),
-                                })}
-                                className="w-24 rounded-lg border border-gray-300 px-2 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            />
-
                             <button
                                 type="button"
                                 disabled={savingId === column.id}
                                 onClick={() => handleDelete(column)}
-                                className="text-gray-400 hover:text-red-600 disabled:opacity-30 p-1"
+                                className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                             >
                                 <Trash2 size={16} />
                             </button>
                         </div>
 
-                        <div className="pl-6">
-                            <ColorPicker
-                                value={column.color}
-                                onChange={(color) => persistColumn(column.id, { color })}
-                            />
+                        <div className="flex items-center gap-6 pl-8">
+                            <div className="flex items-center gap-2">
+                                <label className="text-xs font-medium text-muted-foreground">WIP limit</label>
+                                <input
+                                    type="number"
+                                    min={0}
+                                    placeholder="—"
+                                    value={column.maxTasks ?? ''}
+                                    onChange={(e) => updateColumnInStore(column.id, {
+                                        maxTasks: e.target.value === '' ? undefined : Number(e.target.value),
+                                    })}
+                                    onBlur={(e) => persistColumn(column.id, {
+                                        maxTasks: e.target.value === '' ? undefined : Number(e.target.value),
+                                    })}
+                                    className="w-16 rounded-lg border border-input px-2 py-1.5 text-sm shadow-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                                />
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <label className="text-xs font-medium text-muted-foreground">Color</label>
+                                <ColorPicker
+                                    value={column.color}
+                                    onChange={(color) => persistColumn(column.id, { color })}
+                                />
+                            </div>
                         </div>
                     </div>
                 ))}
             </div>
 
-            <div className="border-t border-gray-200 pt-4 space-y-2">
+            <div className="border border-dashed border-input rounded-lg p-3 space-y-3">
                 <div className="flex items-center gap-2">
                     <Input
                         value={newTitle}
@@ -237,7 +243,10 @@ export const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ projec
                         Add Column
                     </Button>
                 </div>
-                <ColorPicker value={newColor} onChange={setNewColor} />
+                <div className="flex items-center gap-2 pl-1">
+                    <label className="text-xs font-medium text-muted-foreground">Color</label>
+                    <ColorPicker value={newColor} onChange={setNewColor} />
+                </div>
             </div>
         </div>
     );
