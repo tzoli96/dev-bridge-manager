@@ -100,6 +100,25 @@ func (h *TaskHandler) CreateTask(c *fiber.Ctx) error {
 		}
 	}
 
+	var parentTaskID *uint
+	if req.ParentTaskID != "" {
+		id, err := models.StrToID(req.ParentTaskID)
+		if err != nil {
+			return c.Status(400).JSON(fiber.Map{"success": false, "message": "Invalid parent task ID"})
+		}
+		var parent models.Task
+		if err := database.GetDB().First(&parent, id).Error; err != nil {
+			return c.Status(400).JSON(fiber.Map{"success": false, "message": "Parent task not found"})
+		}
+		if parent.ProjectID != uint(projectID) {
+			return c.Status(400).JSON(fiber.Map{"success": false, "message": "Parent task must be in the same project"})
+		}
+		if parent.ParentTaskID != nil {
+			return c.Status(400).JSON(fiber.Map{"success": false, "message": "A subtask cannot itself have subtasks"})
+		}
+		parentTaskID = &id
+	}
+
 	userID := currentUserID(c)
 
 	task := models.Task{
@@ -110,6 +129,7 @@ func (h *TaskHandler) CreateTask(c *fiber.Ctx) error {
 		Priority:        priority,
 		Status:          "todo",
 		AssigneeID:      assigneeID,
+		ParentTaskID:    parentTaskID,
 		EstimatedHours:  estimatedHours,
 		Tags:            models.TagsToJSON(req.Tags),
 		DueDate:         dueDate,
@@ -134,6 +154,10 @@ func (h *TaskHandler) CreateTask(c *fiber.Ctx) error {
 	}
 	if err := database.GetDB().Create(&placement).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"success": false, "message": "Error placing task"})
+	}
+
+	if parentTaskID != nil {
+		logActivity(*parentTaskID, userID, "subtask_added", "", "", task.Title)
 	}
 
 	return c.Status(201).JSON(loadSingleTaskDTO(task, &placement))
