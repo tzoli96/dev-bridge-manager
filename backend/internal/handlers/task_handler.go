@@ -53,6 +53,26 @@ func (h *TaskHandler) GetTask(c *fiber.Ctx) error {
 	return c.JSON(loadSingleTaskDTO(task, nil))
 }
 
+// GetSubtasks - GET /api/v1/projects/:id/tasks/:taskId/subtasks
+func (h *TaskHandler) GetSubtasks(c *fiber.Ctx) error {
+	taskID, err := strconv.Atoi(c.Params("taskId"))
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"success": false, "message": "Invalid task ID"})
+	}
+
+	var parent models.Task
+	if err := database.GetDB().First(&parent, taskID).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{"success": false, "message": "Task not found"})
+	}
+
+	dtos, err := loadSubtaskDTOs(uint(taskID))
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"success": false, "message": "Error loading subtasks"})
+	}
+
+	return c.JSON(dtos)
+}
+
 // CreateTask - POST /api/v1/projects/:id/tasks
 func (h *TaskHandler) CreateTask(c *fiber.Ctx) error {
 	projectID, err := strconv.Atoi(c.Params("id"))

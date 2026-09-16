@@ -40,6 +40,7 @@ func SetupKanbanRoutes(api fiber.Router) {
 	// Project-scoped tasks (board-independent)
 	projects.Get("/:id/tasks", taskHandler.GetTasks)
 	projects.Get("/:id/tasks/:taskId", taskHandler.GetTask)
+	projects.Get("/:id/tasks/:taskId/subtasks", taskHandler.GetSubtasks)
 	projects.Post("/:id/tasks", middleware.RequirePermission("tasks.create"), taskHandler.CreateTask)
 	projects.Put("/:id/tasks/:taskId", middleware.RequirePermission("tasks.update"), taskHandler.UpdateTask)
 	projects.Delete("/:id/tasks/:taskId", middleware.RequirePermission("tasks.delete"), taskHandler.DeleteTask)
