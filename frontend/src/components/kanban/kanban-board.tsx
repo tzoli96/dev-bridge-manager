@@ -49,6 +49,10 @@ export const KanbanBoard: React.FC = () => {
         setActiveModal({ type: ModalType.TASK_DETAIL, taskId, initialTab: 'comments' });
     };
 
+    const handleOpenParentTask = (taskId: string) => {
+        setActiveModal({ type: ModalType.TASK_DETAIL, taskId, initialTab: 'description' });
+    };
+
     const handleOpenTimeLog = (taskId: string) => {
         if (!permissions.canViewTimeTracking) return;
         setActiveModal({ type: ModalType.TIME_LOG, taskId });
@@ -142,6 +146,7 @@ export const KanbanBoard: React.FC = () => {
                             onAddToBoard={handleAddToBoard}
                             onOpenComments={handleOpenComments}
                             onOpenTimeLog={handleOpenTimeLog}
+                            onOpenParentTask={handleOpenParentTask}
                             onDragStart={(task) => dragDrop.startDrag(task, column.id)}
                             onDragEnd={dragDrop.endDrag}
                         />
@@ -177,6 +182,7 @@ export const KanbanBoard: React.FC = () => {
                     await deleteTask(activeModal.taskId!);
                     closeModal();
                 } : undefined}
+                onNavigate={handleOpenParentTask}
             />
 
             <Modal
