@@ -44,10 +44,18 @@ export interface TaskAssignee {
     avatar?: string;
 }
 
+export type TagLevel = 'low' | 'medium' | 'high';
+
 export interface TaskTag {
     id: string;
     name: string;
     color: string;
+    level: TagLevel;
+}
+
+export interface TagInputData {
+    name: string;
+    level: TagLevel;
 }
 
 export interface TimeEntry {
@@ -78,6 +86,7 @@ export interface TaskComment {
         avatar?: string;
     };
     isEdited: boolean;
+    attachments: TaskAttachment[];
     createdAt: string;
     updatedAt: string;
 }
@@ -85,13 +94,18 @@ export interface TaskComment {
 export interface TaskAttachment {
     id: string;
     taskId: string;
-    filename: string;
+    commentId?: string;
     originalName: string;
     mimeType: string;
     size: number;
-    url: string;
-    uploadedBy: string;
+    uploadedById: string;
+    uploadedBy?: {
+        id: string;
+        name: string;
+        avatar?: string;
+    };
     createdAt: string;
+    downloadUrl: string;
 }
 
 // API Request/Response types
@@ -104,7 +118,7 @@ export interface CreateTaskData {
     boardId: string;
     assigneeId?: string;
     estimatedHours?: number;
-    tags?: string[];
+    tags?: TagInputData[];
     dueDate?: string;
 }
 
@@ -115,7 +129,7 @@ export interface UpdateTaskData {
     priority?: TaskPriority;
     assigneeId?: string;
     estimatedHours?: number;
-    tags?: string[];
+    tags?: TagInputData[];
     dueDate?: string;
 }
 
@@ -154,7 +168,7 @@ export interface TaskFormData {
     priority: TaskPriority;
     assigneeId: string;
     estimatedHours: number;
-    tags: string[];
+    tags: TagInputData[];
     dueDate: string;
 }
 
