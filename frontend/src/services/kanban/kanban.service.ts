@@ -37,6 +37,7 @@ export const kanbanService = {
             color?: string;
             position?: number;
             maxTasks?: number;
+            isDone?: boolean;
         }
     ) {
         return apiClient.put(`/projects/${projectId}/boards/${boardId}/kanban/columns/${columnId}`, data);

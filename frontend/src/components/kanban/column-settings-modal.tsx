@@ -87,7 +87,7 @@ export const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ projec
 
     const sortedColumns = [...columns].sort((a, b) => a.position - b.position);
 
-    const persistColumn = async (columnId: string, updates: Partial<Pick<KanbanColumn, 'title' | 'color' | 'maxTasks'>>) => {
+    const persistColumn = async (columnId: string, updates: Partial<Pick<KanbanColumn, 'title' | 'color' | 'maxTasks' | 'isDone'>>) => {
         setError(null);
         setSavingId(columnId);
         try {
@@ -226,6 +226,31 @@ export const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ projec
                                     onChange={(color) => persistColumn(column.id, { color })}
                                 />
                             </div>
+
+                            <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                                <input
+                                    type="checkbox"
+                                    checked={column.isDone ?? false}
+                                    onChange={(e) => {
+                                        const isDone = e.target.checked;
+                                        if (isDone) {
+                                            const other = sortedColumns.find((c) => c.id !== column.id && c.isDone);
+                                            if (other && !window.confirm(`"${other.title}" is currently the Done column. Mark "${column.title}" as Done instead?`)) {
+                                                return;
+                                            }
+                                        }
+                                        persistColumn(column.id, { isDone }).then(() => {
+                                            if (isDone) {
+                                                sortedColumns.forEach((c) => {
+                                                    if (c.id !== column.id && c.isDone) updateColumnInStore(c.id, { isDone: false });
+                                                });
+                                            }
+                                        });
+                                    }}
+                                    className="rounded border-input"
+                                />
+                                Done column
+                            </label>
                         </div>
                     </div>
                 ))}
