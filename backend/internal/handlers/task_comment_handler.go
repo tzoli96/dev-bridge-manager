@@ -4,6 +4,9 @@ package handlers
 import (
 	"dev-bridge-manager/internal/database"
 	"dev-bridge-manager/internal/models"
+	"log"
+	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
@@ -27,15 +30,28 @@ func (h *TaskCommentHandler) GetComments(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"success": false, "message": "Error loading comments"})
 	}
 
+	commentIDs := make([]uint, len(comments))
 	userIDs := make([]uint, 0, len(comments))
-	for _, cm := range comments {
+	for i, cm := range comments {
+		commentIDs[i] = cm.ID
 		userIDs = append(userIDs, cm.UserID)
 	}
+
+	var attachments []models.Attachment
+	if len(commentIDs) > 0 {
+		database.GetDB().Where("comment_id IN ?", commentIDs).Order("created_at ASC").Find(&attachments)
+	}
+	attachmentsByComment := make(map[uint][]models.Attachment)
+	for _, a := range attachments {
+		attachmentsByComment[*a.CommentID] = append(attachmentsByComment[*a.CommentID], a)
+		userIDs = append(userIDs, a.UploadedBy)
+	}
 	users := loadUsersByIDs(userIDs)
+	projectID := taskProjectID(uint(taskID))
 
 	dtos := make([]models.TaskCommentDTO, 0, len(comments))
 	for _, cm := range comments {
-		dtos = append(dtos, buildCommentDTO(cm, users))
+		dtos = append(dtos, buildCommentDTO(cm, users, projectID, attachmentsByComment[cm.ID]))
 	}
 
 	return c.JSON(dtos)
@@ -70,7 +86,8 @@ func (h *TaskCommentHandler) CreateComment(c *fiber.Ctx) error {
 	logActivity(comment.TaskID, comment.UserID, "comment_added", "", "", preview)
 
 	users := loadUsersByIDs([]uint{comment.UserID})
-	return c.Status(201).JSON(buildCommentDTO(comment, users))
+	projectID := taskProjectID(uint(taskID))
+	return c.Status(201).JSON(buildCommentDTO(comment, users, projectID, nil))
 }
 
 // UpdateComment - PUT /api/v1/projects/:id/comments/:commentId
@@ -101,8 +118,16 @@ func (h *TaskCommentHandler) UpdateComment(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"success": false, "message": "Error updating comment"})
 	}
 
-	users := loadUsersByIDs([]uint{comment.UserID})
-	return c.JSON(buildCommentDTO(comment, users))
+	var attachments []models.Attachment
+	database.GetDB().Where("comment_id = ?", comment.ID).Order("created_at ASC").Find(&attachments)
+
+	userIDs := []uint{comment.UserID}
+	for _, a := range attachments {
+		userIDs = append(userIDs, a.UploadedBy)
+	}
+	users := loadUsersByIDs(userIDs)
+	projectID := taskProjectID(comment.TaskID)
+	return c.JSON(buildCommentDTO(comment, users, projectID, attachments))
 }
 
 // DeleteComment - DELETE /api/v1/projects/:id/comments/:commentId
@@ -115,8 +140,18 @@ func (h *TaskCommentHandler) DeleteComment(c *fiber.Ctx) error {
 	var comment models.TaskComment
 	database.GetDB().First(&comment, commentID)
 
+	var attachments []models.Attachment
+	database.GetDB().Where("comment_id = ?", commentID).Find(&attachments)
+
 	if err := database.GetDB().Delete(&models.TaskComment{}, commentID).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"success": false, "message": "Error deleting comment"})
+	}
+
+	for _, a := range attachments {
+		path := filepath.Join(uploadsBaseDir, "tasks", strconv.Itoa(int(a.TaskID)), a.Filename)
+		if err := os.Remove(path); err != nil {
+			log.Printf("⚠️ Failed to remove attachment file %s: %v", path, err)
+		}
 	}
 
 	preview := commentPreview(comment.Content)

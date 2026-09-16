@@ -13,6 +13,7 @@ func SetupKanbanRoutes(api fiber.Router) {
 	taskHandler := handlers.NewTaskHandler()
 	commentHandler := handlers.NewTaskCommentHandler()
 	timeEntryHandler := handlers.NewTaskTimeEntryHandler()
+	attachmentHandler := handlers.NewAttachmentHandler()
 	activityLogHandler := handlers.NewActivityLogHandler()
 
 	projects := api.Group("/projects")
@@ -51,6 +52,12 @@ func SetupKanbanRoutes(api fiber.Router) {
 	projects.Post("/:id/tasks/:taskId/comments", commentHandler.CreateComment)
 	projects.Put("/:id/comments/:commentId", commentHandler.UpdateComment)
 	projects.Delete("/:id/comments/:commentId", commentHandler.DeleteComment)
+
+	// Attachments
+	projects.Get("/:id/tasks/:taskId/attachments", attachmentHandler.GetAttachments)
+	projects.Post("/:id/tasks/:taskId/attachments", middleware.RequirePermission("tasks.update"), attachmentHandler.UploadAttachments)
+	projects.Get("/:id/attachments/:attachmentId/download", attachmentHandler.DownloadAttachment)
+	projects.Delete("/:id/attachments/:attachmentId", attachmentHandler.DeleteAttachment)
 
 	// Time entries
 	projects.Get("/:id/time-entries", middleware.RequirePermission("time_tracking.view"), timeEntryHandler.GetProjectTimeEntries)
