@@ -83,14 +83,14 @@ export const KanbanBoard: React.FC = () => {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
         );
     }
 
     if (error) {
         return (
-            <div className="text-center text-red-600 p-4">
+            <div className="text-center text-destructive p-4">
                 <p>Error loading kanban board: {error}</p>
                 <Button onClick={() => window.location.reload()} className="mt-2">
                     Retry
@@ -102,15 +102,15 @@ export const KanbanBoard: React.FC = () => {
     return (
         <div className="h-full flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b">
+            <div className="flex items-center justify-between px-6 py-5 border-b border-border bg-card">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">{board?.name ?? 'Kanban Board'}</h1>
-                    <p className="text-gray-600 mt-1">Manage your project tasks</p>
+                    <h1 className="text-xl font-semibold text-foreground tracking-tight">{board?.name ?? 'Kanban Board'}</h1>
+                    <p className="text-sm text-muted-foreground mt-0.5">Manage your project tasks</p>
                 </div>
 
                 <div className="flex items-center gap-2">
                     {permissions.canManageColumns && (
-                        <Button variant="ghost" icon={Settings} onClick={handleOpenSettings}>
+                        <Button variant="ghost" size="sm" icon={Settings} onClick={handleOpenSettings}>
                             Settings
                         </Button>
                     )}
@@ -118,8 +118,8 @@ export const KanbanBoard: React.FC = () => {
             </div>
 
             {/* Board */}
-            <div className="flex-1 overflow-x-auto">
-                <div className="flex gap-6 p-6 min-w-max">
+            <div className="flex-1 overflow-x-auto bg-background">
+                <div className="flex gap-5 p-6 min-w-max">
                     {columns.map((column) => (
                         <KanbanColumn
                             key={column.id}
