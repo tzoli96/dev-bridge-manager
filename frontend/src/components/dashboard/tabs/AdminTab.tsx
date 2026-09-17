@@ -1,19 +1,23 @@
 'use client'
 
+import { useState } from 'react'
 import { User } from '@/types/user'
 import { hasPermission } from '@/utils/permissions'
+import BillingoSettingsModal from '@/components/BillingoSettingsModal'
 
 interface AdminTabProps {
     user: User | null
 }
 
 export default function AdminTab({ user }: AdminTabProps) {
+    const [isBillingoModalOpen, setIsBillingoModalOpen] = useState(false)
+
     const adminCards = [
         {
             title: "System Settings",
             description: "Configure system-wide settings",
-            permission: "system.settings",
-            action: () => console.log("Open Settings")
+            permission: "billingo_settings.manage",
+            action: () => setIsBillingoModalOpen(true)
         },
         {
             title: "Role Management",
@@ -58,6 +62,11 @@ export default function AdminTab({ user }: AdminTabProps) {
                         </div>
                     ))}
             </div>
+
+            <BillingoSettingsModal
+                isOpen={isBillingoModalOpen}
+                onClose={() => setIsBillingoModalOpen(false)}
+            />
         </div>
     )
 }
