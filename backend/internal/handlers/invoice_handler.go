@@ -63,9 +63,10 @@ func toInvoiceResponse(inv models.Invoice, clientName, createdByName string) mod
 func ptrInvoiceResponse(r models.InvoiceResponse) *models.InvoiceResponse { return &r }
 
 // recordFailedInvoice persists an audit row for a Billingo call that failed
-// after local validation already passed. A failed row never blocks a
-// subsequent retry — only a status='created' row counts against the
-// fixed-price once-only rule.
+// after local validation already passed. Used only for pricing types that
+// have no pre-existing reservation row (currently: hourly, which has no
+// once-only rule). Fixed-price failures instead update the existing
+// 'pending' reservation row in place — see markReservationFailed.
 func (h *InvoiceHandler) recordFailedInvoice(projectID, clientID, createdBy uint, pricingType string, periodStart, periodEnd *time.Time, amount float64, errMsg string) {
 	invoice := models.Invoice{
 		ProjectID:    projectID,
@@ -79,6 +80,43 @@ func (h *InvoiceHandler) recordFailedInvoice(projectID, clientID, createdBy uint
 		CreatedBy:    createdBy,
 	}
 	database.GetDB().Create(&invoice)
+}
+
+// isDuplicateKeyError reports whether a GORM/Postgres error is a duplicate
+// key / unique constraint violation. Shared by the fixed-price reservation
+// insert and the hourly final insert so the once-only-rule race maps
+// consistently to a 409 in both places.
+func isDuplicateKeyError(err error) bool {
+	errStr := strings.ToLower(err.Error())
+	return strings.Contains(errStr, "duplicate key") || strings.Contains(errStr, "unique constraint")
+}
+
+// markReservationCreated finalizes a fixed-price 'pending' reservation row
+// into a 'created' row after a successful Billingo call, updating both the
+// DB row and the in-memory struct so the handler's JSON response reflects
+// the final state.
+func (h *InvoiceHandler) markReservationCreated(invoice *models.Invoice, billingoInvoiceID, billingoInvoiceNumber string) error {
+	invoice.Status = "created"
+	invoice.BillingoInvoiceID = billingoInvoiceID
+	invoice.BillingoInvoiceNumber = billingoInvoiceNumber
+	return database.GetDB().Model(invoice).Updates(map[string]interface{}{
+		"status":                  invoice.Status,
+		"billingo_invoice_id":     invoice.BillingoInvoiceID,
+		"billingo_invoice_number": invoice.BillingoInvoiceNumber,
+	}).Error
+}
+
+// markReservationFailed turns a fixed-price 'pending' reservation row into a
+// 'failed' row after a Billingo call error, instead of inserting a new row
+// (which would violate the once-only unique index while the reservation
+// still exists).
+func (h *InvoiceHandler) markReservationFailed(invoice *models.Invoice, errMsg string) {
+	invoice.Status = "failed"
+	invoice.ErrorMessage = errMsg
+	database.GetDB().Model(invoice).Updates(map[string]interface{}{
+		"status":        invoice.Status,
+		"error_message": invoice.ErrorMessage,
+	})
 }
 
 // CreateInvoice - POST /api/v1/projects/:id/invoices
@@ -126,19 +164,42 @@ func (h *InvoiceHandler) CreateInvoice(c *fiber.Ctx) error {
 	var periodStart, periodEnd *time.Time
 	var description string
 
+	// reservation holds the fixed-price 'pending' row that reserves the
+	// once-only right for this project before Billingo is ever called. It
+	// stays nil for pricing types (currently only hourly) that have no
+	// once-only rule and therefore no reservation row.
+	var reservation *models.Invoice
+
 	switch project.PricingType {
 	case "fixed":
 		if project.FixedPrice == nil {
 			return c.Status(400).JSON(models.InvoiceListResponse{Success: false, Message: "Project has no fixed price configured"})
 		}
 
-		var existing models.Invoice
-		if err := database.GetDB().Where("project_id = ? AND status = ?", projectID, "created").First(&existing).Error; err == nil {
-			return c.Status(409).JSON(models.InvoiceListResponse{Success: false, Message: "Ez a projekt már ki lett számlázva"})
-		}
-
 		amount = services.CalculateFixedAmount(*project.FixedPrice)
 		description = fmt.Sprintf("%s - fixed price", project.Name)
+
+		// Enforcement of the once-only rule now happens here, via this
+		// INSERT racing against the partial unique index
+		// idx_invoices_fixed_price_once (status IN ('created','pending')),
+		// BEFORE any Billingo API call is made. This closes the TOCTOU
+		// window that a pure pre-check SELECT (the old approach) could not:
+		// two concurrent requests can no longer both reach the Billingo
+		// call for the same project.
+		reservation = &models.Invoice{
+			ProjectID:   uint(projectID),
+			ClientID:    req.ClientID,
+			PricingType: "fixed",
+			Amount:      amount,
+			Status:      "pending",
+			CreatedBy:   currentUserID,
+		}
+		if err := database.GetDB().Create(reservation).Error; err != nil {
+			if isDuplicateKeyError(err) {
+				return c.Status(409).JSON(models.InvoiceListResponse{Success: false, Message: "Ez a projekt már ki lett számlázva"})
+			}
+			return c.Status(500).JSON(models.InvoiceListResponse{Success: false, Message: "Failed to reserve invoice slot"})
+		}
 
 	case "hourly":
 		if project.HourlyRate == nil {
@@ -175,35 +236,54 @@ func (h *InvoiceHandler) CreateInvoice(c *fiber.Ctx) error {
 
 	partnerID, err := h.billingoService.EnsurePartner(&client)
 	if err != nil {
-		h.recordFailedInvoice(uint(projectID), req.ClientID, currentUserID, project.PricingType, periodStart, periodEnd, amount, err.Error())
+		if reservation != nil {
+			h.markReservationFailed(reservation, err.Error())
+		} else {
+			h.recordFailedInvoice(uint(projectID), req.ClientID, currentUserID, project.PricingType, periodStart, periodEnd, amount, err.Error())
+		}
 		return c.Status(502).JSON(models.InvoiceListResponse{Success: false, Message: "Billingo error: " + err.Error()})
 	}
 
 	billingoInvoiceID, billingoInvoiceNumber, err := h.billingoService.CreateInvoice(partnerID, amount, description)
 	if err != nil {
-		h.recordFailedInvoice(uint(projectID), req.ClientID, currentUserID, project.PricingType, periodStart, periodEnd, amount, err.Error())
+		if reservation != nil {
+			h.markReservationFailed(reservation, err.Error())
+		} else {
+			h.recordFailedInvoice(uint(projectID), req.ClientID, currentUserID, project.PricingType, periodStart, periodEnd, amount, err.Error())
+		}
 		return c.Status(502).JSON(models.InvoiceListResponse{Success: false, Message: "Billingo error: " + err.Error()})
 	}
 
-	invoice := models.Invoice{
-		ProjectID:             uint(projectID),
-		ClientID:              req.ClientID,
-		BillingoInvoiceID:     billingoInvoiceID,
-		BillingoInvoiceNumber: billingoInvoiceNumber,
-		PricingType:           project.PricingType,
-		PeriodStart:           periodStart,
-		PeriodEnd:             periodEnd,
-		Amount:                amount,
-		Status:                "created",
-		CreatedBy:             currentUserID,
-	}
-
-	if err := database.GetDB().Create(&invoice).Error; err != nil {
-		errStr := strings.ToLower(err.Error())
-		if strings.Contains(errStr, "duplicate key") || strings.Contains(errStr, "unique constraint") {
-			return c.Status(409).JSON(models.InvoiceListResponse{Success: false, Message: "Ez a projekt már ki lett számlázva"})
+	var invoice models.Invoice
+	if reservation != nil {
+		// Fixed-price: finalize the existing 'pending' reservation row into
+		// 'created' rather than inserting a new row.
+		if err := h.markReservationCreated(reservation, billingoInvoiceID, billingoInvoiceNumber); err != nil {
+			return c.Status(500).JSON(models.InvoiceListResponse{Success: false, Message: "Invoice created in Billingo but failed to save locally"})
 		}
-		return c.Status(500).JSON(models.InvoiceListResponse{Success: false, Message: "Invoice created in Billingo but failed to save locally"})
+		invoice = *reservation
+	} else {
+		// Hourly: no reservation row exists (no once-only rule), so insert
+		// the 'created' row directly, unchanged from before.
+		invoice = models.Invoice{
+			ProjectID:             uint(projectID),
+			ClientID:              req.ClientID,
+			BillingoInvoiceID:     billingoInvoiceID,
+			BillingoInvoiceNumber: billingoInvoiceNumber,
+			PricingType:           project.PricingType,
+			PeriodStart:           periodStart,
+			PeriodEnd:             periodEnd,
+			Amount:                amount,
+			Status:                "created",
+			CreatedBy:             currentUserID,
+		}
+
+		if err := database.GetDB().Create(&invoice).Error; err != nil {
+			if isDuplicateKeyError(err) {
+				return c.Status(409).JSON(models.InvoiceListResponse{Success: false, Message: "Ez a projekt már ki lett számlázva"})
+			}
+			return c.Status(500).JSON(models.InvoiceListResponse{Success: false, Message: "Invoice created in Billingo but failed to save locally"})
+		}
 	}
 
 	return c.Status(201).JSON(models.InvoiceListResponse{
