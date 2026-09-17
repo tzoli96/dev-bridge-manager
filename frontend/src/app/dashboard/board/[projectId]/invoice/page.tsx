@@ -132,6 +132,21 @@ export default function InvoicePreviewPage() {
             .finally(() => setIsLoading(false));
     }, [projectId]);
 
+    React.useEffect(() => {
+        if (!project || !selectedClientId) {
+            setNoticeSentAt(null);
+            return;
+        }
+        InvoiceNoticesService.list(project.id, periodStart || undefined, periodEnd || undefined)
+            .then((res) => {
+                const forClient = (res.notices || []).filter((n) => n.client_id === selectedClientId);
+                setNoticeSentAt(forClient.length > 0 ? forClient[0].sent_at : null);
+            })
+            .catch(() => {
+                // non-fatal: leave whatever noticeSentAt already holds
+            });
+    }, [project, selectedClientId, periodStart, periodEnd]);
+
     const hoursByDate = React.useMemo(() => {
         const map = new Map<string, number>();
         for (const entry of entries) {

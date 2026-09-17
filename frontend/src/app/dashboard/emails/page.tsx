@@ -15,12 +15,15 @@ export default function EmailsPage() {
     const [status, setStatus] = useState<GmailStatus | null>(null)
     const [loadingStatus, setLoadingStatus] = useState(true)
     const [connecting, setConnecting] = useState(false)
+    const [statusError, setStatusError] = useState<string | null>(null)
 
     const [folder, setFolder] = useState<Folder>('inbox')
     const [emails, setEmails] = useState<EmailListItem[]>([])
     const [loadingEmails, setLoadingEmails] = useState(false)
+    const [listError, setListError] = useState<string | null>(null)
     const [selected, setSelected] = useState<EmailDetail | null>(null)
     const [selectedId, setSelectedId] = useState<number | null>(null)
+    const [detailError, setDetailError] = useState<string | null>(null)
 
     const [composeOpen, setComposeOpen] = useState(false)
     const [composeTo, setComposeTo] = useState('')
@@ -33,35 +36,52 @@ export default function EmailsPage() {
     useEffect(() => {
         GmailService.getStatus()
             .then(setStatus)
+            .catch((err: any) => setStatusError(err.message))
             .finally(() => setLoadingStatus(false))
     }, [])
 
     useEffect(() => {
         if (!status?.connected) return
         setLoadingEmails(true)
+        setListError(null)
         EmailsService.list(folder)
             .then(res => setEmails(res.emails || []))
+            .catch((err: any) => setListError(err.message))
             .finally(() => setLoadingEmails(false))
     }, [status?.connected, folder])
 
     const handleConnect = async () => {
         setConnecting(true)
-        const url = await GmailService.getAuthURL()
-        window.location.href = url
+        try {
+            const url = await GmailService.getAuthURL()
+            window.location.href = url
+        } catch (err: any) {
+            setStatusError(err.message)
+            setConnecting(false)
+        }
     }
 
     const handleDisconnect = async () => {
-        await GmailService.disconnect()
-        setStatus({ success: true, connected: false })
-        setEmails([])
-        setSelected(null)
+        try {
+            await GmailService.disconnect()
+            setStatus({ success: true, connected: false })
+            setEmails([])
+            setSelected(null)
+        } catch (err: any) {
+            setStatusError(err.message)
+        }
     }
 
     const openEmail = async (item: EmailListItem) => {
         setSelectedId(item.id)
-        const detail = await EmailsService.get(item.id)
-        setSelected(detail)
-        setEmails(prev => prev.map(e => (e.id === item.id ? { ...e, is_read: true } : e)))
+        setDetailError(null)
+        try {
+            const detail = await EmailsService.get(item.id)
+            setSelected(detail)
+            setEmails(prev => prev.map(e => (e.id === item.id ? { ...e, is_read: true } : e)))
+        } catch (err: any) {
+            setDetailError(err.message)
+        }
     }
 
     const openCompose = (reply?: EmailDetail) => {
@@ -123,6 +143,9 @@ export default function EmailsPage() {
                     {searchParams.get('error') === 'oauth_failed' && (
                         <p className="text-sm text-destructive">Az összekapcsolás sikertelen volt, próbáld újra.</p>
                     )}
+                    {statusError && (
+                        <p className="text-sm text-destructive">{statusError}</p>
+                    )}
                     <button
                         onClick={handleConnect}
                         disabled={connecting}
@@ -148,6 +171,9 @@ export default function EmailsPage() {
                         <p className="text-sm text-destructive mt-1">
                             A Gmail hozzáférés lejárt, kösd össze újra a fiókot.
                         </p>
+                    )}
+                    {statusError && (
+                        <p className="text-sm text-destructive mt-1">{statusError}</p>
                     )}
                 </div>
                 <div className="flex gap-2">
@@ -187,6 +213,8 @@ export default function EmailsPage() {
 
                     {loadingEmails ? (
                         <div className="p-6"><LoadingState message="E-mailek betöltése..." /></div>
+                    ) : listError ? (
+                        <p className="p-6 text-sm text-destructive text-center">{listError}</p>
                     ) : emails.length === 0 ? (
                         <p className="p-6 text-sm text-muted-foreground text-center">Nincs megjeleníthető e-mail.</p>
                     ) : (
@@ -219,7 +247,11 @@ export default function EmailsPage() {
                 </div>
 
                 <div className="md:col-span-3 bg-card border border-border rounded-xl shadow-sm p-6 min-h-[300px]">
-                    {!selected ? (
+                    {detailError ? (
+                        <div className="h-full flex items-center justify-center text-destructive text-sm">
+                            {detailError}
+                        </div>
+                    ) : !selected ? (
                         <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
                             Válassz egy e-mailt a bal oldali listából.
                         </div>
@@ -230,9 +262,18 @@ export default function EmailsPage() {
                                 <p className="text-sm text-muted-foreground">Feladó: {selected.from}</p>
                                 <p className="text-sm text-muted-foreground">Címzett: {selected.to}</p>
                             </div>
-                            <div className="prose prose-sm max-w-none text-foreground whitespace-pre-wrap">
-                                {selected.body_text || '(üres törzs)'}
-                            </div>
+                            {selected.body_text ? (
+                                <div className="prose prose-sm max-w-none text-foreground whitespace-pre-wrap">
+                                    {selected.body_text}
+                                </div>
+                            ) : selected.body_html ? (
+                                <div
+                                    className="prose prose-sm max-w-none text-foreground"
+                                    dangerouslySetInnerHTML={{ __html: selected.body_html }}
+                                />
+                            ) : (
+                                <div className="prose prose-sm max-w-none text-foreground whitespace-pre-wrap">(üres törzs)</div>
+                            )}
                             {selected.attachments && selected.attachments.length > 0 && (
                                 <div className="border-t border-border pt-3 space-y-1">
                                     <p className="text-xs font-medium text-muted-foreground">Csatolmányok</p>
