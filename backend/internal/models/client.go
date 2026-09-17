@@ -18,6 +18,7 @@ type Client struct {
 	Email             string    `json:"email" gorm:"size:255"`
 	Phone             string    `json:"phone" gorm:"size:50"`
 	Notes             string    `json:"notes" gorm:"type:text"`
+	BillingoPartnerID string    `json:"billingo_partner_id" gorm:"column:billingo_partner_id;size:100"`
 	IsActive          bool      `json:"is_active" gorm:"default:true"`
 	CreatedBy         uint      `json:"created_by" gorm:"not null"`
 	CreatedByName     string    `json:"created_by_name" gorm:"-"`
