@@ -14,10 +14,10 @@ import (
 
 // billingoBaseURL is Billingo's production API base. Verified 2026-09-17
 // against Billingo's official OpenAPI v3 (v3.0.14) schema, cross-checked via
-// the community-maintained swagger-codegen clients (Go, Python) generated
-// from it: https://github.com/kopridar/billingo-v3-python (base URL,
-// X-API-KEY auth header, /partners and /documents paths and payload field
-// names all confirmed against that schema).
+// the community-maintained Python swagger-codegen client generated from it:
+// https://github.com/kopridar/billingo-v3-python (base URL, X-API-KEY auth
+// header, /partners and /documents paths and payload field names all
+// confirmed against that schema).
 const billingoBaseURL = "https://api.billingo.hu/v3"
 
 type BillingoService struct {
