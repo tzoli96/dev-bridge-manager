@@ -25,6 +25,7 @@ func SetupRoutes(app *fiber.App) {
 	SetupInvoiceRoutes(v1)           // Invoice endpoints
 	SetupBillingoSettingsRoutes(v1)  // Billingo settings endpoints
 	SetupGmailRoutes(v1)             // Gmail OAuth connect/status endpoints
+	SetupEmailRoutes(v1)             // Synced email list/detail/attachment/send endpoints
 }
 
 func SetupAPIRoutes(api fiber.Router) {
