@@ -22,6 +22,8 @@ func SetupRoutes(app *fiber.App) {
 	SetupKanbanRoutes(v1)            // Kanban board/task/comment/time-entry endpoints - ÚJ!
 	SetupClientRoutes(v1)            // Client endpoints
 	SetupProjectClientRoutes(v1)     // Project-client assignment endpoints
+	SetupInvoiceRoutes(v1)           // Invoice endpoints
+	SetupBillingoSettingsRoutes(v1)  // Billingo settings endpoints
 }
 
 func SetupAPIRoutes(api fiber.Router) {
