@@ -1,38 +1,44 @@
 import HealthCheck from '../components/HealthCheck'
 import Link from 'next/link'
+import { Boxes, LogIn, Users } from 'lucide-react'
 
 export default function Home() {
   return (
-      <main className="min-h-screen bg-gray-50 py-12 px-4">
+      <main className="min-h-screen bg-background py-12 px-4">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-12">
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+              <Boxes size={24} />
+            </div>
+            <h1 className="text-4xl font-bold text-foreground mb-3">
               Dev Bridge Manager
             </h1>
-            <p className="text-xl text-gray-600 mb-8">
+            <p className="text-lg text-muted-foreground mb-6">
               Multi-agency development project management system
             </p>
-            <div className="inline-block bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded">
-              🚀 Frontend is running with Next.js 15 + Turbopack!
+            <div className="inline-block bg-primary/10 border border-primary/20 text-primary text-sm px-4 py-2 rounded-full">
+              Frontend running on Next.js 15 + Turbopack
             </div>
           </div>
 
           {/* Navigation */}
           <div className="flex justify-center mb-12">
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-lg font-semibold mb-4 text-center">Quick Navigation</h2>
-              <div className="grid grid-cols-2 gap-4">
+            <div className="bg-card rounded-xl shadow-sm border border-border p-6 w-full max-w-md">
+              <h2 className="text-base font-semibold text-foreground mb-4 text-center">Quick Navigation</h2>
+              <div className="grid grid-cols-2 gap-3">
                 <Link
                     href="/auth"
-                    className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors text-center"
+                    className="flex items-center justify-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-xl font-medium text-sm hover:bg-primary/90 active:scale-[0.98] transition-all"
                 >
-                  🔐 Login / Register
+                  <LogIn size={16} />
+                  Login / Register
                 </Link>
                 <Link
                     href="/users"
-                    className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors text-center"
+                    className="flex items-center justify-center gap-2 bg-card text-foreground border border-border px-6 py-3 rounded-xl font-medium text-sm hover:bg-muted active:scale-[0.98] transition-all"
                 >
-                  👥 View Users
+                  <Users size={16} />
+                  View Users
                 </Link>
               </div>
             </div>
@@ -44,7 +50,7 @@ export default function Home() {
           </div>
 
           {/* Additional Info */}
-          <div className="mt-12 text-center text-gray-500">
+          <div className="mt-12 text-center text-muted-foreground text-sm">
             <p>Test the connection between frontend and backend services</p>
           </div>
         </div>

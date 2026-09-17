@@ -6,15 +6,16 @@ import { useProjects } from '@/hooks/useProjects'
 import { useModals } from '@/components/dashboard/DashboardModals'
 import { useAuth } from '@/contexts/AuthContext'
 import { isAdmin } from '@/utils/permissions'
+import { Button } from '@/components/ui/button'
 import LoadingState from '@/components/ui/LoadingState'
 import ErrorState from '@/components/ui/ErrorState'
 import EmptyState from '@/components/ui/EmptyState'
 
 const statusStyles: Record<string, string> = {
-    active: 'bg-green-100 text-green-700',
-    completed: 'bg-blue-100 text-blue-700',
-    'on-hold': 'bg-yellow-100 text-yellow-700',
-    cancelled: 'bg-gray-100 text-gray-600',
+    active: 'bg-success/10 text-success',
+    completed: 'bg-primary/10 text-primary',
+    'on-hold': 'bg-warning/10 text-warning',
+    cancelled: 'bg-muted text-muted-foreground',
 }
 
 function formatPricing(project: { pricing_type?: 'hourly' | 'fixed' | ''; hourly_rate?: number | null; fixed_price?: number | null }): string {
@@ -45,16 +46,13 @@ export default function BoardPage() {
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
-                    <p className="text-gray-500 text-sm">Choose a project to open its boards</p>
+                    <h1 className="text-2xl font-bold text-foreground">Projects</h1>
+                    <p className="text-muted-foreground text-sm">Choose a project to open its boards</p>
                 </div>
                 {isAdmin(user) && (
-                    <button
-                        onClick={() => setShowCreateProject(true)}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium text-sm shadow-sm hover:bg-blue-700 hover:shadow-md active:scale-[0.98] transition-all"
-                    >
+                    <Button onClick={() => setShowCreateProject(true)}>
                         New Project
-                    </button>
+                    </Button>
                 )}
             </div>
 
@@ -69,32 +67,32 @@ export default function BoardPage() {
                     } : undefined}
                 />
             ) : (
-                <div className="bg-white shadow-sm border border-gray-200 rounded-xl overflow-hidden">
-                    <div className="bg-gray-50 px-6 py-3 border-b">
-                        <p className="text-sm text-gray-600">
+                <div className="bg-card shadow-sm border border-border rounded-xl overflow-hidden">
+                    <div className="bg-muted px-6 py-3 border-b">
+                        <p className="text-sm text-muted-foreground">
                             {projects.length} project{projects.length !== 1 ? 's' : ''}
                         </p>
                     </div>
 
                     <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
+                        <table className="min-w-full divide-y divide-border">
+                            <thead className="bg-muted">
                                 <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pricing</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created By</th>
-                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Project</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Pricing</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Created By</th>
+                                    <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
+                            <tbody className="bg-card divide-y divide-border">
                                 {projects.map(project => (
-                                    <tr key={project.id} className="hover:bg-gray-50">
+                                    <tr key={project.id} className="hover:bg-muted/50">
                                         <td className="px-6 py-4">
-                                            <div className="text-sm font-medium text-gray-900">{project.name}</div>
-                                            <div className="text-sm text-gray-500 line-clamp-1">{project.description}</div>
+                                            <div className="text-sm font-medium text-foreground">{project.name}</div>
+                                            <div className="text-sm text-muted-foreground line-clamp-1">{project.description}</div>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                                             {formatPricing(project)}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
@@ -102,13 +100,13 @@ export default function BoardPage() {
                                                 {project.status}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                                             {project.created_by_name || '-'}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                                             <button
                                                 onClick={() => router.push(`/dashboard/board/${project.id}`)}
-                                                className="text-blue-600 hover:text-blue-800 font-medium"
+                                                className="text-primary hover:text-primary/80 font-medium"
                                             >
                                                 Open
                                             </button>

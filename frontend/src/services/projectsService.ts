@@ -1,10 +1,25 @@
 import { apiClient } from '@/lib/api'
 
+export interface ProjectClient {
+    id: number
+    project_id: number
+    client_id: number
+    client_name: string
+    client_type: string
+    assigned_at: string
+    assigned_by: number
+    assigned_by_name: string
+}
+
 export interface Project {
     id: number
     name: string
     description: string
     status: 'active' | 'completed' | 'on-hold' | 'cancelled'
+    pricing_type?: 'hourly' | 'fixed' | ''
+    hourly_rate?: number | null
+    fixed_price?: number | null
+    clients?: ProjectClient[]
     created_by: number
     created_by_name: string
     created_at: string
@@ -15,12 +30,18 @@ export interface ProjectCreateRequest {
     name: string
     description?: string
     status?: 'active' | 'completed' | 'on-hold' | 'cancelled'
+    pricing_type?: 'hourly' | 'fixed' | ''
+    hourly_rate?: number | null
+    fixed_price?: number | null
 }
 
 export interface ProjectUpdateRequest {
     name?: string
     description?: string
     status?: 'active' | 'completed' | 'on-hold' | 'cancelled'
+    pricing_type?: 'hourly' | 'fixed' | ''
+    hourly_rate?: number | null
+    fixed_price?: number | null
 }
 
 export interface ProjectsResponse {
@@ -31,6 +52,14 @@ export interface ProjectsResponse {
     count?: number
 }
 
+export interface ProjectClientsResponse {
+    success: boolean
+    message: string
+    project_clients?: ProjectClient[]
+    project_client?: ProjectClient
+    count?: number
+}
+
 export class ProjectsService {
     private static baseUrl = '/projects'
 
@@ -38,8 +67,8 @@ export class ProjectsService {
         try {
             const response = await apiClient.get<ProjectsResponse>(this.baseUrl)
 
-            if (response.success && response.projects) {
-                return response.projects
+            if (response.success) {
+                return response.projects || []
             }
 
             throw new Error(response.message || 'Failed to fetch projects')
@@ -104,6 +133,49 @@ export class ProjectsService {
         } catch (error: any) {
             console.error('Error deleting project:', error)
             throw new Error(error.response?.data?.message || error.message || 'Failed to delete project')
+        }
+    }
+
+    static async getProjectClients(projectId: number): Promise<ProjectClient[]> {
+        try {
+            const response = await apiClient.get<ProjectClientsResponse>(`${this.baseUrl}/${projectId}/clients`)
+
+            if (response.success) {
+                return response.project_clients || []
+            }
+
+            throw new Error(response.message || 'Failed to fetch project clients')
+        } catch (error: any) {
+            console.error('Error fetching project clients:', error)
+            throw new Error(error.response?.data?.message || error.message || 'Failed to fetch project clients')
+        }
+    }
+
+    static async assignClientToProject(projectId: number, clientId: number): Promise<ProjectClient> {
+        try {
+            const response = await apiClient.post<ProjectClientsResponse>(`${this.baseUrl}/${projectId}/clients`, { client_id: clientId })
+
+            if (response.success && response.project_client) {
+                return response.project_client
+            }
+
+            throw new Error(response.message || 'Failed to assign client to project')
+        } catch (error: any) {
+            console.error('Error assigning client to project:', error)
+            throw new Error(error.response?.data?.message || error.message || 'Failed to assign client to project')
+        }
+    }
+
+    static async removeClientFromProject(projectId: number, clientId: number): Promise<void> {
+        try {
+            const response = await apiClient.delete<ProjectClientsResponse>(`${this.baseUrl}/${projectId}/clients/${clientId}`)
+
+            if (!response.success) {
+                throw new Error(response.message || 'Failed to remove client from project')
+            }
+        } catch (error: any) {
+            console.error('Error removing client from project:', error)
+            throw new Error(error.response?.data?.message || error.message || 'Failed to remove client from project')
         }
     }
 }

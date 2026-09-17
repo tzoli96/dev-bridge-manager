@@ -14,28 +14,28 @@ export default function ProfileTab({ user }: ProfileTabProps) {
     return (
         <div className="space-y-6">
             <div>
-                <h2 className="text-lg font-semibold">Your Profile</h2>
-                <p className="text-gray-600">View and manage your account information</p>
+                <h2 className="text-lg font-semibold text-foreground">Your Profile</h2>
+                <p className="text-muted-foreground text-sm">View and manage your account information</p>
             </div>
 
-            <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-semibold mb-4">Account Information</h3>
+            <div className="bg-card rounded-xl shadow-sm border border-border p-6">
+                <h3 className="text-base font-semibold text-foreground mb-4">Account Information</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700">Name</label>
-                        <p className="mt-1 text-gray-900">{user?.name}</p>
+                        <label className="block text-sm font-medium text-foreground">Name</label>
+                        <p className="mt-1 text-foreground">{user?.name}</p>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700">Email</label>
-                        <p className="mt-1 text-gray-900">{user?.email}</p>
+                        <label className="block text-sm font-medium text-foreground">Email</label>
+                        <p className="mt-1 text-foreground">{user?.email}</p>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700">Position</label>
-                        <p className="mt-1 text-gray-900">{user?.position || 'Not specified'}</p>
+                        <label className="block text-sm font-medium text-foreground">Position</label>
+                        <p className="mt-1 text-foreground">{user?.position || 'Not specified'}</p>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700">Role</label>
-                        <p className="mt-1 text-gray-900">{user?.role?.display_name}</p>
+                        <label className="block text-sm font-medium text-foreground">Role</label>
+                        <p className="mt-1 text-foreground">{user?.role?.display_name}</p>
                     </div>
                 </div>
 
@@ -43,13 +43,13 @@ export default function ProfileTab({ user }: ProfileTabProps) {
                     <div className="mt-6 space-x-3">
                         <button
                             onClick={() => setShowEditProfile(true)}
-                            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                            className="bg-primary text-white px-4 py-2 rounded-lg font-medium text-sm shadow-sm hover:bg-primary/90 hover:shadow-sm active:scale-[0.98] transition-all"
                         >
                             Edit Profile
                         </button>
                         <button
                             onClick={() => setShowChangePassword(true)}
-                            className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors"
+                            className="bg-card text-destructive border border-destructive/20 px-4 py-2 rounded-lg font-medium text-sm hover:bg-destructive/10 active:scale-[0.98] transition-all"
                         >
                             Change Password
                         </button>
@@ -59,13 +59,13 @@ export default function ProfileTab({ user }: ProfileTabProps) {
 
             {/* Debug info csak fejlesztési módban */}
             {process.env.NODE_ENV === 'development' && user?.permissions && (
-                <div className="bg-white rounded-lg shadow p-6">
-                    <h3 className="text-lg font-semibold mb-4">Your Permissions (Debug)</h3>
+                <div className="bg-card rounded-xl shadow-sm border border-border p-6">
+                    <h3 className="text-base font-semibold text-foreground mb-4">Your Permissions (Debug)</h3>
                     <div className="flex flex-wrap gap-2">
                         {user.permissions.map((permission: string) => (
                             <span
                                 key={permission}
-                                className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded"
+                                className="text-xs bg-success/10 text-success px-2 py-1 rounded"
                             >
                                 {permission}
                             </span>

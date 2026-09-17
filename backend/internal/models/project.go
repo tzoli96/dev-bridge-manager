@@ -9,6 +9,9 @@ type Project struct {
 	Name          string    `json:"name" gorm:"not null" validate:"required,min=1,max=255"`
 	Description   string    `json:"description" gorm:"type:text"`
 	Status        string    `json:"status" gorm:"default:active" validate:"oneof=active completed on-hold cancelled"`
+	PricingType   string    `json:"pricing_type" validate:"omitempty,oneof=hourly fixed"`
+	HourlyRate    *float64  `json:"hourly_rate"`
+	FixedPrice    *float64  `json:"fixed_price"`
 	CreatedBy     uint      `json:"created_by" gorm:"not null"`
 	CreatedByName string    `json:"created_by_name" gorm:"-"`
 	CreatedAt     time.Time `json:"created_at"`
@@ -16,29 +19,41 @@ type Project struct {
 
 	// Kapcsolat a User modellel
 	Creator User `json:"creator,omitempty" gorm:"foreignKey:CreatedBy"`
+	// Kapcsolat az ügyfelekkel
+	Clients []Client `json:"clients,omitempty" gorm:"many2many:project_clients;"`
 }
 
 type ProjectCreateRequest struct {
-	Name        string `json:"name" validate:"required,min=1,max=255"`
-	Description string `json:"description"`
-	Status      string `json:"status" validate:"omitempty,oneof=active completed on-hold cancelled"`
+	Name        string   `json:"name" validate:"required,min=1,max=255"`
+	Description string   `json:"description"`
+	Status      string   `json:"status" validate:"omitempty,oneof=active completed on-hold cancelled"`
+	PricingType string   `json:"pricing_type" validate:"omitempty,oneof=hourly fixed"`
+	HourlyRate  *float64 `json:"hourly_rate"`
+	FixedPrice  *float64 `json:"fixed_price"`
 }
 
 type ProjectUpdateRequest struct {
-	Name        string `json:"name" validate:"omitempty,min=1,max=255"`
-	Description string `json:"description"`
-	Status      string `json:"status" validate:"omitempty,oneof=active completed on-hold cancelled"`
+	Name        string   `json:"name" validate:"omitempty,min=1,max=255"`
+	Description string   `json:"description"`
+	Status      string   `json:"status" validate:"omitempty,oneof=active completed on-hold cancelled"`
+	PricingType string   `json:"pricing_type" validate:"omitempty,oneof=hourly fixed"`
+	HourlyRate  *float64 `json:"hourly_rate"`
+	FixedPrice  *float64 `json:"fixed_price"`
 }
 
 type ProjectResponse struct {
-	ID            uint      `json:"id"`
-	Name          string    `json:"name"`
-	Description   string    `json:"description"`
-	Status        string    `json:"status"`
-	CreatedBy     uint      `json:"created_by"`
-	CreatedByName string    `json:"created_by_name"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	ID            uint                    `json:"id"`
+	Name          string                  `json:"name"`
+	Description   string                  `json:"description"`
+	Status        string                  `json:"status"`
+	PricingType   string                  `json:"pricing_type"`
+	HourlyRate    *float64                `json:"hourly_rate"`
+	FixedPrice    *float64                `json:"fixed_price"`
+	CreatedBy     uint                    `json:"created_by"`
+	CreatedByName string                  `json:"created_by_name"`
+	CreatedAt     time.Time               `json:"created_at"`
+	UpdatedAt     time.Time               `json:"updated_at"`
+	Clients       []ProjectClientResponse `json:"clients,omitempty"`
 }
 
 type ProjectListResponse struct {

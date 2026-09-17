@@ -102,6 +102,42 @@ class ApiClient {
         return response.data
     }
 
+    // Multi-file upload
+    async uploadFiles<T>(
+        endpoint: string,
+        files: File[],
+        extraFields?: Record<string, string>,
+        onProgress?: (progress: number) => void
+    ): Promise<T> {
+        const formData = new FormData()
+        files.forEach((file) => formData.append('files', file))
+        if (extraFields) {
+            Object.entries(extraFields).forEach(([key, value]) => formData.append(key, value))
+        }
+
+        const response = await this.client.post<T>(endpoint, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+            timeout: 60000,
+            onUploadProgress: (progressEvent) => {
+                if (onProgress && progressEvent.total) {
+                    const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+                    onProgress(progress)
+                }
+            },
+        })
+
+        return response.data
+    }
+
+    // Authenticated blob fetch (thumbnails/downloads) — reuses the same
+    // Authorization header the shared axios instance already carries.
+    async getBlob(endpoint: string): Promise<Blob> {
+        const response = await this.client.get(endpoint, { responseType: 'blob', timeout: 60000 })
+        return response.data
+    }
+
     // Health check
     async healthCheck() {
         return this.get('/health')

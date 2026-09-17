@@ -50,7 +50,7 @@ export default function EmptyState({
     return (
         <div 
             className={cn(
-                "bg-white shadow-sm hover:shadow-md transition-all duration-300 rounded-lg p-8 text-center",
+                "bg-card shadow-sm hover:shadow-sm transition-all duration-300 rounded-lg p-8 text-center",
                 animate && "transition-all duration-500",
                 animate && (isVisible ? "opacity-100 transform translate-y-0" : "opacity-0 transform translate-y-8"),
                 className
@@ -58,7 +58,7 @@ export default function EmptyState({
         >
             <div 
                 className={cn(
-                    "text-gray-500 mb-6",
+                    "text-muted-foreground mb-6",
                     animate && "transition-all duration-500 transform",
                     animate && (isIconVisible 
                         ? "opacity-100 scale-100" 
@@ -67,8 +67,8 @@ export default function EmptyState({
             >
                 <IconComponent className={cn("mx-auto h-16 w-16", iconColorClass)} />
             </div>
-            <h3 className="text-xl font-medium text-gray-900 mb-3">{title}</h3>
-            <p className="text-gray-500 mb-6 max-w-md mx-auto">{description}</p>
+            <h3 className="text-xl font-medium text-foreground mb-3">{title}</h3>
+            <p className="text-muted-foreground mb-6 max-w-md mx-auto">{description}</p>
             {action && (
                 <Button
                     variant={action.variant || 'primary'}
@@ -105,17 +105,17 @@ function getIconComponent(icon: string) {
 function getIconColorClass(color: string) {
     switch (color) {
         case 'blue':
-            return 'text-blue-500';
+            return 'text-primary';
         case 'gray':
-            return 'text-gray-500';
+            return 'text-muted-foreground';
         case 'green':
-            return 'text-green-500';
+            return 'text-success';
         case 'purple':
-            return 'text-purple-500';
+            return 'text-primary';
         case 'yellow':
-            return 'text-yellow-500';
+            return 'text-warning';
         default:
-            return 'text-blue-500';
+            return 'text-primary';
     }
 }
 

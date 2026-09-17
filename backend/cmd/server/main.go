@@ -37,6 +37,7 @@ func main() {
 	app := fiber.New(fiber.Config{
 		AppName:      "Dev Bridge Manager v1.0",
 		ErrorHandler: errorHandler,
+		BodyLimit:    55 * 1024 * 1024, // 55MB — up to 5 attachments x 10MB each, plus multipart overhead
 	})
 
 	// Global middleware

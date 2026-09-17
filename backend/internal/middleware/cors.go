@@ -26,7 +26,7 @@ func getAllowedOrigins() string {
 	if origins == "" {
 		// Default allowed origins
 		defaultOrigins := []string{
-			"http://localhost:3000",
+			"http://localhost:3010",
 			"http://frontend:3000",
 		}
 		origins = strings.Join(defaultOrigins, ",")

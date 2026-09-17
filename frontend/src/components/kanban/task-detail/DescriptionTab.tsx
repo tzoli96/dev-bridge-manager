@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -55,9 +56,9 @@ export const DescriptionTab: React.FC<DescriptionTabProps> = ({ taskId, onDelete
     const Indicator = ({ field }: { field: string }) => {
         const s = status[field] ?? 'idle';
         const icon =
-            s === 'saving' ? <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" /> :
-            s === 'saved' ? <Check className="w-3.5 h-3.5 text-green-600" /> :
-            s === 'error' ? <AlertCircle className="w-3.5 h-3.5 text-red-600" /> :
+            s === 'saving' ? <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" /> :
+            s === 'saved' ? <Check className="w-3.5 h-3.5 text-success" /> :
+            s === 'error' ? <AlertCircle className="w-3.5 h-3.5 text-destructive" /> :
             null;
         return (
             <div className={cn('w-3.5 h-3.5 shrink-0 transition-opacity duration-300', s === 'idle' ? 'opacity-0' : 'opacity-100')}>
@@ -108,7 +109,7 @@ export const DescriptionTab: React.FC<DescriptionTabProps> = ({ taskId, onDelete
                 </div>
 
                 <div className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-700">Description</label>
+                    <label className="block text-sm font-medium text-foreground">Description</label>
                     <div className="flex items-start gap-2">
                         <div className="flex-1">
                             <RichTextEditor
@@ -123,8 +124,8 @@ export const DescriptionTab: React.FC<DescriptionTabProps> = ({ taskId, onDelete
                 </div>
             </section>
 
-            <section className="space-y-4 rounded-xl bg-gray-50 p-4">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Details</h3>
+            <section className="space-y-4 rounded-xl bg-muted p-4">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Details</h3>
 
                 <div className="grid grid-cols-2 gap-4">
                     <div className="flex items-center gap-2">
@@ -193,13 +194,13 @@ export const DescriptionTab: React.FC<DescriptionTabProps> = ({ taskId, onDelete
             </section>
 
             <section className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">Tags</label>
-                <div className="flex flex-wrap items-center gap-2 p-2 border rounded-lg border-gray-300 focus-within:ring-blue-500 focus-within:border-blue-500">
+                <label className="block text-sm font-medium text-foreground">Tags</label>
+                <div className="flex flex-wrap items-center gap-2 p-2 border rounded-lg border-border focus-within:ring-ring focus-within:border-ring">
                     {tags.map((tag) => (
                         <Badge key={tag.name} variant="secondary" className="gap-1">
                             <button type="button" onClick={() => handleCycleTagLevel(tag.name)}>{tag.level}</button>
                             {tag.name}
-                            <button type="button" onClick={() => handleRemoveTag(tag.name)} className="ml-1 hover:text-red-600">
+                            <button type="button" onClick={() => handleRemoveTag(tag.name)} className="ml-1 hover:text-destructive">
                                 <X size={12} />
                             </button>
                         </Badge>
@@ -216,8 +217,12 @@ export const DescriptionTab: React.FC<DescriptionTabProps> = ({ taskId, onDelete
 
             {onDeletePermanently && (
                 <div className="pt-4 border-t">
-                    <button
+                    <Button
                         type="button"
+                        variant="danger"
+                        size="sm"
+                        icon={Trash2}
+                        loading={isDeleting}
                         onClick={async () => {
                             const subtaskWarning = task.subtaskProgress?.total
                                 ? ` This will also permanently delete its ${task.subtaskProgress.total} subtask${task.subtaskProgress.total === 1 ? '' : 's'}.`
@@ -226,11 +231,9 @@ export const DescriptionTab: React.FC<DescriptionTabProps> = ({ taskId, onDelete
                             setIsDeleting(true);
                             try { await onDeletePermanently(); } finally { setIsDeleting(false); }
                         }}
-                        disabled={isDeleting}
-                        className="flex items-center gap-2 text-sm text-red-600 hover:text-red-700"
                     >
-                        <Trash2 size={14} /> {isDeleting ? 'Deleting…' : 'Delete permanently'}
-                    </button>
+                        {isDeleting ? 'Deleting…' : 'Delete permanently'}
+                    </Button>
                 </div>
             )}
         </div>

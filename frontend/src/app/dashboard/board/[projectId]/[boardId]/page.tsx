@@ -14,7 +14,7 @@ export default function BoardPage() {
             <div className="px-6 pt-4">
                 <Link
                     href={`/dashboard/board/${projectId}`}
-                    className="text-sm text-gray-500 hover:text-gray-700"
+                    className="text-sm text-muted-foreground hover:text-foreground"
                 >
                     ← Back to boards
                 </Link>

@@ -20,6 +20,8 @@ func SetupRoutes(app *fiber.App) {
 	SetupProjectRoutes(v1)           // Project endpoints - ÚJ!
 	SetupProjectAssignmentRoutes(v1) // Project endpoints - ÚJ!
 	SetupKanbanRoutes(v1)            // Kanban board/task/comment/time-entry endpoints - ÚJ!
+	SetupClientRoutes(v1)            // Client endpoints
+	SetupProjectClientRoutes(v1)     // Project-client assignment endpoints
 }
 
 func SetupAPIRoutes(api fiber.Router) {

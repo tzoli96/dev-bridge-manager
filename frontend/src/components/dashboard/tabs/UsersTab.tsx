@@ -41,13 +41,13 @@ export default function UsersTab({ user }: UsersTabProps) {
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <div>
-                    <h2 className="text-lg font-semibold">Team Members</h2>
-                    <p className="text-gray-600">Manage your team members and their roles</p>
+                    <h2 className="text-lg font-semibold text-foreground">Team Members</h2>
+                    <p className="text-muted-foreground text-sm">Manage your team members and their roles</p>
                 </div>
                 {hasPermission(user, 'users.create') && (
                     <button
                         onClick={() => setShowCreateUser(true)}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                        className="bg-primary text-white px-4 py-2 rounded-lg font-medium text-sm shadow-sm hover:bg-primary/90 hover:shadow-sm active:scale-[0.98] transition-all"
                     >
                         Add New User
                     </button>

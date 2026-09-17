@@ -56,13 +56,13 @@ export const AddToBoardModal: React.FC<AddToBoardModalProps> = ({ projectId, cur
     };
 
     if (boards.length === 0) {
-        return <p className="text-sm text-gray-500">No other boards in this project yet.</p>;
+        return <p className="text-sm text-muted-foreground">No other boards in this project yet.</p>;
     }
 
     return (
         <div className="space-y-4">
             {error && (
-                <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">
                     {error}
                 </div>
             )}

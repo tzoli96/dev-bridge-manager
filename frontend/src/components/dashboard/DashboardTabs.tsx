@@ -38,7 +38,7 @@ export default function DashboardTabs({ activeTab, onTabChange, user }: Dashboar
     ]
 
     return (
-        <div className="bg-white border-b">
+        <div className="bg-card border-b">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <nav className="flex space-x-8">
                     {tabs.filter(tab => tab.show).map(tab => (
@@ -47,16 +47,16 @@ export default function DashboardTabs({ activeTab, onTabChange, user }: Dashboar
                             onClick={() => onTabChange(tab.id)}
                             className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center ${
                                 activeTab === tab.id
-                                    ? 'border-blue-500 text-blue-600'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                    ? 'border-primary text-primary'
+                                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
                             }`}
                         >
                             {tab.label}
                             {tab.badge && tab.badge > 0 && (
                                 <span className={`ml-1 px-2 py-0.5 rounded-full text-xs ${
                                     tab.id === 'users'
-                                        ? 'bg-blue-100 text-blue-600'
-                                        : 'bg-green-100 text-green-600'
+                                        ? 'bg-primary/10 text-primary'
+                                        : 'bg-success/10 text-success'
                                 }`}>
                                     {tab.badge}
                                 </span>

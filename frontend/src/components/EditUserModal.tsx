@@ -87,10 +87,10 @@ export default function EditUserModal({ isOpen, user, onClose, onSuccess }: Edit
 
     const getPasswordStrengthColor = () => {
         switch (passwordStrength) {
-            case 'Weak': return 'text-red-600'
-            case 'Medium': return 'text-yellow-600'
-            case 'Strong': return 'text-green-600'
-            default: return 'text-gray-600'
+            case 'Weak': return 'text-destructive'
+            case 'Medium': return 'text-warning'
+            case 'Strong': return 'text-success'
+            default: return 'text-muted-foreground'
         }
     }
 
@@ -180,14 +180,14 @@ export default function EditUserModal({ isOpen, user, onClose, onSuccess }: Edit
     if (!isOpen || !user) return null
 
     return (
-        <div className="fixed inset-0 bg-black/10 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md mx-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-card rounded-xl shadow-sm p-6 w-full max-w-md mx-4">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-semibold">Edit User</h2>
                     <button
                         onClick={handleClose}
                         disabled={loading || success}
-                        className="text-gray-400 hover:text-gray-600 disabled:opacity-50 text-xl font-bold"
+                        className="text-muted-foreground hover:text-muted-foreground disabled:opacity-50 text-xl font-bold"
                     >
                         ✕
                     </button>
@@ -195,24 +195,24 @@ export default function EditUserModal({ isOpen, user, onClose, onSuccess }: Edit
 
                 {success ? (
                     <div className="text-center py-8">
-                        <div className="text-green-600 mb-4">
+                        <div className="text-success mb-4">
                             <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                             </svg>
                         </div>
-                        <h3 className="text-lg font-medium text-green-900 mb-2">User Updated!</h3>
-                        <p className="text-green-700">The user has been successfully updated.</p>
+                        <h3 className="text-lg font-medium text-success mb-2">User Updated!</h3>
+                        <p className="text-success">The user has been successfully updated.</p>
                     </div>
                 ) : (
                     <div className="space-y-4">
                         {error && (
-                            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                            <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded">
                                 {error}
                             </div>
                         )}
 
                         <div>
-                            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                            <label htmlFor="name" className="block text-sm font-medium text-foreground mb-1">
                                 Name *
                             </label>
                             <input
@@ -222,14 +222,14 @@ export default function EditUserModal({ isOpen, user, onClose, onSuccess }: Edit
                                 value={formData.name}
                                 onChange={handleChange}
                                 required
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
                                 disabled={loading}
                                 placeholder="Enter full name"
                             />
                         </div>
 
                         <div>
-                            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                            <label htmlFor="email" className="block text-sm font-medium text-foreground mb-1">
                                 Email *
                             </label>
                             <input
@@ -239,14 +239,14 @@ export default function EditUserModal({ isOpen, user, onClose, onSuccess }: Edit
                                 value={formData.email}
                                 onChange={handleChange}
                                 required
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
                                 disabled={loading}
                                 placeholder="Enter email address"
                             />
                         </div>
 
                         <div>
-                            <label htmlFor="position" className="block text-sm font-medium text-gray-700 mb-1">
+                            <label htmlFor="position" className="block text-sm font-medium text-foreground mb-1">
                                 Position
                             </label>
                             <input
@@ -255,14 +255,14 @@ export default function EditUserModal({ isOpen, user, onClose, onSuccess }: Edit
                                 name="position"
                                 value={formData.position}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
                                 disabled={loading}
                                 placeholder="Enter job position"
                             />
                         </div>
 
                         <div>
-                            <label htmlFor="role_name" className="block text-sm font-medium text-gray-700 mb-1">
+                            <label htmlFor="role_name" className="block text-sm font-medium text-foreground mb-1">
                                 Role *
                             </label>
                             <select
@@ -271,7 +271,7 @@ export default function EditUserModal({ isOpen, user, onClose, onSuccess }: Edit
                                 value={formData.role_name}
                                 onChange={handleChange}
                                 required
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
                                 disabled={loading}
                             >
                                 <option value="">Select a role</option>
@@ -286,13 +286,13 @@ export default function EditUserModal({ isOpen, user, onClose, onSuccess }: Edit
                         {/* Password section */}
                         <div>
                             <div className="flex items-center justify-between mb-1">
-                                <label className="block text-sm font-medium text-gray-700">
+                                <label className="block text-sm font-medium text-foreground">
                                     Password
                                 </label>
                                 <button
                                     type="button"
                                     onClick={() => setShowPasswordField(!showPasswordField)}
-                                    className="text-xs text-blue-600 hover:text-blue-800"
+                                    className="text-xs text-primary hover:text-primary"
                                     disabled={loading}
                                 >
                                     {showPasswordField ? 'Hide password field' : 'Change password'}
@@ -308,7 +308,7 @@ export default function EditUserModal({ isOpen, user, onClose, onSuccess }: Edit
                                         value={formData.password}
                                         onChange={handleChange}
                                         minLength={6}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
                                         disabled={loading}
                                         placeholder="Enter new password (min. 6 characters)"
                                     />
@@ -317,7 +317,7 @@ export default function EditUserModal({ isOpen, user, onClose, onSuccess }: Edit
                                             Password strength: {passwordStrength}
                                         </p>
                                     )}
-                                    <p className="text-xs text-gray-500 mt-1">
+                                    <p className="text-xs text-muted-foreground mt-1">
                                         Leave empty to keep current password
                                     </p>
                                 </>
@@ -329,7 +329,7 @@ export default function EditUserModal({ isOpen, user, onClose, onSuccess }: Edit
                                 type="button"
                                 onClick={handleClose}
                                 disabled={loading}
-                                className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50 transition-colors"
+                                className="flex-1 px-4 py-2 text-foreground bg-muted rounded-lg hover:bg-muted disabled:opacity-50 transition-colors"
                             >
                                 Cancel
                             </button>
@@ -337,7 +337,7 @@ export default function EditUserModal({ isOpen, user, onClose, onSuccess }: Edit
                                 type="button"
                                 onClick={handleSubmit}
                                 disabled={loading}
-                                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center justify-center"
+                                className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center justify-center"
                             >
                                 {loading ? (
                                     <>

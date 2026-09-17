@@ -8,13 +8,14 @@ services:
     environment:
       PORT: 8080
       GO_ENV: development
-      ALLOWED_ORIGINS: http://localhost:3000,http://frontend:3000
+      ALLOWED_ORIGINS: http://localhost:3010,http://frontend:3000
       DATABASE_URL: postgres://devbridge_user:devbridge_password@postgres:5432/devbridge?sslmode=disable
     ports:
       - "8080:8080"
       - "2345:2345"
     volumes:
       - ../backend:/app
+      - backend_uploads:/app/uploads
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
@@ -35,7 +36,7 @@ services:
       NEXT_PUBLIC_API_URL: http://localhost:8080/api/v1
       INTERNAL_API_URL: http://backend:8080/api/v1
     ports:
-      - "3000:3000"
+      - "3010:3000"
     volumes:
       - ../frontend:/app
     working_dir: /app
@@ -83,6 +84,8 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+  backend_uploads:
     driver: local
 
 networks:

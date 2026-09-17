@@ -26,12 +26,12 @@ export default function LoadingSpinner({
     };
 
     const colorClasses = {
-        primary: 'border-blue-600',
-        secondary: 'border-gray-600',
-        success: 'border-green-600',
-        warning: 'border-yellow-600',
-        danger: 'border-red-600',
-        gray: 'border-gray-400'
+        primary: 'border-primary',
+        secondary: 'border-border',
+        success: 'border-success',
+        warning: 'border-warning',
+        danger: 'border-destructive',
+        gray: 'border-input'
     };
 
     const textSizeClasses = {
@@ -50,7 +50,7 @@ export default function LoadingSpinner({
             )}></div>
             {showText && (
                 <span className={cn(
-                    "ml-3 text-gray-600 animate-pulse",
+                    "ml-3 text-muted-foreground animate-pulse",
                     textSizeClasses[size]
                 )}>
                     {text}
@@ -62,7 +62,7 @@ export default function LoadingSpinner({
     if (fullScreen) {
         return (
             <div className={cn(
-                "min-h-screen bg-gray-50 flex items-center justify-center",
+                "min-h-screen bg-muted flex items-center justify-center",
                 className
             )}>
                 {spinner}

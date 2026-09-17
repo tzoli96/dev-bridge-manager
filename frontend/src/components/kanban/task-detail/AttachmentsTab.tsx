@@ -34,9 +34,9 @@ export const AttachmentsTab: React.FC<AttachmentsTabProps> = ({ taskId }) => {
                 canManage={canManageAttachments}
                 onDelete={(attachmentId) => deleteAttachment(taskId, attachmentId)}
             />
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && <p className="text-sm text-destructive">{error}</p>}
             <div
-                className="border-2 border-dashed rounded-lg p-4 text-center text-gray-500"
+                className="border-2 border-dashed rounded-lg p-4 text-center text-muted-foreground"
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => { e.preventDefault(); handleFiles(e.dataTransfer.files); }}
             >

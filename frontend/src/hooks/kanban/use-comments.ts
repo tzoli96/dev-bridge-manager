@@ -3,14 +3,14 @@
 import { useState, useCallback } from 'react';
 import { commentService } from '@/services/kanban';
 import { useKanbanStore } from '@/stores/kanban';
-import type { CreateCommentData, UpdateCommentData } from '@/types/kanban';
+import type { CreateCommentData, UpdateCommentData, TaskComment } from '@/types/kanban';
 
 interface UseCommentsReturn {
     isLoading: boolean;
     error: string | null;
     getCommentsByTask: (taskId: string) => ReturnType<typeof useKanbanStore.getState>['comments'];
     loadComments: (taskId: string) => Promise<void>;
-    addComment: (taskId: string, data: CreateCommentData) => Promise<void>;
+    addComment: (taskId: string, data: CreateCommentData) => Promise<TaskComment>;
     updateComment: (commentId: string, data: UpdateCommentData) => Promise<void>;
     deleteComment: (commentId: string) => Promise<void>;
 }
@@ -47,13 +47,14 @@ export const useComments = (projectId: string): UseCommentsReturn => {
         }
     }, [projectId, comments, setComments]);
 
-    const addComment = useCallback(async (taskId: string, data: CreateCommentData): Promise<void> => {
+    const addComment = useCallback(async (taskId: string, data: CreateCommentData): Promise<TaskComment> => {
         setIsLoading(true);
         setError(null);
 
         try {
             const comment = await commentService.createComment(projectId, taskId, data);
             addCommentToStore(comment);
+            return comment;
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to add comment');
             throw err;

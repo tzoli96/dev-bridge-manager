@@ -15,16 +15,16 @@ const sizeClasses = {
 };
 
 const variantClasses = {
-    default: 'bg-blue-500',
-    danger: 'bg-red-500',
-    success: 'bg-green-500',
+    default: 'bg-primary',
+    danger: 'bg-destructive',
+    success: 'bg-success',
 };
 
 export const ProgressBar: React.FC<ProgressBarProps> = ({ percentage, size = 'md', variant = 'default', className }) => {
     const clamped = Math.min(100, Math.max(0, percentage));
 
     return (
-        <div className={cn('w-full bg-gray-200 rounded-full overflow-hidden', sizeClasses[size], className)}>
+        <div className={cn('w-full bg-muted rounded-full overflow-hidden', sizeClasses[size], className)}>
             <div
                 className={cn('h-full rounded-full transition-all duration-300', variantClasses[variant])}
                 style={{ width: `${clamped}%` }}

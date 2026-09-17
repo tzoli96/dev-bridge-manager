@@ -122,24 +122,24 @@ export default function ChangePasswordModal({ isOpen, onClose, onSuccess }: Chan
 
     const getPasswordStrengthColor = () => {
         switch (passwordStrength) {
-            case 'Weak': return 'text-red-600'
-            case 'Medium': return 'text-yellow-600'
-            case 'Strong': return 'text-green-600'
-            default: return 'text-gray-600'
+            case 'Weak': return 'text-destructive'
+            case 'Medium': return 'text-warning'
+            case 'Strong': return 'text-success'
+            default: return 'text-muted-foreground'
         }
     }
 
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 bg-black/10 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md mx-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 overflow-y-auto py-8">
+            <div className="bg-card rounded-xl shadow-sm p-6 w-full max-w-md mx-4">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-semibold">Change Password</h2>
                     <button
                         onClick={handleClose}
                         disabled={loading || success}
-                        className="text-gray-400 hover:text-gray-600 disabled:opacity-50 text-xl font-bold"
+                        className="text-muted-foreground hover:text-muted-foreground disabled:opacity-50 text-xl font-bold"
                     >
                         ✕
                     </button>
@@ -147,28 +147,28 @@ export default function ChangePasswordModal({ isOpen, onClose, onSuccess }: Chan
 
                 {success ? (
                     <div className="text-center py-8">
-                        <div className="text-green-600 mb-4">
+                        <div className="text-success mb-4">
                             <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </div>
-                        <h3 className="text-lg font-medium text-green-900 mb-2">Password Changed!</h3>
-                        <p className="text-green-700 mb-4">Your password has been successfully changed.</p>
-                        <p className="text-sm text-gray-600">You will be logged out automatically in a few seconds...</p>
+                        <h3 className="text-lg font-medium text-success mb-2">Password Changed!</h3>
+                        <p className="text-success mb-4">Your password has been successfully changed.</p>
+                        <p className="text-sm text-muted-foreground">You will be logged out automatically in a few seconds...</p>
                         <div className="mt-4">
-                            <div className="animate-spin rounded-full h-6 w-6 border-2 border-green-600 border-t-transparent mx-auto"></div>
+                            <div className="animate-spin rounded-full h-6 w-6 border-2 border-success border-t-transparent mx-auto"></div>
                         </div>
                     </div>
                 ) : (
                     <div className="space-y-4">
                         {error && (
-                            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                            <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded">
                                 {error}
                             </div>
                         )}
 
                         <div>
-                            <label htmlFor="current_password" className="block text-sm font-medium text-gray-700 mb-1">
+                            <label htmlFor="current_password" className="block text-sm font-medium text-foreground mb-1">
                                 Current Password *
                             </label>
                             <input
@@ -178,14 +178,14 @@ export default function ChangePasswordModal({ isOpen, onClose, onSuccess }: Chan
                                 value={formData.current_password}
                                 onChange={handleChange}
                                 required
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
                                 disabled={loading}
                                 placeholder="Enter your current password"
                             />
                         </div>
 
                         <div>
-                            <label htmlFor="new_password" className="block text-sm font-medium text-gray-700 mb-1">
+                            <label htmlFor="new_password" className="block text-sm font-medium text-foreground mb-1">
                                 New Password *
                             </label>
                             <input
@@ -196,7 +196,7 @@ export default function ChangePasswordModal({ isOpen, onClose, onSuccess }: Chan
                                 onChange={handleChange}
                                 required
                                 minLength={6}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
                                 disabled={loading}
                                 placeholder="Enter new password (min. 6 characters)"
                             />
@@ -208,7 +208,7 @@ export default function ChangePasswordModal({ isOpen, onClose, onSuccess }: Chan
                         </div>
 
                         <div>
-                            <label htmlFor="confirm_password" className="block text-sm font-medium text-gray-700 mb-1">
+                            <label htmlFor="confirm_password" className="block text-sm font-medium text-foreground mb-1">
                                 Confirm New Password *
                             </label>
                             <input
@@ -218,26 +218,26 @@ export default function ChangePasswordModal({ isOpen, onClose, onSuccess }: Chan
                                 value={formData.confirm_password}
                                 onChange={handleChange}
                                 required
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
                                 disabled={loading}
                                 placeholder="Confirm your new password"
                             />
                             {formData.confirm_password && formData.new_password !== formData.confirm_password && (
-                                <p className="text-xs text-red-600 mt-1">
+                                <p className="text-xs text-destructive mt-1">
                                     Passwords do not match
                                 </p>
                             )}
                         </div>
 
-                        <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+                        <div className="bg-warning/10 border border-warning/20 rounded-lg p-3">
                             <div className="flex">
                                 <div className="flex-shrink-0">
-                                    <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <svg className="h-5 w-5 text-warning" viewBox="0 0 20 20" fill="currentColor">
                                         <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                                     </svg>
                                 </div>
                                 <div className="ml-3">
-                                    <p className="text-sm text-yellow-800">
+                                    <p className="text-sm text-warning">
                                         <strong>Important:</strong> After changing your password, you will be automatically logged out and need to log in again with your new password.
                                     </p>
                                 </div>
@@ -249,7 +249,7 @@ export default function ChangePasswordModal({ isOpen, onClose, onSuccess }: Chan
                                 type="button"
                                 onClick={handleClose}
                                 disabled={loading}
-                                className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50 transition-colors"
+                                className="flex-1 px-4 py-2 text-foreground bg-muted rounded-lg hover:bg-muted disabled:opacity-50 transition-colors"
                             >
                                 Cancel
                             </button>
@@ -257,7 +257,7 @@ export default function ChangePasswordModal({ isOpen, onClose, onSuccess }: Chan
                                 type="button"
                                 onClick={handleSubmit}
                                 disabled={loading || !formData.current_password || !formData.new_password || !formData.confirm_password}
-                                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 transition-colors flex items-center justify-center"
+                                className="flex-1 px-4 py-2 bg-destructive text-white rounded-lg hover:bg-destructive/90 disabled:opacity-50 transition-colors flex items-center justify-center"
                             >
                                 {loading ? (
                                     <>

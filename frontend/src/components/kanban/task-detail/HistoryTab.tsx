@@ -24,12 +24,12 @@ const FIELD_LABELS: Record<string, string> = {
 const fieldLabel = (name?: string) => (name ? FIELD_LABELS[name] ?? name : 'a field');
 
 const EVENT_STYLE: Record<ActivityLogEntry['eventType'], { icon: React.ComponentType<{ size?: number; className?: string }>; className: string }> = {
-    field_changed: { icon: Pencil, className: 'bg-blue-100 text-blue-600' },
-    moved: { icon: ArrowRightLeft, className: 'bg-purple-100 text-purple-600' },
-    comment_added: { icon: MessageSquarePlus, className: 'bg-green-100 text-green-600' },
-    comment_deleted: { icon: MessageSquareX, className: 'bg-red-100 text-red-600' },
-    attachment_added: { icon: Paperclip, className: 'bg-green-100 text-green-600' },
-    attachment_deleted: { icon: PaperclipIcon, className: 'bg-red-100 text-red-600' },
+    field_changed: { icon: Pencil, className: 'bg-primary/10 text-primary' },
+    moved: { icon: ArrowRightLeft, className: 'bg-primary/10 text-primary' },
+    comment_added: { icon: MessageSquarePlus, className: 'bg-success/10 text-success' },
+    comment_deleted: { icon: MessageSquareX, className: 'bg-destructive/10 text-destructive' },
+    attachment_added: { icon: Paperclip, className: 'bg-success/10 text-success' },
+    attachment_deleted: { icon: PaperclipIcon, className: 'bg-destructive/10 text-destructive' },
 };
 
 const describe = (entry: ActivityLogEntry): React.ReactNode => {
@@ -72,7 +72,7 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ taskId }) => {
 
     if (isLoading && entries.length === 0) {
         return (
-            <div className="flex items-center justify-center gap-2 py-12 text-sm text-gray-400">
+            <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
                 <Loader2 className="w-4 h-4 animate-spin" /> Loading history…
             </div>
         );
@@ -80,8 +80,8 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ taskId }) => {
 
     if (!isLoading && entries.length === 0 && !error) {
         return (
-            <div className="text-center py-12 text-gray-500">
-                <History className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+            <div className="text-center py-12 text-muted-foreground">
+                <History className="w-12 h-12 mx-auto mb-3 text-muted-foreground/50" />
                 <p>No activity yet.</p>
                 <p className="text-sm">Changes to this task will show up here.</p>
             </div>
@@ -99,12 +99,12 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ taskId }) => {
                             <div className={cn('flex items-center justify-center w-7 h-7 rounded-full shrink-0', className)}>
                                 <Icon size={14} />
                             </div>
-                            {!isLast && <div className="w-px flex-1 bg-gray-200 my-1" />}
+                            {!isLast && <div className="w-px flex-1 bg-border my-1" />}
                         </div>
                         <div className="flex-1 pb-5 min-w-0">
-                            <p className="text-sm text-gray-800 break-words">{describe(entry)}</p>
+                            <p className="text-sm text-foreground break-words">{describe(entry)}</p>
                             <p
-                                className="text-xs text-gray-400 mt-0.5"
+                                className="text-xs text-muted-foreground mt-0.5"
                                 title={new Date(entry.createdAt).toLocaleString()}
                             >
                                 {formatDistanceToNow(new Date(entry.createdAt), { addSuffix: true, locale: hu })}
@@ -113,14 +113,14 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ taskId }) => {
                     </div>
                 );
             })}
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && <p className="text-sm text-destructive">{error}</p>}
             {hasMore && (
                 <div className="pl-10">
                     <button
                         type="button"
                         onClick={() => fetchPage(entries.length)}
                         disabled={isLoading}
-                        className="text-sm text-blue-600 hover:text-blue-700"
+                        className="text-sm text-primary hover:text-primary/80"
                     >
                         {isLoading ? 'Loading…' : 'Load more'}
                     </button>

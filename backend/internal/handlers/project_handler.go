@@ -31,6 +31,9 @@ func (h *ProjectHandler) validateProjectCreateRequest(req *models.ProjectCreateR
 	if req.Status != "" && req.Status != "active" && req.Status != "completed" && req.Status != "on-hold" && req.Status != "cancelled" {
 		return fiber.NewError(400, "Status must be one of: active, completed, on-hold, cancelled")
 	}
+	if err := validateProjectPricing(req.PricingType, req.HourlyRate, req.FixedPrice); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -41,6 +44,26 @@ func (h *ProjectHandler) validateProjectUpdateRequest(req *models.ProjectUpdateR
 	}
 	if req.Status != "" && req.Status != "active" && req.Status != "completed" && req.Status != "on-hold" && req.Status != "cancelled" {
 		return fiber.NewError(400, "Status must be one of: active, completed, on-hold, cancelled")
+	}
+	if err := validateProjectPricing(req.PricingType, req.HourlyRate, req.FixedPrice); err != nil {
+		return err
+	}
+	return nil
+}
+
+// validateProjectPricing - óradíjas vagy fix díjas megállapodás ellenőrzése
+func validateProjectPricing(pricingType string, hourlyRate, fixedPrice *float64) error {
+	if pricingType == "" {
+		return nil
+	}
+	if pricingType != "hourly" && pricingType != "fixed" {
+		return fiber.NewError(400, "Pricing type must be one of: hourly, fixed")
+	}
+	if pricingType == "hourly" && (hourlyRate == nil || *hourlyRate <= 0) {
+		return fiber.NewError(400, "Hourly rate is required and must be greater than 0 for hourly pricing")
+	}
+	if pricingType == "fixed" && (fixedPrice == nil || *fixedPrice <= 0) {
+		return fiber.NewError(400, "Fixed price is required and must be greater than 0 for fixed pricing")
 	}
 	return nil
 }
@@ -72,6 +95,9 @@ func (h *ProjectHandler) GetAllProjects(c *fiber.Ctx) error {
 			Name:          project.Name,
 			Description:   project.Description,
 			Status:        project.Status,
+			PricingType:   project.PricingType,
+			HourlyRate:    project.HourlyRate,
+			FixedPrice:    project.FixedPrice,
 			CreatedBy:     project.CreatedBy,
 			CreatedByName: project.CreatedByName,
 			CreatedAt:     project.CreatedAt,
@@ -117,10 +143,14 @@ func (h *ProjectHandler) GetProject(c *fiber.Ctx) error {
 		Name:          project.Name,
 		Description:   project.Description,
 		Status:        project.Status,
+		PricingType:   project.PricingType,
+		HourlyRate:    project.HourlyRate,
+		FixedPrice:    project.FixedPrice,
 		CreatedBy:     project.CreatedBy,
 		CreatedByName: project.CreatedByName,
 		CreatedAt:     project.CreatedAt,
 		UpdatedAt:     project.UpdatedAt,
+		Clients:       fetchProjectClients(uint(id)),
 	}
 
 	return c.JSON(models.ProjectListResponse{
@@ -128,6 +158,18 @@ func (h *ProjectHandler) GetProject(c *fiber.Ctx) error {
 		Message: "Project retrieved successfully",
 		Project: &response,
 	})
+}
+
+// fetchProjectClients - egy projekthez rendelt ügyfelek lekérése
+func fetchProjectClients(projectID uint) []models.ProjectClientResponse {
+	var clients []models.ProjectClientResponse
+	database.GetDB().Table("project_clients").
+		Select("project_clients.id, project_clients.project_id, project_clients.client_id, clients.name as client_name, clients.type as client_type, project_clients.assigned_at, project_clients.assigned_by, users.name as assigned_by_name").
+		Joins("LEFT JOIN clients ON project_clients.client_id = clients.id").
+		Joins("LEFT JOIN users ON project_clients.assigned_by = users.id").
+		Where("project_clients.project_id = ?", projectID).
+		Scan(&clients)
+	return clients
 }
 
 // CreateProject - POST /api/v1/projects
@@ -180,6 +222,9 @@ func (h *ProjectHandler) CreateProject(c *fiber.Ctx) error {
 		Name:        req.Name,
 		Description: req.Description,
 		Status:      req.Status,
+		PricingType: req.PricingType,
+		HourlyRate:  req.HourlyRate,
+		FixedPrice:  req.FixedPrice,
 		CreatedBy:   currentUserID,
 	}
 
@@ -203,6 +248,9 @@ func (h *ProjectHandler) CreateProject(c *fiber.Ctx) error {
 		Name:          createdProject.Name,
 		Description:   createdProject.Description,
 		Status:        createdProject.Status,
+		PricingType:   createdProject.PricingType,
+		HourlyRate:    createdProject.HourlyRate,
+		FixedPrice:    createdProject.FixedPrice,
 		CreatedBy:     createdProject.CreatedBy,
 		CreatedByName: createdProject.CreatedByName,
 		CreatedAt:     createdProject.CreatedAt,
@@ -285,6 +333,11 @@ func (h *ProjectHandler) UpdateProject(c *fiber.Ctx) error {
 	if req.Status != "" {
 		updates["status"] = req.Status
 	}
+	if req.PricingType != "" {
+		updates["pricing_type"] = req.PricingType
+		updates["hourly_rate"] = req.HourlyRate
+		updates["fixed_price"] = req.FixedPrice
+	}
 
 	if len(updates) > 0 {
 		if err := database.GetDB().Model(&project).Updates(updates).Error; err != nil {
@@ -308,6 +361,9 @@ func (h *ProjectHandler) UpdateProject(c *fiber.Ctx) error {
 		Name:          updatedProject.Name,
 		Description:   updatedProject.Description,
 		Status:        updatedProject.Status,
+		PricingType:   updatedProject.PricingType,
+		HourlyRate:    updatedProject.HourlyRate,
+		FixedPrice:    updatedProject.FixedPrice,
 		CreatedBy:     updatedProject.CreatedBy,
 		CreatedByName: updatedProject.CreatedByName,
 		CreatedAt:     updatedProject.CreatedAt,

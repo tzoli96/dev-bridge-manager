@@ -7,7 +7,7 @@ RUN apk add --no-cache curl bash
 WORKDIR /app
 
 # Copy package files and install dependencies
-COPY frontend/package*.json ./
+COPY frontend/package*.json frontend/pnpm-workspace.yaml ./
 RUN pnpm install
 
 # Copy source code
@@ -24,7 +24,7 @@ RUN npm install -g pnpm@latest
 WORKDIR /app
 
 # Copy package files and install dependencies
-COPY frontend/package*.json ./
+COPY frontend/package*.json frontend/pnpm-workspace.yaml ./
 RUN pnpm install
 
 # Copy source and build

@@ -38,26 +38,26 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChang
     };
 
     return (
-        <div className="border border-gray-300 rounded-lg overflow-hidden">
-            <div className="flex items-center gap-1 border-b border-gray-200 bg-gray-50 px-2 py-1">
+        <div className="border border-input rounded-lg overflow-hidden">
+            <div className="flex items-center gap-1 border-b border-border bg-muted px-2 py-1">
                 <button
                     type="button"
                     onClick={() => exec('bold')}
-                    className="p-1.5 rounded hover:bg-gray-200 text-gray-600"
+                    className="p-1.5 rounded hover:bg-muted text-muted-foreground"
                 >
                     <Bold size={14} />
                 </button>
                 <button
                     type="button"
                     onClick={() => exec('italic')}
-                    className="p-1.5 rounded hover:bg-gray-200 text-gray-600"
+                    className="p-1.5 rounded hover:bg-muted text-muted-foreground"
                 >
                     <Italic size={14} />
                 </button>
                 <button
                     type="button"
                     onClick={() => exec('insertUnorderedList')}
-                    className="p-1.5 rounded hover:bg-gray-200 text-gray-600"
+                    className="p-1.5 rounded hover:bg-muted text-muted-foreground"
                 >
                     <List size={14} />
                 </button>
@@ -69,8 +69,8 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChang
                 onBlur={onBlur}
                 data-placeholder={placeholder}
                 className={cn(
-                    'p-3 text-sm text-gray-900 focus:outline-none prose prose-sm max-w-none',
-                    'empty:before:content-[attr(data-placeholder)] empty:before:text-gray-400'
+                    'p-3 text-sm text-foreground focus:outline-none prose prose-sm max-w-none',
+                    'empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground'
                 )}
                 style={{ minHeight }}
             />

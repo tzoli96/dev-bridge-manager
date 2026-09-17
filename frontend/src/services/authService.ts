@@ -82,6 +82,8 @@ export class AuthService {
     static saveToken(token: string): void {
         if (typeof window !== 'undefined') {
             localStorage.setItem('auth_token', token)
+            // middleware.ts runs on the server and can only see cookies, not localStorage
+            document.cookie = `auth_token=${token}; path=/; max-age=86400; SameSite=Lax`
         }
     }
 
@@ -95,6 +97,7 @@ export class AuthService {
     static removeToken(): void {
         if (typeof window !== 'undefined') {
             localStorage.removeItem('auth_token')
+            document.cookie = 'auth_token=; path=/; max-age=0'
         }
     }
 

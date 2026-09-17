@@ -41,19 +41,19 @@ export default function BoardsListPage() {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
         );
     }
 
     return (
         <div className="p-6">
-            <Link href="/dashboard/board" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4">
+            <Link href="/dashboard/board" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4">
                 <ArrowLeft size={14} /> Back to projects
             </Link>
 
             <div className="flex items-center justify-between mb-6">
-                <h1 className="text-2xl font-bold text-gray-900">Boards</h1>
+                <h1 className="text-2xl font-bold text-foreground">Boards</h1>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
@@ -61,10 +61,10 @@ export default function BoardsListPage() {
                     <button
                         key={board.id}
                         onClick={() => router.push(`/dashboard/board/${projectId}/${board.id}`)}
-                        className="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md hover:border-blue-300 transition-all text-left"
+                        className="flex items-center gap-3 p-4 bg-card border border-border rounded-lg shadow-sm hover:shadow-sm hover:border-primary/40 transition-all text-left"
                     >
-                        <KanbanSquare className="text-blue-600" size={20} />
-                        <span className="font-medium text-gray-900">{board.name}</span>
+                        <KanbanSquare className="text-primary" size={20} />
+                        <span className="font-medium text-foreground">{board.name}</span>
                     </button>
                 ))}
             </div>
