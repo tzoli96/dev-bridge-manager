@@ -7,6 +7,7 @@ import (
 
 	"dev-bridge-manager/internal/middleware"
 	"dev-bridge-manager/internal/routes"
+	"dev-bridge-manager/internal/services"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -47,6 +48,13 @@ func main() {
 
 	// Setup all routes
 	routes.SetupRoutes(app)
+
+	// Monthly auto-invoicing for hourly projects with it enabled (see
+	// services.RunAutoInvoicing)
+	go services.StartAutoInvoiceScheduler()
+
+	// Gmail inbox/sent mirror sync, every 3 hours (see services.RunGmailSync)
+	go services.StartGmailSyncScheduler()
 
 	// Start server
 	port := getPort()
