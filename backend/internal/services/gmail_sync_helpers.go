@@ -8,6 +8,7 @@ import (
 
 	"dev-bridge-manager/internal/models"
 
+	"golang.org/x/oauth2"
 	"google.golang.org/api/gmail/v1"
 	"google.golang.org/api/googleapi"
 )
@@ -65,7 +66,10 @@ func isHistoryExpiredError(err error) bool {
 
 // isAuthError reports whether err means the stored refresh token is no
 // longer valid (revoked access), which should mark the account as needing
-// the user to reconnect rather than retrying.
+// the user to reconnect rather than retrying. Besides a direct 401 from a
+// Gmail API call, a revoked refresh token also surfaces as an
+// *oauth2.RetrieveError during TokenSource.Token() (i.e. before any Gmail
+// API call is made), so that path is checked too.
 func isAuthError(err error) bool {
 	if err == nil {
 		return false
@@ -73,6 +77,10 @@ func isAuthError(err error) bool {
 	var apiErr *googleapi.Error
 	if errors.As(err, &apiErr) {
 		return apiErr.Code == 401
+	}
+	var retrieveErr *oauth2.RetrieveError
+	if errors.As(err, &retrieveErr) {
+		return strings.Contains(string(retrieveErr.Body), "invalid_grant")
 	}
 	return false
 }

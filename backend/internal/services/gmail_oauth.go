@@ -116,9 +116,19 @@ func ExchangeAndSaveGmailAccount(ctx context.Context, code, state string) error 
 		NeedsReauth:  false,
 	}
 
+	// Assign takes a map here rather than the account struct: GORM's
+	// Assign(structValue) skips zero-valued fields, which would silently
+	// stop needs_reauth from ever being reset to false on the update path
+	// (reconnect after a prior needs_reauth: true state).
 	return database.GetDB().
 		Where("user_id = ?", userID).
-		Assign(account).
+		Assign(map[string]interface{}{
+			"email_address": account.EmailAddress,
+			"access_token":  account.AccessToken,
+			"refresh_token": account.RefreshToken,
+			"token_expiry":  account.TokenExpiry,
+			"needs_reauth":  false,
+		}).
 		FirstOrCreate(&account).Error
 }
 

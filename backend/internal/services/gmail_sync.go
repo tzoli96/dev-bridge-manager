@@ -135,7 +135,7 @@ func applyAddedMessages(ctx context.Context, api GmailAPI, db *gorm.DB, account 
 			continue // skipped: no INBOX/SENT label (see classifyFolder)
 		}
 
-		db.Create(&models.Email{
+		if err := db.Create(&models.Email{
 			GmailAccountID: account.ID,
 			GmailMessageID: meta.GmailMessageID,
 			ThreadID:       meta.ThreadID,
@@ -150,7 +150,10 @@ func applyAddedMessages(ctx context.Context, api GmailAPI, db *gorm.DB, account 
 			IsRead:         meta.IsRead,
 			ReceivedAt:     meta.ReceivedAt,
 			SyncedAt:       time.Now(),
-		})
+		}).Error; err != nil {
+			log.Printf("gmail sync: failed to store message %s for account %d: %v", meta.GmailMessageID, account.ID, err)
+			continue
+		}
 	}
 	return nil
 }

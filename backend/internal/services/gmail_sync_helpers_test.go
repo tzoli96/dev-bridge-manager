@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"golang.org/x/oauth2"
 	"google.golang.org/api/googleapi"
 )
 
@@ -64,6 +65,16 @@ func TestIsAuthError(t *testing.T) {
 	}
 	if isAuthError(errors.New("plain error")) {
 		t.Error("expected a non-googleapi error to be false")
+	}
+
+	invalidGrant := &oauth2.RetrieveError{Body: []byte(`{"error":"invalid_grant","error_description":"Token has been expired or revoked."}`)}
+	if !isAuthError(invalidGrant) {
+		t.Error("expected an oauth2.RetrieveError with invalid_grant body to be treated as an auth error")
+	}
+
+	otherRetrieveErr := &oauth2.RetrieveError{Body: []byte(`{"error":"server_error"}`)}
+	if isAuthError(otherRetrieveErr) {
+		t.Error("expected an oauth2.RetrieveError without invalid_grant to be false")
 	}
 }
 

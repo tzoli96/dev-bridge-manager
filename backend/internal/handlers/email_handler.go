@@ -2,9 +2,11 @@
 package handlers
 
 import (
+	"log"
 	"mime"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"dev-bridge-manager/internal/database"
 	"dev-bridge-manager/internal/models"
@@ -194,6 +196,27 @@ func (h *EmailHandler) SendEmail(c *fiber.Ctx) error {
 	gmailMessageID, err := h.gmailAPI.SendMessage(c.Context(), account, raw)
 	if err != nil {
 		return c.Status(502).JSON(models.EmailSendResponse{Success: false, Message: "Failed to send email: " + err.Error()})
+	}
+
+	// Mirror the sent message locally so it shows up in the Sent tab
+	// immediately, rather than waiting for the next scheduled sync.
+	now := time.Now()
+	localEmail := models.Email{
+		GmailAccountID: account.ID,
+		GmailMessageID: gmailMessageID,
+		Folder:         "sent",
+		FromAddress:    account.EmailAddress,
+		ToAddresses:    req.To,
+		Subject:        req.Subject,
+		Snippet:        "",
+		HasAttachments: false,
+		AttachmentMeta: models.AttachmentMetaToJSON(nil),
+		IsRead:         true,
+		ReceivedAt:     now,
+		SyncedAt:       now,
+	}
+	if err := database.GetDB().Create(&localEmail).Error; err != nil {
+		log.Printf("email send: failed to mirror sent message %s locally: %v", gmailMessageID, err)
 	}
 
 	return c.JSON(models.EmailSendResponse{Success: true, GmailMessageID: gmailMessageID})

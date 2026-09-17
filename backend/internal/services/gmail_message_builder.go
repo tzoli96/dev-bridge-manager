@@ -2,7 +2,9 @@
 package services
 
 import (
+	"encoding/base64"
 	"fmt"
+	"mime"
 	"strings"
 )
 
@@ -13,14 +15,16 @@ func BuildRawMessage(fromAddress, to, subject, body, inReplyToHeader, references
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("From: %s\r\n", fromAddress))
 	sb.WriteString(fmt.Sprintf("To: %s\r\n", to))
-	sb.WriteString(fmt.Sprintf("Subject: %s\r\n", subject))
+	sb.WriteString(fmt.Sprintf("Subject: %s\r\n", mime.QEncoding.Encode("utf-8", subject)))
 	if inReplyToHeader != "" {
 		sb.WriteString(fmt.Sprintf("In-Reply-To: %s\r\n", inReplyToHeader))
 		refs := strings.TrimSpace(referencesHeader + " " + inReplyToHeader)
 		sb.WriteString(fmt.Sprintf("References: %s\r\n", refs))
 	}
 	sb.WriteString("MIME-Version: 1.0\r\n")
-	sb.WriteString("Content-Type: text/plain; charset=\"UTF-8\"\r\n\r\n")
-	sb.WriteString(body)
+	sb.WriteString("Content-Type: text/plain; charset=\"UTF-8\"\r\n")
+	sb.WriteString("Content-Transfer-Encoding: base64\r\n")
+	sb.WriteString("\r\n")
+	sb.WriteString(base64.StdEncoding.EncodeToString([]byte(body)))
 	return []byte(sb.String())
 }

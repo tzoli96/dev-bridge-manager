@@ -83,10 +83,15 @@ func (h *InvoiceNoticeHandler) SendInvoiceNotice(c *fiber.Ctx) error {
 		periodEnd = &t
 	}
 
+	periodText := ""
+	if periodStart != nil && periodEnd != nil {
+		periodText = fmt.Sprintf(" a %s - %s időszakra vonatkozóan", periodStart.Format("2006.01.02"), periodEnd.Format("2006.01.02"))
+	}
+
 	subject := fmt.Sprintf("Számla értesítő - %s", project.Name)
 	body := fmt.Sprintf(
-		"Kedves %s!\n\nÉrtesítjük, hogy hamarosan számlát állítunk ki a(z) \"%s\" projekt kapcsán.\n\nÜdvözlettel",
-		client.Name, project.Name,
+		"Kedves %s!\n\nÉrtesítjük, hogy hamarosan számlát állítunk ki a(z) \"%s\" projekt kapcsán%s.\n\nÜdvözlettel",
+		client.Name, project.Name, periodText,
 	)
 
 	raw := services.BuildRawMessage(account.EmailAddress, client.Email, subject, body, "", "")
