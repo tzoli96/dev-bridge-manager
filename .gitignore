@@ -2,3 +2,4 @@
 .serena/
 backend/tmp/
 frontend/.pnpm-store/
+.worktrees/
