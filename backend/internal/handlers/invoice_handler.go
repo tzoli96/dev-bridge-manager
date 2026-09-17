@@ -6,6 +6,7 @@ import (
 	"dev-bridge-manager/internal/models"
 	"dev-bridge-manager/internal/services"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -113,10 +114,16 @@ func (h *InvoiceHandler) markReservationCreated(invoice *models.Invoice, billing
 func (h *InvoiceHandler) markReservationFailed(invoice *models.Invoice, errMsg string) {
 	invoice.Status = "failed"
 	invoice.ErrorMessage = errMsg
-	database.GetDB().Model(invoice).Updates(map[string]interface{}{
+	if err := database.GetDB().Model(invoice).Updates(map[string]interface{}{
 		"status":        invoice.Status,
 		"error_message": invoice.ErrorMessage,
-	})
+	}).Error; err != nil {
+		// A failed UPDATE here leaves the reservation row stuck at
+		// 'pending', which permanently blocks all future invoicing for
+		// this project under the once-only unique index — there is no
+		// other recovery path, so this must be visible in the logs.
+		log.Printf("⚠️ Failed to mark invoice reservation %d as failed (project %d): %v", invoice.ID, invoice.ProjectID, err)
+	}
 }
 
 // CreateInvoice - POST /api/v1/projects/:id/invoices
@@ -259,6 +266,12 @@ func (h *InvoiceHandler) CreateInvoice(c *fiber.Ctx) error {
 		// Fixed-price: finalize the existing 'pending' reservation row into
 		// 'created' rather than inserting a new row.
 		if err := h.markReservationCreated(reservation, billingoInvoiceID, billingoInvoiceNumber); err != nil {
+			// The reservation row stays stuck at 'pending', permanently
+			// blocking future invoicing for this project under the
+			// once-only unique index — there is no other recovery path,
+			// so this must be visible in the logs even though the client
+			// already gets a 500.
+			log.Printf("⚠️ Failed to finalize invoice reservation %d as created (project %d): %v", reservation.ID, reservation.ProjectID, err)
 			return c.Status(500).JSON(models.InvoiceListResponse{Success: false, Message: "Invoice created in Billingo but failed to save locally"})
 		}
 		invoice = *reservation
