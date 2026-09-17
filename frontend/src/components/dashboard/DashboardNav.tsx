@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, KanbanSquare, Users, Building2 } from 'lucide-react'
+import { LayoutDashboard, KanbanSquare, Users, Building2, ShieldCheck, Mail } from 'lucide-react'
 import { User } from '@/types/user'
 import { hasAnyPermission } from '@/utils/permissions'
 
@@ -23,10 +23,22 @@ export default function DashboardNav({ user }: DashboardNavProps) {
             show: hasAnyPermission(user, ['clients.list', 'clients.read']),
         },
         {
+            href: '/dashboard/emails',
+            label: 'E-mailek',
+            icon: Mail,
+            show: hasAnyPermission(user, ['gmail.manage']),
+        },
+        {
             href: '/users',
             label: 'Team Members',
             icon: Users,
             show: hasAnyPermission(user, ['users.list', 'users.read']),
+        },
+        {
+            href: '/dashboard/admin',
+            label: 'Administration',
+            icon: ShieldCheck,
+            show: hasAnyPermission(user, ['system.settings', 'roles.list']),
         },
     ]
 
