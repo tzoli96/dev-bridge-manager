@@ -18,6 +18,12 @@ type InvoiceNoticeHandler struct {
 	billingoService   *services.BillingoService
 }
 
+// defaultInvoiceDueDays matches the manual "Számla kiállítása" button's
+// INVOICE_DUE_DAYS frontend constant (frontend/.../invoice/page.tsx), so
+// approval-created invoices get the same payment deadline as manually
+// created ones instead of falling back to Billingo's own default.
+const defaultInvoiceDueDays = 8
+
 func NewInvoiceNoticeHandler() *InvoiceNoticeHandler {
 	return &InvoiceNoticeHandler{
 		permissionService: services.NewPermissionService(),
@@ -148,9 +154,6 @@ func (h *InvoiceNoticeHandler) ApproveInvoiceNotice(c *fiber.Ctx) error {
 	if err := db.Where("id = ? AND project_id = ?", noticeID, projectID).First(&notice).Error; err != nil {
 		return c.Status(404).JSON(models.InvoiceNoticeApproveResponse{Success: false, Message: "Invoice notice not found"})
 	}
-	if notice.Status != "pending" {
-		return c.Status(409).JSON(models.InvoiceNoticeApproveResponse{Success: false, Message: "Ez az értesítő már jóvá lett hagyva"})
-	}
 
 	var project models.Project
 	if err := db.First(&project, projectID).Error; err != nil {
@@ -165,6 +168,27 @@ func (h *InvoiceNoticeHandler) ApproveInvoiceNotice(c *fiber.Ctx) error {
 		return c.Status(404).JSON(models.InvoiceNoticeApproveResponse{Success: false, Message: "Client not found"})
 	}
 
+	// Atomically claim the notice before making any Billingo/Gmail calls, the
+	// same pattern createInvoiceForProject uses (invoice_handler.go) to reserve
+	// a fixed-price invoice slot: a pre-check SELECT here would leave a TOCTOU
+	// window open between the read and the later Updates call, and a client
+	// retry after an axios timeout (frontend's 10s timeout vs. Billingo's own
+	// 15s budget, hit multiple times by this handler) could otherwise create
+	// two real Billingo invoices for one notice.
+	claimTime := time.Now()
+	claim := db.Model(&models.InvoiceNotice{}).
+		Where("id = ? AND status = ?", notice.ID, "pending").
+		Updates(map[string]interface{}{"status": "approved", "approved_by": currentUserID, "approved_at": claimTime})
+	if claim.Error != nil {
+		return c.Status(500).JSON(models.InvoiceNoticeApproveResponse{Success: false, Message: "Failed to claim invoice notice"})
+	}
+	if claim.RowsAffected == 0 {
+		return c.Status(409).JSON(models.InvoiceNoticeApproveResponse{Success: false, Message: "Ez az értesítő már jóvá lett hagyva"})
+	}
+	notice.Status = "approved"
+	notice.ApprovedBy = &currentUserID
+	notice.ApprovedAt = &claimTime
+
 	req := models.InvoiceCreateRequest{ClientID: notice.ClientID}
 	if notice.PeriodStart != nil {
 		req.PeriodStart = notice.PeriodStart.Format("2006-01-02")
@@ -172,25 +196,26 @@ func (h *InvoiceNoticeHandler) ApproveInvoiceNotice(c *fiber.Ctx) error {
 	if notice.PeriodEnd != nil {
 		req.PeriodEnd = notice.PeriodEnd.Format("2006-01-02")
 	}
+	req.DueDate = time.Now().AddDate(0, 0, defaultInvoiceDueDays).Format("2006-01-02")
 
 	invoice, items, httpStatus, message := createInvoiceForProject(h.billingoService, project, client, req, currentUserID)
 	if httpStatus != 0 {
+		// The notice was already claimed as "approved" above, but no invoice
+		// was created — best-effort revert it back to "pending" so a retry is
+		// possible instead of leaving it stuck.
+		revert := db.Model(&models.InvoiceNotice{}).
+			Where("id = ? AND status = ?", notice.ID, "approved").
+			Updates(map[string]interface{}{"status": "pending", "approved_by": nil, "approved_at": nil})
+		if revert.Error != nil {
+			log.Printf("⚠️ Failed to revert invoice notice %d to pending after failed approval: %v", notice.ID, revert.Error)
+		}
 		return c.Status(httpStatus).JSON(models.InvoiceNoticeApproveResponse{Success: false, Message: message})
 	}
 
-	now := time.Now()
-	if err := db.Model(&notice).Updates(map[string]interface{}{
-		"status":      "approved",
-		"invoice_id":  invoice.ID,
-		"approved_by": currentUserID,
-		"approved_at": now,
-	}).Error; err != nil {
-		log.Printf("⚠️ Failed to mark invoice notice %d as approved: %v", notice.ID, err)
+	if err := db.Model(&models.InvoiceNotice{}).Where("id = ?", notice.ID).Update("invoice_id", invoice.ID).Error; err != nil {
+		log.Printf("⚠️ Failed to set invoice_id on invoice notice %d: %v", notice.ID, err)
 	}
-	notice.Status = "approved"
 	notice.InvoiceID = &invoice.ID
-	notice.ApprovedBy = &currentUserID
-	notice.ApprovedAt = &now
 
 	emailSent := false
 	warning := ""

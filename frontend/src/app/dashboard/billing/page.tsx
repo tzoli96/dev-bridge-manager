@@ -432,7 +432,7 @@ export default function BillingPage() {
             </div>
 
             <div>
-                <h2 className="text-lg font-semibold text-foreground mb-3">Automatikus számlázás</h2>
+                <h2 className="text-lg font-semibold text-foreground mb-3">Automatikus havi értesítő</h2>
                 {loadingProjects ? (
                     <div className="flex items-center justify-center h-32">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>

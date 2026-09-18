@@ -160,9 +160,9 @@ export default function BoardsListPage() {
                             {project.auto_invoice_enabled && (
                                 <span
                                     className="inline-flex items-center gap-1 text-xs font-medium text-primary bg-primary/10 rounded-full px-2 py-0.5"
-                                    title="Minden hónap 1-jén automatikusan kiszámlázza az előző havi órákat"
+                                    title="Minden hónap 1-jén automatikusan értesítőt küld az előző havi órákról, jóváhagyásra várva."
                                 >
-                                    <Repeat size={12} /> Automatikus számlázás
+                                    <Repeat size={12} /> Automatikus havi értesítő
                                 </span>
                             )}
                         </div>
