@@ -110,6 +110,15 @@ export interface InvoiceNotice {
     gmail_message_id: string
     sent_by: number
     sent_at: string
+    status: 'pending' | 'approved'
+    invoice_id: number | null
+    approved_by: number | null
+    approved_at: string | null
+}
+
+export interface InvoiceNoticeWithNames extends InvoiceNotice {
+    project_name: string
+    client_name: string
 }
 
 export const InvoiceNoticesService = {
@@ -124,6 +133,20 @@ export const InvoiceNoticesService = {
         return apiClient.get<{ success: boolean; notices?: InvoiceNotice[] }>(
             `/projects/${projectId}/invoice-notices`,
             { period_start: periodStart, period_end: periodEnd }
+        )
+    },
+
+    async approve(projectId: number, noticeId: number) {
+        return apiClient.post<{ success: boolean; message?: string; invoice?: Invoice; notice?: InvoiceNotice; email_sent: boolean }>(
+            `/projects/${projectId}/invoice-notices/${noticeId}/approve`,
+            {}
+        )
+    },
+
+    async listAll(status?: 'pending' | 'approved') {
+        return apiClient.get<{ success: boolean; notices?: InvoiceNoticeWithNames[] }>(
+            '/invoice-notices',
+            status ? { status } : undefined
         )
     },
 }
