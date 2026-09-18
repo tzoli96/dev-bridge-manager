@@ -2,7 +2,6 @@
 package handlers
 
 import (
-	"fmt"
 	"strconv"
 	"time"
 
@@ -83,35 +82,12 @@ func (h *InvoiceNoticeHandler) SendInvoiceNotice(c *fiber.Ctx) error {
 		periodEnd = &t
 	}
 
-	periodText := ""
-	if periodStart != nil && periodEnd != nil {
-		periodText = fmt.Sprintf(" a %s - %s időszakra vonatkozóan", periodStart.Format("2006.01.02"), periodEnd.Format("2006.01.02"))
-	}
-
-	subject := fmt.Sprintf("Számla értesítő - %s", project.Name)
-	body := fmt.Sprintf(
-		"Kedves %s!\n\nÉrtesítjük, hogy hamarosan számlát állítunk ki a(z) \"%s\" projekt kapcsán%s.\n\nÜdvözlettel",
-		client.Name, project.Name, periodText,
-	)
-
-	raw := services.BuildRawMessage(account.EmailAddress, client.Email, subject, body, "", "", "", nil)
-	gmailMessageID, err := services.NewRealGmailAPI().SendMessage(c.Context(), &account, raw)
+	notice, err := services.SendInvoiceNoticeEmail(project, client, account, periodStart, periodEnd, currentUserID)
 	if err != nil {
 		return c.Status(502).JSON(models.InvoiceNoticeResponse{Success: false, Message: "Failed to send notice email: " + err.Error()})
 	}
 
-	notice := models.InvoiceNotice{
-		ProjectID:      uint(projectID),
-		ClientID:       req.ClientID,
-		PeriodStart:    periodStart,
-		PeriodEnd:      periodEnd,
-		GmailMessageID: gmailMessageID,
-		SentBy:         currentUserID,
-		SentAt:         time.Now(),
-	}
-	db.Create(&notice)
-
-	return c.JSON(models.InvoiceNoticeResponse{Success: true, Notice: &notice})
+	return c.JSON(models.InvoiceNoticeResponse{Success: true, Notice: notice})
 }
 
 // ListInvoiceNotices - GET /api/v1/projects/:id/invoice-notices?period_start=&period_end=
