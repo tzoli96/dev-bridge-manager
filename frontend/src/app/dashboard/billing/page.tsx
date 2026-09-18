@@ -3,7 +3,7 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { ProjectsService, Project, ProjectClient } from '@/services/projectsService';
-import { InvoicesService, Invoice, InvoiceLineItem } from '@/services/invoicesService';
+import { InvoicesService, Invoice, InvoiceLineItem, InvoiceNoticesService, InvoiceNoticeWithNames } from '@/services/invoicesService';
 import { Button } from '@/components/ui/button';
 import { Eye, ChevronDown, ChevronUp, ArrowUpRight, Receipt } from 'lucide-react';
 
@@ -76,7 +76,7 @@ function AutomationRow({ project, clients }: AutomationRowProps) {
                     onChange={(e) => handleToggle(e.target.checked)}
                     disabled={saving || clients.length === 0}
                 />
-                Automatikus számlázás
+                Automatikus havi értesítő
                 {saving && <span className="text-xs text-muted-foreground font-normal">(mentés...)</span>}
             </label>
             {clients.length === 0 ? (
@@ -113,6 +113,44 @@ export default function BillingPage() {
     const [expandedInvoiceId, setExpandedInvoiceId] = React.useState<number | null>(null);
     const [breakdowns, setBreakdowns] = React.useState<Record<number, InvoiceLineItem[]>>({});
     const [breakdownLoading, setBreakdownLoading] = React.useState<number | null>(null);
+
+    const [pendingNotices, setPendingNotices] = React.useState<InvoiceNoticeWithNames[]>([]);
+    const [loadingNotices, setLoadingNotices] = React.useState(true);
+    const [approvingNoticeId, setApprovingNoticeId] = React.useState<number | null>(null);
+    const [noticeApprovalError, setNoticeApprovalError] = React.useState<string | null>(null);
+
+    const fetchPendingNotices = React.useCallback(() => {
+        setLoadingNotices(true);
+        InvoiceNoticesService.listAll('pending')
+            .then((res) => setPendingNotices(res.notices || []))
+            .catch(() => setPendingNotices([]))
+            .finally(() => setLoadingNotices(false));
+    }, []);
+
+    React.useEffect(() => {
+        fetchPendingNotices();
+    }, [fetchPendingNotices]);
+
+    const handleApproveNotice = async (notice: InvoiceNoticeWithNames) => {
+        setNoticeApprovalError(null);
+        try {
+            setApprovingNoticeId(notice.id);
+            const res = await InvoiceNoticesService.approve(notice.project_id, notice.id);
+            if (!res.success && !res.notice) {
+                setNoticeApprovalError(res.message || 'A jóváhagyás sikertelen');
+                return;
+            }
+            if (res.message) {
+                setNoticeApprovalError(res.message);
+            }
+            fetchPendingNotices();
+            InvoicesService.getAllInvoices(selectedProjectId || undefined).then(setInvoices).catch(() => {});
+        } catch (err: any) {
+            setNoticeApprovalError(err.message);
+        } finally {
+            setApprovingNoticeId(null);
+        }
+    };
 
     React.useEffect(() => {
         ProjectsService.getAllProjects()
@@ -351,6 +389,44 @@ export default function BillingPage() {
                                 })}
                             </tbody>
                         </table>
+                    </div>
+                )}
+            </div>
+
+            <div>
+                <h2 className="text-lg font-semibold text-foreground mb-3">Jóváhagyásra váró értesítők</h2>
+                {noticeApprovalError && (
+                    <div className="bg-destructive/10 border border-destructive/20 text-destructive px-3 py-2 rounded text-sm mb-3">
+                        {noticeApprovalError}
+                    </div>
+                )}
+                {loadingNotices ? (
+                    <div className="flex items-center justify-center h-20">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                    </div>
+                ) : pendingNotices.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Nincs jóváhagyásra váró értesítő.</p>
+                ) : (
+                    <div className="bg-card border border-border rounded-lg divide-y divide-border">
+                        {pendingNotices.map((notice) => (
+                            <div key={notice.id} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 px-4 py-3">
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-foreground">{notice.project_name}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {notice.client_name}
+                                        {notice.period_start && notice.period_end ? ` · ${notice.period_start} – ${notice.period_end}` : ''}
+                                        {' · elküldve: '}{new Date(notice.sent_at).toLocaleString('hu-HU')}
+                                    </p>
+                                </div>
+                                <Button
+                                    size="sm"
+                                    loading={approvingNoticeId === notice.id}
+                                    onClick={() => handleApproveNotice(notice)}
+                                >
+                                    Jóváhagyás
+                                </Button>
+                            </div>
+                        ))}
                     </div>
                 )}
             </div>
