@@ -226,3 +226,42 @@ func (h *InvoiceNoticeHandler) ApproveInvoiceNotice(c *fiber.Ctx) error {
 		EmailSent: emailSent,
 	})
 }
+
+// ListAllInvoiceNotices - GET /api/v1/invoice-notices?status=pending - minden
+// projekt értesítője, opcionális állapot-szűréssel, a Számlázás menüponthoz.
+func (h *InvoiceNoticeHandler) ListAllInvoiceNotices(c *fiber.Ctx) error {
+	currentUserID := c.Locals("userID").(uint)
+	if err := checkInvoiceAccess(h.permissionService, currentUserID, "invoices.read"); err != nil {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": err.Error()})
+	}
+
+	var rows []struct {
+		models.InvoiceNotice
+		ProjectName string `gorm:"column:project_name"`
+		ClientName  string `gorm:"column:client_name"`
+	}
+
+	query := database.GetDB().Table("invoice_notices").
+		Select("invoice_notices.*, projects.name as project_name, clients.name as client_name").
+		Joins("LEFT JOIN projects ON invoice_notices.project_id = projects.id").
+		Joins("LEFT JOIN clients ON invoice_notices.client_id = clients.id")
+
+	if status := c.Query("status"); status != "" {
+		query = query.Where("invoice_notices.status = ?", status)
+	}
+
+	if err := query.Order("invoice_notices.sent_at DESC").Scan(&rows).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"success": false, "message": "Error fetching invoice notices"})
+	}
+
+	notices := make([]models.InvoiceNoticeWithNames, 0, len(rows))
+	for _, row := range rows {
+		notices = append(notices, models.InvoiceNoticeWithNames{
+			InvoiceNotice: row.InvoiceNotice,
+			ProjectName:   row.ProjectName,
+			ClientName:    row.ClientName,
+		})
+	}
+
+	return c.JSON(fiber.Map{"success": true, "notices": notices})
+}

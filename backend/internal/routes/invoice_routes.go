@@ -25,6 +25,8 @@ func SetupInvoiceRoutes(api fiber.Router) {
 	projects.Post("/:id/invoice-notice", noticeHandler.SendInvoiceNotice)
 	// GET /api/v1/projects/:id/invoice-notices - Elküldött értesítők listázása
 	projects.Get("/:id/invoice-notices", noticeHandler.ListInvoiceNotices)
+	// POST /api/v1/projects/:id/invoice-notices/:noticeId/approve - Értesítő jóváhagyása, számla létrehozása
+	projects.Post("/:id/invoice-notices/:noticeId/approve", noticeHandler.ApproveInvoiceNotice)
 
 	// GET /api/v1/projects/:id/invoices/analytics - Projekt bevétel elemzése (havi/éves/összesen)
 	projects.Get("/:id/invoices/analytics", invoiceHandler.GetProjectRevenueAnalytics)
@@ -46,4 +48,7 @@ func SetupInvoiceRoutes(api fiber.Router) {
 
 	// GET /api/v1/invoices - Minden számla listázása, opcionális ?project_id= szűréssel (Számlázás menüpont)
 	api.Get("/invoices", middleware.JWTMiddleware(), invoiceHandler.ListAllInvoices)
+
+	// GET /api/v1/invoice-notices - Minden értesítő listázása, opcionális ?status= szűréssel (Számlázás menüpont)
+	api.Get("/invoice-notices", middleware.JWTMiddleware(), noticeHandler.ListAllInvoiceNotices)
 }
