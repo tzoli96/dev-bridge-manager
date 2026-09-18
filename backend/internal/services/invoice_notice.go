@@ -56,3 +56,23 @@ func SendInvoiceNoticeEmail(project models.Project, client models.Client, accoun
 	}
 	return &notice, nil
 }
+
+// SendInvoiceReadyEmail notifies the client that their invoice has been
+// issued, with the Billingo PDF attached. Sent once, immediately after
+// InvoiceNoticeHandler.ApproveInvoiceNotice creates the invoice — never sent
+// for invoices created via the manual "Számla kiállítása" button.
+func SendInvoiceReadyEmail(account models.GmailAccount, client models.Client, project models.Project, invoiceNumber string, pdfBytes []byte) error {
+	subject := fmt.Sprintf("Számla - %s", project.Name)
+	body := fmt.Sprintf(
+		"Kedves %s!\n\nMellékelten küldjük a(z) \"%s\" projekt %s számú számláját.\n\nÜdvözlettel",
+		client.Name, project.Name, invoiceNumber,
+	)
+	attachments := []MessageAttachment{{
+		Filename:    invoiceNumber + ".pdf",
+		ContentType: "application/pdf",
+		Data:        pdfBytes,
+	}}
+	raw := BuildRawMessage(account.EmailAddress, client.Email, subject, body, "", "", "", attachments)
+	_, err := NewRealGmailAPI().SendMessage(context.Background(), &account, raw)
+	return err
+}

@@ -2,6 +2,7 @@
 package handlers
 
 import (
+	"log"
 	"strconv"
 	"time"
 
@@ -14,10 +15,14 @@ import (
 
 type InvoiceNoticeHandler struct {
 	permissionService *services.PermissionService
+	billingoService   *services.BillingoService
 }
 
 func NewInvoiceNoticeHandler() *InvoiceNoticeHandler {
-	return &InvoiceNoticeHandler{permissionService: services.NewPermissionService()}
+	return &InvoiceNoticeHandler{
+		permissionService: services.NewPermissionService(),
+		billingoService:   services.NewBillingoService(),
+	}
 }
 
 // SendInvoiceNotice - POST /api/v1/projects/:id/invoice-notice - e-mail
@@ -114,4 +119,110 @@ func (h *InvoiceNoticeHandler) ListInvoiceNotices(c *fiber.Ctx) error {
 	query.Order("sent_at desc").Find(&notices)
 
 	return c.JSON(models.InvoiceNoticeListResponse{Success: true, Notices: notices})
+}
+
+// ApproveInvoiceNotice - POST /api/v1/projects/:id/invoice-notices/:noticeId/approve
+// Jóváhagyja a függőben lévő értesítőt: legyártja a tényleges Billingo
+// számlát (createInvoiceForProject-tal, ugyanazzal a logikával mint a
+// manuális "Számla kiállítása" gomb), majd e-mailben elküldi a PDF-et az
+// ügyfélnek. Ha a PDF-küldés bármilyen okból meghiúsul, a számla attól még
+// létrejön — csak egy figyelmeztető üzenetet kap vissza a jóváhagyó.
+func (h *InvoiceNoticeHandler) ApproveInvoiceNotice(c *fiber.Ctx) error {
+	currentUserID := c.Locals("userID").(uint)
+	if err := checkInvoiceAccess(h.permissionService, currentUserID, "invoices.create"); err != nil {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": err.Error()})
+	}
+
+	projectID, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return c.Status(400).JSON(models.InvoiceNoticeApproveResponse{Success: false, Message: "Invalid project id"})
+	}
+	noticeID, err := strconv.Atoi(c.Params("noticeId"))
+	if err != nil {
+		return c.Status(400).JSON(models.InvoiceNoticeApproveResponse{Success: false, Message: "Invalid notice id"})
+	}
+
+	db := database.GetDB()
+
+	var notice models.InvoiceNotice
+	if err := db.Where("id = ? AND project_id = ?", noticeID, projectID).First(&notice).Error; err != nil {
+		return c.Status(404).JSON(models.InvoiceNoticeApproveResponse{Success: false, Message: "Invoice notice not found"})
+	}
+	if notice.Status != "pending" {
+		return c.Status(409).JSON(models.InvoiceNoticeApproveResponse{Success: false, Message: "Ez az értesítő már jóvá lett hagyva"})
+	}
+
+	var project models.Project
+	if err := db.First(&project, projectID).Error; err != nil {
+		return c.Status(404).JSON(models.InvoiceNoticeApproveResponse{Success: false, Message: "Project not found"})
+	}
+	if project.PricingType == "" {
+		return c.Status(400).JSON(models.InvoiceNoticeApproveResponse{Success: false, Message: "Project has no pricing type configured"})
+	}
+
+	var client models.Client
+	if err := db.First(&client, notice.ClientID).Error; err != nil {
+		return c.Status(404).JSON(models.InvoiceNoticeApproveResponse{Success: false, Message: "Client not found"})
+	}
+
+	req := models.InvoiceCreateRequest{ClientID: notice.ClientID}
+	if notice.PeriodStart != nil {
+		req.PeriodStart = notice.PeriodStart.Format("2006-01-02")
+	}
+	if notice.PeriodEnd != nil {
+		req.PeriodEnd = notice.PeriodEnd.Format("2006-01-02")
+	}
+
+	invoice, items, httpStatus, message := createInvoiceForProject(h.billingoService, project, client, req, currentUserID)
+	if httpStatus != 0 {
+		return c.Status(httpStatus).JSON(models.InvoiceNoticeApproveResponse{Success: false, Message: message})
+	}
+
+	now := time.Now()
+	if err := db.Model(&notice).Updates(map[string]interface{}{
+		"status":      "approved",
+		"invoice_id":  invoice.ID,
+		"approved_by": currentUserID,
+		"approved_at": now,
+	}).Error; err != nil {
+		log.Printf("⚠️ Failed to mark invoice notice %d as approved: %v", notice.ID, err)
+	}
+	notice.Status = "approved"
+	notice.InvoiceID = &invoice.ID
+	notice.ApprovedBy = &currentUserID
+	notice.ApprovedAt = &now
+
+	emailSent := false
+	warning := ""
+	var account models.GmailAccount
+	if err := db.Where("user_id = ?", currentUserID).First(&account).Error; err != nil {
+		warning = "A számla elkészült, de nincs csatlakoztatott Gmail-fiókod — kérlek küldd el a PDF-et manuálisan."
+	} else {
+		var settings models.BillingoSettings
+		if err := db.First(&settings, 1).Error; err != nil || settings.APIKey == "" {
+			warning = "A számla elkészült, de a Billingo nincs beállítva a PDF letöltéséhez — kérlek küldd el manuálisan."
+		} else {
+			pdfBytes, err := h.billingoService.DownloadInvoicePDF(settings.APIKey, invoice.BillingoInvoiceID)
+			if err != nil {
+				log.Printf("⚠️ Failed to download PDF for invoice %d: %v", invoice.ID, err)
+				warning = "A számla elkészült, de a PDF letöltése sikertelen — kérlek küldd el manuálisan."
+			} else if err := services.SendInvoiceReadyEmail(account, client, project, invoice.BillingoInvoiceNumber, pdfBytes); err != nil {
+				log.Printf("⚠️ Failed to send invoice-ready e-mail for invoice %d: %v", invoice.ID, err)
+				warning = "A számla elkészült, de a PDF-es e-mail küldése sikertelen — kérlek küldd el manuálisan."
+			} else {
+				emailSent = true
+			}
+		}
+	}
+
+	response := toInvoiceResponse(*invoice, client.Name, "")
+	response.Items = items
+
+	return c.JSON(models.InvoiceNoticeApproveResponse{
+		Success:   true,
+		Message:   warning,
+		Invoice:   &response,
+		Notice:    &notice,
+		EmailSent: emailSent,
+	})
 }
