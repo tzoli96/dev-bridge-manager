@@ -75,7 +75,7 @@ func ptrInvoiceResponse(r models.InvoiceResponse) *models.InvoiceResponse { retu
 // have no pre-existing reservation row (currently: hourly, which has no
 // once-only rule). Fixed-price failures instead update the existing
 // 'pending' reservation row in place — see markReservationFailed.
-func (h *InvoiceHandler) recordFailedInvoice(projectID, clientID, createdBy uint, pricingType string, periodStart, periodEnd *time.Time, amount float64, errMsg string) {
+func recordFailedInvoice(projectID, clientID, createdBy uint, pricingType string, periodStart, periodEnd *time.Time, amount float64, errMsg string) {
 	invoice := models.Invoice{
 		ProjectID:    projectID,
 		ClientID:     clientID,
@@ -103,7 +103,7 @@ func isDuplicateKeyError(err error) bool {
 // into a 'created' row after a successful Billingo call, updating both the
 // DB row and the in-memory struct so the handler's JSON response reflects
 // the final state.
-func (h *InvoiceHandler) markReservationCreated(invoice *models.Invoice, billingoInvoiceID, billingoInvoiceNumber string) error {
+func markReservationCreated(invoice *models.Invoice, billingoInvoiceID, billingoInvoiceNumber string) error {
 	invoice.Status = "created"
 	invoice.BillingoInvoiceID = billingoInvoiceID
 	invoice.BillingoInvoiceNumber = billingoInvoiceNumber
@@ -118,7 +118,7 @@ func (h *InvoiceHandler) markReservationCreated(invoice *models.Invoice, billing
 // 'failed' row after a Billingo call error, instead of inserting a new row
 // (which would violate the once-only unique index while the reservation
 // still exists).
-func (h *InvoiceHandler) markReservationFailed(invoice *models.Invoice, errMsg string) {
+func markReservationFailed(invoice *models.Invoice, errMsg string) {
 	invoice.Status = "failed"
 	invoice.ErrorMessage = errMsg
 	if err := database.GetDB().Model(invoice).Updates(map[string]interface{}{
@@ -131,6 +131,226 @@ func (h *InvoiceHandler) markReservationFailed(invoice *models.Invoice, errMsg s
 		// other recovery path, so this must be visible in the logs.
 		log.Printf("⚠️ Failed to mark invoice reservation %d as failed (project %d): %v", invoice.ID, invoice.ProjectID, err)
 	}
+}
+
+// createInvoiceForProject runs the shared pricing/Billingo/persistence logic
+// for creating an invoice. Used by both the manual CreateInvoice handler and
+// InvoiceNoticeHandler.ApproveInvoiceNotice, so the two paths can never
+// diverge in how an invoice is priced or persisted. Assumes the caller has
+// already resolved project/client and validated req.ClientID != 0.
+// httpStatus == 0 means success (invoice/items are set); otherwise
+// httpStatus/message are ready to write straight into a fiber response.
+func createInvoiceForProject(billingoService *services.BillingoService, project models.Project, client models.Client, req models.InvoiceCreateRequest, createdBy uint) (invoice *models.Invoice, items []models.InvoiceItem, httpStatus int, message string) {
+	projectID := project.ID
+
+	var dueDate *time.Time
+	if req.DueDate != "" {
+		parsed, err := time.Parse("2006-01-02", req.DueDate)
+		if err != nil {
+			return nil, nil, 400, "Invalid due_date (expected YYYY-MM-DD)"
+		}
+		dueDate = &parsed
+	}
+
+	var amount float64
+	var periodStart, periodEnd *time.Time
+	var description string
+	baseQuantity := 1.0
+	var baseUnit string
+	var baseUnitPrice float64
+	var reservation *models.Invoice
+
+	switch project.PricingType {
+	case "fixed":
+		if project.FixedPrice == nil {
+			return nil, nil, 400, "Project has no fixed price configured"
+		}
+
+		fixedPrice := *project.FixedPrice
+		if req.BaseUnitPrice > 0 {
+			fixedPrice = req.BaseUnitPrice
+		}
+		amount = services.CalculateFixedAmount(fixedPrice)
+		baseUnit = client.BillingoUnit
+		baseUnitPrice = amount
+		description = fmt.Sprintf("%s - fixed price", project.Name)
+
+		reservation = &models.Invoice{
+			ProjectID:   projectID,
+			ClientID:    req.ClientID,
+			PricingType: "fixed",
+			Amount:      amount,
+			Status:      "pending",
+			CreatedBy:   createdBy,
+		}
+		if err := database.GetDB().Create(reservation).Error; err != nil {
+			if isDuplicateKeyError(err) {
+				return nil, nil, 409, "Ez a projekt már ki lett számlázva"
+			}
+			return nil, nil, 500, "Failed to reserve invoice slot"
+		}
+
+	case "hourly":
+		if project.HourlyRate == nil {
+			return nil, nil, 400, "Project has no hourly rate configured"
+		}
+		if req.PeriodStart == "" || req.PeriodEnd == "" {
+			return nil, nil, 400, "period_start and period_end are required for hourly projects"
+		}
+
+		start, err := time.Parse("2006-01-02", req.PeriodStart)
+		if err != nil {
+			return nil, nil, 400, "Invalid period_start (expected YYYY-MM-DD)"
+		}
+		end, err := time.Parse("2006-01-02", req.PeriodEnd)
+		if err != nil {
+			return nil, nil, 400, "Invalid period_end (expected YYYY-MM-DD)"
+		}
+		if start.After(end) {
+			return nil, nil, 400, "period_start must not be after period_end"
+		}
+
+		totalHours, err := services.SumLoggedHours(projectID, start, end)
+		if err != nil {
+			return nil, nil, 500, "Error summing logged hours"
+		}
+
+		hourlyRate := *project.HourlyRate
+		if req.BaseUnitPrice > 0 {
+			hourlyRate = req.BaseUnitPrice
+		}
+		amount = services.CalculateHourlyAmount(totalHours, hourlyRate)
+		baseQuantity = totalHours
+		baseUnit = "óra"
+		baseUnitPrice = hourlyRate
+		periodStart, periodEnd = &start, &end
+		description = fmt.Sprintf("%s - %s to %s", project.Name, req.PeriodStart, req.PeriodEnd)
+
+	default:
+		return nil, nil, 400, "Unsupported pricing type"
+	}
+
+	if req.ItemName != "" {
+		description = req.ItemName
+	}
+
+	type invoiceLine struct {
+		Name      string
+		Quantity  float64
+		Unit      string
+		UnitPrice float64
+		IsBase    bool
+	}
+	lines := []invoiceLine{
+		{Name: description, Quantity: baseQuantity, Unit: baseUnit, UnitPrice: baseUnitPrice, IsBase: true},
+	}
+	for _, extra := range req.ExtraItems {
+		name := strings.TrimSpace(extra.Name)
+		if name == "" && extra.Quantity == 0 && extra.UnitPrice == 0 {
+			continue
+		}
+		if name == "" {
+			return nil, nil, 400, "Extra item name is required"
+		}
+		if extra.Quantity <= 0 {
+			return nil, nil, 400, "Extra item quantity must be greater than 0"
+		}
+		lines = append(lines, invoiceLine{Name: name, Quantity: extra.Quantity, Unit: extra.Unit, UnitPrice: extra.UnitPrice})
+		amount += extra.Quantity * extra.UnitPrice
+	}
+
+	if reservation != nil {
+		reservation.ItemName = description
+		reservation.DueDate = dueDate
+		reservation.Amount = amount
+		if err := database.GetDB().Model(reservation).Updates(map[string]interface{}{
+			"item_name": reservation.ItemName,
+			"due_date":  reservation.DueDate,
+			"amount":    reservation.Amount,
+		}).Error; err != nil {
+			markReservationFailed(reservation, "failed to save item name/due date")
+			return nil, nil, 500, "Failed to reserve invoice slot"
+		}
+	}
+
+	billingoItems := make([]services.InvoiceLineItem, 0, len(lines))
+	for _, l := range lines {
+		billingoItems = append(billingoItems, services.InvoiceLineItem{
+			Name: l.Name, Quantity: l.Quantity, Unit: l.Unit, UnitPrice: l.UnitPrice, UnitPriceType: client.BillingoUnitPriceType,
+		})
+	}
+
+	partnerID, err := billingoService.EnsurePartner(&client)
+	if err != nil {
+		friendly := services.FriendlyBillingoError(err)
+		if reservation != nil {
+			markReservationFailed(reservation, friendly)
+		} else {
+			recordFailedInvoice(projectID, req.ClientID, createdBy, project.PricingType, periodStart, periodEnd, amount, friendly)
+		}
+		return nil, nil, 502, friendly
+	}
+
+	billingoInvoiceID, billingoInvoiceNumber, err := billingoService.CreateInvoice(partnerID, billingoItems, req.DueDate)
+	if err != nil {
+		friendly := services.FriendlyBillingoError(err)
+		if reservation != nil {
+			markReservationFailed(reservation, friendly)
+		} else {
+			recordFailedInvoice(projectID, req.ClientID, createdBy, project.PricingType, periodStart, periodEnd, amount, friendly)
+		}
+		return nil, nil, 502, friendly
+	}
+
+	var inv models.Invoice
+	if reservation != nil {
+		if err := markReservationCreated(reservation, billingoInvoiceID, billingoInvoiceNumber); err != nil {
+			log.Printf("⚠️ Failed to finalize invoice reservation %d as created (project %d): %v", reservation.ID, reservation.ProjectID, err)
+			return nil, nil, 500, "Invoice created in Billingo but failed to save locally"
+		}
+		inv = *reservation
+	} else {
+		inv = models.Invoice{
+			ProjectID:             projectID,
+			ClientID:              req.ClientID,
+			BillingoInvoiceID:     billingoInvoiceID,
+			BillingoInvoiceNumber: billingoInvoiceNumber,
+			PricingType:           project.PricingType,
+			PeriodStart:           periodStart,
+			PeriodEnd:             periodEnd,
+			ItemName:              description,
+			DueDate:               dueDate,
+			Amount:                amount,
+			Status:                "created",
+			CreatedBy:             createdBy,
+		}
+		if err := database.GetDB().Create(&inv).Error; err != nil {
+			if isDuplicateKeyError(err) {
+				return nil, nil, 409, "Ez a projekt már ki lett számlázva"
+			}
+			return nil, nil, 500, "Invoice created in Billingo but failed to save locally"
+		}
+	}
+
+	itemRows := make([]models.InvoiceItem, 0, len(lines))
+	for _, l := range lines {
+		itemRows = append(itemRows, models.InvoiceItem{
+			InvoiceID:     inv.ID,
+			Name:          l.Name,
+			Quantity:      l.Quantity,
+			Unit:          l.Unit,
+			UnitPrice:     l.UnitPrice,
+			UnitPriceType: client.BillingoUnitPriceType,
+			LineTotal:     l.Quantity * l.UnitPrice,
+			IsBase:        l.IsBase,
+		})
+	}
+	if err := database.GetDB().Create(&itemRows).Error; err != nil {
+		log.Printf("⚠️ Failed to save invoice_items for invoice %d: %v", inv.ID, err)
+		itemRows = nil
+	}
+
+	return &inv, itemRows, 0, ""
 }
 
 // CreateInvoice - POST /api/v1/projects/:id/invoices
@@ -174,249 +394,13 @@ func (h *InvoiceHandler) CreateInvoice(c *fiber.Ctx) error {
 		return c.Status(404).JSON(models.InvoiceListResponse{Success: false, Message: "Client not found"})
 	}
 
-	var dueDate *time.Time
-	if req.DueDate != "" {
-		parsed, err := time.Parse("2006-01-02", req.DueDate)
-		if err != nil {
-			return c.Status(400).JSON(models.InvoiceListResponse{Success: false, Message: "Invalid due_date (expected YYYY-MM-DD)"})
-		}
-		dueDate = &parsed
+	invoice, items, httpStatus, message := createInvoiceForProject(h.billingoService, project, client, req, currentUserID)
+	if httpStatus != 0 {
+		return c.Status(httpStatus).JSON(models.InvoiceListResponse{Success: false, Message: message})
 	}
 
-	var amount float64
-	var periodStart, periodEnd *time.Time
-	var description string
-	// baseQuantity/baseUnit/baseUnitPrice describe the pricing-type-derived
-	// base line item; hourly billing sets these to the period's total hours
-	// / "óra" / per-hour rate so the invoice reads as hours x rate instead
-	// of a single opaque quantity-1 line.
-	baseQuantity := 1.0
-	var baseUnit string
-	var baseUnitPrice float64
-
-	// reservation holds the fixed-price 'pending' row that reserves the
-	// once-only right for this project before Billingo is ever called. It
-	// stays nil for pricing types (currently only hourly) that have no
-	// once-only rule and therefore no reservation row.
-	var reservation *models.Invoice
-
-	switch project.PricingType {
-	case "fixed":
-		if project.FixedPrice == nil {
-			return c.Status(400).JSON(models.InvoiceListResponse{Success: false, Message: "Project has no fixed price configured"})
-		}
-
-		fixedPrice := *project.FixedPrice
-		if req.BaseUnitPrice > 0 {
-			fixedPrice = req.BaseUnitPrice
-		}
-		amount = services.CalculateFixedAmount(fixedPrice)
-		baseUnit = client.BillingoUnit
-		baseUnitPrice = amount
-		description = fmt.Sprintf("%s - fixed price", project.Name)
-
-		// Enforcement of the once-only rule now happens here, via this
-		// INSERT racing against the partial unique index
-		// idx_invoices_fixed_price_once (status IN ('created','pending')),
-		// BEFORE any Billingo API call is made. This closes the TOCTOU
-		// window that a pure pre-check SELECT (the old approach) could not:
-		// two concurrent requests can no longer both reach the Billingo
-		// call for the same project.
-		reservation = &models.Invoice{
-			ProjectID:   uint(projectID),
-			ClientID:    req.ClientID,
-			PricingType: "fixed",
-			Amount:      amount,
-			Status:      "pending",
-			CreatedBy:   currentUserID,
-		}
-		if err := database.GetDB().Create(reservation).Error; err != nil {
-			if isDuplicateKeyError(err) {
-				return c.Status(409).JSON(models.InvoiceListResponse{Success: false, Message: "Ez a projekt már ki lett számlázva"})
-			}
-			return c.Status(500).JSON(models.InvoiceListResponse{Success: false, Message: "Failed to reserve invoice slot"})
-		}
-
-	case "hourly":
-		if project.HourlyRate == nil {
-			return c.Status(400).JSON(models.InvoiceListResponse{Success: false, Message: "Project has no hourly rate configured"})
-		}
-		if req.PeriodStart == "" || req.PeriodEnd == "" {
-			return c.Status(400).JSON(models.InvoiceListResponse{Success: false, Message: "period_start and period_end are required for hourly projects"})
-		}
-
-		start, err := time.Parse("2006-01-02", req.PeriodStart)
-		if err != nil {
-			return c.Status(400).JSON(models.InvoiceListResponse{Success: false, Message: "Invalid period_start (expected YYYY-MM-DD)"})
-		}
-		end, err := time.Parse("2006-01-02", req.PeriodEnd)
-		if err != nil {
-			return c.Status(400).JSON(models.InvoiceListResponse{Success: false, Message: "Invalid period_end (expected YYYY-MM-DD)"})
-		}
-		if start.After(end) {
-			return c.Status(400).JSON(models.InvoiceListResponse{Success: false, Message: "period_start must not be after period_end"})
-		}
-
-		totalHours, err := services.SumLoggedHours(uint(projectID), start, end)
-		if err != nil {
-			return c.Status(500).JSON(models.InvoiceListResponse{Success: false, Message: "Error summing logged hours"})
-		}
-
-		hourlyRate := *project.HourlyRate
-		if req.BaseUnitPrice > 0 {
-			hourlyRate = req.BaseUnitPrice
-		}
-		amount = services.CalculateHourlyAmount(totalHours, hourlyRate)
-		baseQuantity = totalHours
-		baseUnit = "óra"
-		baseUnitPrice = hourlyRate
-		periodStart, periodEnd = &start, &end
-		description = fmt.Sprintf("%s - %s to %s", project.Name, req.PeriodStart, req.PeriodEnd)
-
-	default:
-		return c.Status(400).JSON(models.InvoiceListResponse{Success: false, Message: "Unsupported pricing type"})
-	}
-
-	if req.ItemName != "" {
-		description = req.ItemName
-	}
-
-	// lines starts with the pricing-type-derived base item and is extended
-	// with any user-supplied extra items (e.g. one-time fees, expenses).
-	// Every line here becomes both a Billingo invoice item and a persisted
-	// invoice_items row, so an invoice's full item breakdown survives beyond
-	// this request.
-	type invoiceLine struct {
-		Name      string
-		Quantity  float64
-		Unit      string
-		UnitPrice float64
-		IsBase    bool
-	}
-	lines := []invoiceLine{
-		{Name: description, Quantity: baseQuantity, Unit: baseUnit, UnitPrice: baseUnitPrice, IsBase: true},
-	}
-	for _, extra := range req.ExtraItems {
-		name := strings.TrimSpace(extra.Name)
-		if name == "" && extra.Quantity == 0 && extra.UnitPrice == 0 {
-			continue // ignore blank placeholder rows
-		}
-		if name == "" {
-			return c.Status(400).JSON(models.InvoiceListResponse{Success: false, Message: "Extra item name is required"})
-		}
-		if extra.Quantity <= 0 {
-			return c.Status(400).JSON(models.InvoiceListResponse{Success: false, Message: "Extra item quantity must be greater than 0"})
-		}
-		lines = append(lines, invoiceLine{Name: name, Quantity: extra.Quantity, Unit: extra.Unit, UnitPrice: extra.UnitPrice})
-		amount += extra.Quantity * extra.UnitPrice
-	}
-
-	if reservation != nil {
-		reservation.ItemName = description
-		reservation.DueDate = dueDate
-		reservation.Amount = amount
-		if err := database.GetDB().Model(reservation).Updates(map[string]interface{}{
-			"item_name": reservation.ItemName,
-			"due_date":  reservation.DueDate,
-			"amount":    reservation.Amount,
-		}).Error; err != nil {
-			h.markReservationFailed(reservation, "failed to save item name/due date")
-			return c.Status(500).JSON(models.InvoiceListResponse{Success: false, Message: "Failed to reserve invoice slot"})
-		}
-	}
-
-	billingoItems := make([]services.InvoiceLineItem, 0, len(lines))
-	for _, l := range lines {
-		billingoItems = append(billingoItems, services.InvoiceLineItem{
-			Name: l.Name, Quantity: l.Quantity, Unit: l.Unit, UnitPrice: l.UnitPrice, UnitPriceType: client.BillingoUnitPriceType,
-		})
-	}
-
-	partnerID, err := h.billingoService.EnsurePartner(&client)
-	if err != nil {
-		friendly := services.FriendlyBillingoError(err)
-		if reservation != nil {
-			h.markReservationFailed(reservation, friendly)
-		} else {
-			h.recordFailedInvoice(uint(projectID), req.ClientID, currentUserID, project.PricingType, periodStart, periodEnd, amount, friendly)
-		}
-		return c.Status(502).JSON(models.InvoiceListResponse{Success: false, Message: friendly})
-	}
-
-	billingoInvoiceID, billingoInvoiceNumber, err := h.billingoService.CreateInvoice(partnerID, billingoItems, req.DueDate)
-	if err != nil {
-		friendly := services.FriendlyBillingoError(err)
-		if reservation != nil {
-			h.markReservationFailed(reservation, friendly)
-		} else {
-			h.recordFailedInvoice(uint(projectID), req.ClientID, currentUserID, project.PricingType, periodStart, periodEnd, amount, friendly)
-		}
-		return c.Status(502).JSON(models.InvoiceListResponse{Success: false, Message: friendly})
-	}
-
-	var invoice models.Invoice
-	if reservation != nil {
-		// Fixed-price: finalize the existing 'pending' reservation row into
-		// 'created' rather than inserting a new row.
-		if err := h.markReservationCreated(reservation, billingoInvoiceID, billingoInvoiceNumber); err != nil {
-			// The reservation row stays stuck at 'pending', permanently
-			// blocking future invoicing for this project under the
-			// once-only unique index — there is no other recovery path,
-			// so this must be visible in the logs even though the client
-			// already gets a 500.
-			log.Printf("⚠️ Failed to finalize invoice reservation %d as created (project %d): %v", reservation.ID, reservation.ProjectID, err)
-			return c.Status(500).JSON(models.InvoiceListResponse{Success: false, Message: "Invoice created in Billingo but failed to save locally"})
-		}
-		invoice = *reservation
-	} else {
-		// Hourly: no reservation row exists (no once-only rule), so insert
-		// the 'created' row directly, unchanged from before.
-		invoice = models.Invoice{
-			ProjectID:             uint(projectID),
-			ClientID:              req.ClientID,
-			BillingoInvoiceID:     billingoInvoiceID,
-			BillingoInvoiceNumber: billingoInvoiceNumber,
-			PricingType:           project.PricingType,
-			PeriodStart:           periodStart,
-			PeriodEnd:             periodEnd,
-			ItemName:              description,
-			DueDate:               dueDate,
-			Amount:                amount,
-			Status:                "created",
-			CreatedBy:             currentUserID,
-		}
-
-		if err := database.GetDB().Create(&invoice).Error; err != nil {
-			if isDuplicateKeyError(err) {
-				return c.Status(409).JSON(models.InvoiceListResponse{Success: false, Message: "Ez a projekt már ki lett számlázva"})
-			}
-			return c.Status(500).JSON(models.InvoiceListResponse{Success: false, Message: "Invoice created in Billingo but failed to save locally"})
-		}
-	}
-
-	itemRows := make([]models.InvoiceItem, 0, len(lines))
-	for _, l := range lines {
-		itemRows = append(itemRows, models.InvoiceItem{
-			InvoiceID:     invoice.ID,
-			Name:          l.Name,
-			Quantity:      l.Quantity,
-			Unit:          l.Unit,
-			UnitPrice:     l.UnitPrice,
-			UnitPriceType: client.BillingoUnitPriceType,
-			LineTotal:     l.Quantity * l.UnitPrice,
-			IsBase:        l.IsBase,
-		})
-	}
-	if err := database.GetDB().Create(&itemRows).Error; err != nil {
-		// The invoice itself was already created (locally and in Billingo);
-		// losing its item breakdown here is a display-only regression, not
-		// a billing-correctness issue, so this only needs to be logged.
-		log.Printf("⚠️ Failed to save invoice_items for invoice %d: %v", invoice.ID, err)
-		itemRows = nil
-	}
-
-	response := toInvoiceResponse(invoice, client.Name, "")
-	response.Items = itemRows
+	response := toInvoiceResponse(*invoice, client.Name, "")
+	response.Items = items
 
 	return c.Status(201).JSON(models.InvoiceListResponse{
 		Success: true,
