@@ -127,6 +127,7 @@ type TimeEntryDTO struct {
 	Date        string          `json:"date"`
 	UserID      string          `json:"userId"`
 	User        *TaskUserRefDTO `json:"user,omitempty"`
+	Invoiced    bool            `json:"invoiced"`
 	CreatedAt   time.Time       `json:"createdAt"`
 	UpdatedAt   time.Time       `json:"updatedAt"`
 }
@@ -139,6 +140,7 @@ type TaskCommentDTO struct {
 	UserID      string          `json:"userId"`
 	User        *TaskUserRefDTO `json:"user,omitempty"`
 	IsEdited    bool            `json:"isEdited"`
+	Attachments []AttachmentDTO `json:"attachments"`
 	CreatedAt   time.Time       `json:"createdAt"`
 	UpdatedAt   time.Time       `json:"updatedAt"`
 }
@@ -154,31 +156,37 @@ type TaskParentRefDTO struct {
 }
 
 type TaskDTO struct {
-	ID              string              `json:"id"`
-	Title           string              `json:"title"`
-	Description     string              `json:"description"`
-	HTMLDescription string              `json:"htmlDescription,omitempty"`
-	Priority        string              `json:"priority"`
-	Status          string              `json:"status"`
-	ColumnID        string              `json:"columnId"`
-	IsDoneColumn    bool                `json:"isDoneColumn,omitempty"`
-	ProjectID       string              `json:"projectId"`
-	AssigneeID      string              `json:"assigneeId,omitempty"`
-	Assignee        *TaskAssigneeDTO    `json:"assignee,omitempty"`
-	EstimatedHours  float64             `json:"estimatedHours"`
-	LoggedHours     float64             `json:"loggedHours"`
-	Tags            []TaskTagDTO        `json:"tags"`
-	TimeEntries     []TimeEntryDTO      `json:"timeEntries"`
-	Comments        []TaskCommentDTO    `json:"comments"`
-	Attachments     []AttachmentDTO     `json:"attachments"`
-	Position        int                 `json:"position"`
-	DueDate         string              `json:"dueDate,omitempty"`
-	SubtaskProgress *SubtaskProgressDTO `json:"subtaskProgress,omitempty"`
-	ParentTask      *TaskParentRefDTO   `json:"parentTask,omitempty"`
-	CreatedAt       time.Time           `json:"createdAt"`
-	UpdatedAt       time.Time           `json:"updatedAt"`
-	CreatedBy       string              `json:"createdBy"`
-	UpdatedBy       string              `json:"updatedBy"`
+	ID              string           `json:"id"`
+	Title           string           `json:"title"`
+	Description     string           `json:"description"`
+	HTMLDescription string           `json:"htmlDescription,omitempty"`
+	Priority        string           `json:"priority"`
+	Status          string           `json:"status"`
+	ColumnID        string           `json:"columnId"`
+	IsDoneColumn    bool             `json:"isDoneColumn,omitempty"`
+	BoardID         string           `json:"boardId,omitempty"`
+	ProjectID       string           `json:"projectId"`
+	AssigneeID      string           `json:"assigneeId,omitempty"`
+	Assignee        *TaskAssigneeDTO `json:"assignee,omitempty"`
+	EstimatedHours  float64          `json:"estimatedHours"`
+	LoggedHours     float64          `json:"loggedHours"`
+	// HasUninvoicedHours is true when this task has logged hours on an
+	// hourly-priced project that no created invoice's period covers yet.
+	// Always false for fixed-price/unpriced projects, where per-hour billing
+	// status doesn't apply.
+	HasUninvoicedHours bool                `json:"hasUninvoicedHours"`
+	Tags               []TaskTagDTO        `json:"tags"`
+	TimeEntries        []TimeEntryDTO      `json:"timeEntries"`
+	Comments           []TaskCommentDTO    `json:"comments"`
+	Attachments        []AttachmentDTO     `json:"attachments"`
+	Position           int                 `json:"position"`
+	DueDate            string              `json:"dueDate,omitempty"`
+	SubtaskProgress    *SubtaskProgressDTO `json:"subtaskProgress,omitempty"`
+	ParentTask         *TaskParentRefDTO   `json:"parentTask,omitempty"`
+	CreatedAt          time.Time           `json:"createdAt"`
+	UpdatedAt          time.Time           `json:"updatedAt"`
+	CreatedBy          string              `json:"createdBy"`
+	UpdatedBy          string              `json:"updatedBy"`
 }
 
 type KanbanColumnDTO struct {

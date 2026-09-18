@@ -39,6 +39,11 @@ func main() {
 		AppName:      "Dev Bridge Manager v1.0",
 		ErrorHandler: errorHandler,
 		BodyLimit:    55 * 1024 * 1024, // 55MB — up to 5 attachments x 10MB each, plus multipart overhead
+		// fasthttp's default is 4096 bytes; browsers on this dev machine send
+		// the "localhost" cookie jar (host-only, not port-scoped) shared across
+		// every other project running on localhost, which can push combined
+		// request headers past that default and trigger a 431.
+		ReadBufferSize: 16 * 1024,
 	})
 
 	// Global middleware

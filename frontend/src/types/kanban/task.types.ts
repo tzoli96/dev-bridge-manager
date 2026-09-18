@@ -20,6 +20,7 @@ export interface Task {
     priority: TaskPriority;
     status: TaskStatus;
     columnId: string;
+    boardId?: string;
     projectId: string;
     assigneeId?: string;
     assignee?: TaskAssignee;
@@ -33,6 +34,7 @@ export interface Task {
     dueDate?: string;
     subtaskProgress?: { total: number; done: number };
     isDoneColumn?: boolean;
+    hasUninvoicedHours?: boolean;
     parentTask?: { id: string; title: string };
     createdAt: string;
     updatedAt: string;
@@ -73,6 +75,7 @@ export interface TimeEntry {
         name: string;
         avatar?: string;
     };
+    invoiced?: boolean;
     createdAt: string;
     updatedAt: string;
 }

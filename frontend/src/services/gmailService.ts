@@ -22,4 +22,8 @@ export const GmailService = {
     async disconnect(): Promise<void> {
         await apiClient.post('/gmail/disconnect')
     },
+
+    async sync(): Promise<{ success: boolean; message?: string; last_synced_at?: string }> {
+        return apiClient.post('/gmail/sync')
+    },
 }

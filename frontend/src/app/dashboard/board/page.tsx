@@ -32,7 +32,7 @@ export default function BoardPage() {
     const router = useRouter()
     const { user } = useAuth()
     const { projects, loading, error, refetch } = useProjects()
-    const { setShowCreateProject, setOnProjectUpdated } = useModals()
+    const { setShowCreateProject, setShowEditProject, setSelectedProject, setOnProjectUpdated } = useModals()
 
     useEffect(() => {
         setOnProjectUpdated(() => refetch)
@@ -103,7 +103,18 @@ export default function BoardPage() {
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                                             {project.created_by_name || '-'}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm space-x-4">
+                                            {isAdmin(user) && (
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedProject(project)
+                                                        setShowEditProject(true)
+                                                    }}
+                                                    className="text-muted-foreground hover:text-foreground font-medium"
+                                                >
+                                                    Edit
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => router.push(`/dashboard/board/${project.id}`)}
                                                 className="text-primary hover:text-primary/80 font-medium"

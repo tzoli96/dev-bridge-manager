@@ -10,6 +10,9 @@ services:
       GO_ENV: development
       ALLOWED_ORIGINS: http://localhost:3010,http://frontend:3000
       DATABASE_URL: postgres://devbridge_user:devbridge_password@postgres:5432/devbridge?sslmode=disable
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET}
+      GOOGLE_OAUTH_REDIRECT_URL: ${GOOGLE_OAUTH_REDIRECT_URL}
     ports:
       - "8080:8080"
       - "2345:2345"

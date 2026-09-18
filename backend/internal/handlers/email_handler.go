@@ -2,6 +2,8 @@
 package handlers
 
 import (
+	"fmt"
+	"io"
 	"log"
 	"mime"
 	"path/filepath"
@@ -75,6 +77,23 @@ func (h *EmailHandler) ListEmails(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(models.EmailListResponse{Success: true, Emails: items, Total: total})
+}
+
+// GetUnreadCount - GET /api/v1/emails/unread-count - olvasatlan levelek
+// száma az inbox mappában, a nav sávban lévő piros badge-hez.
+func (h *EmailHandler) GetUnreadCount(c *fiber.Ctx) error {
+	userID := c.Locals("userID").(uint)
+	account, err := currentGmailAccount(userID)
+	if err != nil {
+		return c.JSON(fiber.Map{"success": true, "count": 0})
+	}
+
+	var count int64
+	database.GetDB().Model(&models.Email{}).
+		Where("gmail_account_id = ? AND folder = 'inbox' AND is_read = ?", account.ID, false).
+		Count(&count)
+
+	return c.JSON(fiber.Map{"success": true, "count": count})
 }
 
 // GetEmail - GET /api/v1/emails/:id - helyi metaadat + élő body lekérés
@@ -165,6 +184,9 @@ func (h *EmailHandler) GetAttachment(c *fiber.Ctx) error {
 }
 
 // SendEmail - POST /api/v1/emails/send - új levél vagy válasz küldése
+// multipart/form-data: mezők "to", "subject", "body", opcionális
+// "in_reply_to_email_id", és opcionális "files" (max maxAttachmentCount db,
+// max maxAttachmentSize/fájl, csak allowedAttachmentMimeTypes típusok).
 func (h *EmailHandler) SendEmail(c *fiber.Ctx) error {
 	userID := c.Locals("userID").(uint)
 	account, err := currentGmailAccount(userID)
@@ -172,18 +194,54 @@ func (h *EmailHandler) SendEmail(c *fiber.Ctx) error {
 		return c.Status(400).JSON(models.EmailSendResponse{Success: false, Message: "Connect your Gmail account first"})
 	}
 
-	var req models.EmailSendRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(models.EmailSendResponse{Success: false, Message: "Invalid request body"})
-	}
-	if req.To == "" || req.Subject == "" {
+	to := c.FormValue("to")
+	subject := c.FormValue("subject")
+	body := c.FormValue("body")
+	bodyHTML := c.FormValue("body_html")
+	if to == "" || subject == "" {
 		return c.Status(400).JSON(models.EmailSendResponse{Success: false, Message: "to and subject are required"})
 	}
 
+	var inReplyToEmailID uint
+	if raw := c.FormValue("in_reply_to_email_id"); raw != "" {
+		id, err := strconv.Atoi(raw)
+		if err != nil {
+			return c.Status(400).JSON(models.EmailSendResponse{Success: false, Message: "Invalid in_reply_to_email_id"})
+		}
+		inReplyToEmailID = uint(id)
+	}
+
+	var attachments []services.MessageAttachment
+	if form, err := c.MultipartForm(); err == nil {
+		files := form.File["files"]
+		if len(files) > maxAttachmentCount {
+			return c.Status(400).JSON(models.EmailSendResponse{Success: false, Message: fmt.Sprintf("Maximum %d files per email", maxAttachmentCount)})
+		}
+		for _, fh := range files {
+			if fh.Size > maxAttachmentSize {
+				return c.Status(400).JSON(models.EmailSendResponse{Success: false, Message: fmt.Sprintf("%s exceeds the 10MB size limit", fh.Filename)})
+			}
+			contentType := fh.Header.Get("Content-Type")
+			if !allowedAttachmentMimeTypes[contentType] {
+				return c.Status(400).JSON(models.EmailSendResponse{Success: false, Message: fmt.Sprintf("%s has an unsupported file type", fh.Filename)})
+			}
+			src, err := fh.Open()
+			if err != nil {
+				return c.Status(500).JSON(models.EmailSendResponse{Success: false, Message: fmt.Sprintf("Error reading %s", fh.Filename)})
+			}
+			data, err := io.ReadAll(src)
+			src.Close()
+			if err != nil {
+				return c.Status(500).JSON(models.EmailSendResponse{Success: false, Message: fmt.Sprintf("Error reading %s", fh.Filename)})
+			}
+			attachments = append(attachments, services.MessageAttachment{Filename: fh.Filename, ContentType: contentType, Data: data})
+		}
+	}
+
 	var inReplyToHeader, referencesHeader string
-	if req.InReplyToEmailID != 0 {
+	if inReplyToEmailID != 0 {
 		var original models.Email
-		if err := database.GetDB().Where("id = ? AND gmail_account_id = ?", req.InReplyToEmailID, account.ID).First(&original).Error; err == nil {
+		if err := database.GetDB().Where("id = ? AND gmail_account_id = ?", inReplyToEmailID, account.ID).First(&original).Error; err == nil {
 			full, err := h.gmailAPI.GetFullMessage(c.Context(), account, original.GmailMessageID)
 			if err == nil {
 				inReplyToHeader = full.MessageIDHeader
@@ -192,7 +250,7 @@ func (h *EmailHandler) SendEmail(c *fiber.Ctx) error {
 		}
 	}
 
-	raw := services.BuildRawMessage(account.EmailAddress, req.To, req.Subject, req.Body, inReplyToHeader, referencesHeader)
+	raw := services.BuildRawMessage(account.EmailAddress, to, subject, body, bodyHTML, inReplyToHeader, referencesHeader, attachments)
 	gmailMessageID, err := h.gmailAPI.SendMessage(c.Context(), account, raw)
 	if err != nil {
 		return c.Status(502).JSON(models.EmailSendResponse{Success: false, Message: "Failed to send email: " + err.Error()})
@@ -201,16 +259,20 @@ func (h *EmailHandler) SendEmail(c *fiber.Ctx) error {
 	// Mirror the sent message locally so it shows up in the Sent tab
 	// immediately, rather than waiting for the next scheduled sync.
 	now := time.Now()
+	attachmentMetas := make([]models.EmailAttachmentMeta, 0, len(attachments))
+	for _, a := range attachments {
+		attachmentMetas = append(attachmentMetas, models.EmailAttachmentMeta{Filename: a.Filename, Size: int64(len(a.Data))})
+	}
 	localEmail := models.Email{
 		GmailAccountID: account.ID,
 		GmailMessageID: gmailMessageID,
 		Folder:         "sent",
 		FromAddress:    account.EmailAddress,
-		ToAddresses:    req.To,
-		Subject:        req.Subject,
+		ToAddresses:    to,
+		Subject:        subject,
 		Snippet:        "",
-		HasAttachments: false,
-		AttachmentMeta: models.AttachmentMetaToJSON(nil),
+		HasAttachments: len(attachments) > 0,
+		AttachmentMeta: models.AttachmentMetaToJSON(attachmentMetas),
 		IsRead:         true,
 		ReceivedAt:     now,
 		SyncedAt:       now,

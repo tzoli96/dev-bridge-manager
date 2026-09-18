@@ -15,16 +15,17 @@ func NewTaskTimeEntryHandler() *TaskTimeEntryHandler {
 	return &TaskTimeEntryHandler{}
 }
 
-func timeEntryDTOsForEntries(entries []models.TaskTimeEntry) []models.TimeEntryDTO {
+func timeEntryDTOsForEntries(entries []models.TaskTimeEntry, projectID uint) []models.TimeEntryDTO {
 	userIDs := make([]uint, 0, len(entries))
 	for _, e := range entries {
 		userIDs = append(userIDs, e.UserID)
 	}
 	users := loadUsersByIDs(userIDs)
+	invoicedPeriods := invoicedPeriodsForProject(projectID)
 
 	dtos := make([]models.TimeEntryDTO, 0, len(entries))
 	for _, e := range entries {
-		dtos = append(dtos, buildTimeEntryDTO(e, users))
+		dtos = append(dtos, buildTimeEntryDTO(e, users, invoicedPeriods))
 	}
 	return dtos
 }
@@ -41,7 +42,7 @@ func (h *TaskTimeEntryHandler) GetTaskTimeEntries(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"success": false, "message": "Error loading time entries"})
 	}
 
-	return c.JSON(timeEntryDTOsForEntries(entries))
+	return c.JSON(timeEntryDTOsForEntries(entries, taskProjectID(uint(taskID))))
 }
 
 // GetProjectTimeEntries - GET /api/v1/projects/:id/time-entries
@@ -61,7 +62,7 @@ func (h *TaskTimeEntryHandler) GetProjectTimeEntries(c *fiber.Ctx) error {
 		}
 	}
 
-	return c.JSON(timeEntryDTOsForEntries(entries))
+	return c.JSON(timeEntryDTOsForEntries(entries, uint(projectID)))
 }
 
 // CreateTimeEntry - POST /api/v1/projects/:id/tasks/:taskId/time-entries
@@ -95,7 +96,8 @@ func (h *TaskTimeEntryHandler) CreateTimeEntry(c *fiber.Ctx) error {
 	}
 
 	users := loadUsersByIDs([]uint{entry.UserID})
-	return c.Status(201).JSON(buildTimeEntryDTO(entry, users))
+	invoicedPeriods := invoicedPeriodsForProject(taskProjectID(entry.TaskID))
+	return c.Status(201).JSON(buildTimeEntryDTO(entry, users, invoicedPeriods))
 }
 
 // UpdateTimeEntry - PUT /api/v1/projects/:id/time-entries/:entryId
@@ -137,7 +139,8 @@ func (h *TaskTimeEntryHandler) UpdateTimeEntry(c *fiber.Ctx) error {
 	}
 
 	users := loadUsersByIDs([]uint{entry.UserID})
-	return c.JSON(buildTimeEntryDTO(entry, users))
+	invoicedPeriods := invoicedPeriodsForProject(taskProjectID(entry.TaskID))
+	return c.JSON(buildTimeEntryDTO(entry, users, invoicedPeriods))
 }
 
 // DeleteTimeEntry - DELETE /api/v1/projects/:id/time-entries/:entryId

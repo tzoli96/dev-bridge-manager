@@ -4,6 +4,7 @@ import { apiClient } from '@/lib/api'
 export interface Invoice {
     id: number
     project_id: number
+    project_name?: string
     client_id: number
     client_name: string
     billingo_invoice_id: string
@@ -133,6 +134,21 @@ export class InvoicesService {
     static async getProjectInvoices(projectId: number): Promise<Invoice[]> {
         try {
             const response = await apiClient.get<InvoicesResponse>(`${this.baseUrl}/${projectId}/invoices`)
+
+            if (response.success) {
+                return response.invoices || []
+            }
+
+            throw new Error(response.message || 'Failed to fetch invoices')
+        } catch (error: any) {
+            console.error('Error fetching invoices:', error)
+            throw new Error(error.response?.data?.message || error.message || 'Failed to fetch invoices')
+        }
+    }
+
+    static async getAllInvoices(projectId?: number): Promise<Invoice[]> {
+        try {
+            const response = await apiClient.get<InvoicesResponse>('/invoices', projectId ? { project_id: projectId } : undefined)
 
             if (response.success) {
                 return response.invoices || []

@@ -12,7 +12,8 @@ import {
     Clock,
     Calendar,
     AlertCircle,
-    ListTree
+    ListTree,
+    Receipt
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ProgressBar } from '@/components/ui/progress-bar';
@@ -221,9 +222,19 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                         )}
                     </div>
 
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                        <Clock size={12} />
-                        <span>{task.loggedHours}h</span>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                        {task.loggedHours > 0 && (
+                            <span title={task.hasUninvoicedHours ? 'Van még nem számlázott óra' : 'Minden rögzített óra ki van számlázva'}>
+                                <Receipt
+                                    size={12}
+                                    className={task.hasUninvoicedHours ? 'text-warning' : 'text-success'}
+                                />
+                            </span>
+                        )}
+                        <div className="flex items-center gap-1">
+                            <Clock size={12} />
+                            <span>{task.loggedHours}h</span>
+                        </div>
                     </div>
                 </div>
             </div>

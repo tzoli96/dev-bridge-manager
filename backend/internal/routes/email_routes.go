@@ -15,6 +15,7 @@ func SetupEmailRoutes(api fiber.Router) {
 	emails.Use(middleware.RequirePermission("gmail.manage"))
 
 	emails.Get("/", h.ListEmails)
+	emails.Get("/unread-count", h.GetUnreadCount)
 	emails.Get("/:id", h.GetEmail)
 	emails.Get("/:id/attachments/:attachmentId", h.GetAttachment)
 	emails.Post("/send", h.SendEmail)

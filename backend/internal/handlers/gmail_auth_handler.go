@@ -70,6 +70,24 @@ func (h *GmailAuthHandler) Status(c *fiber.Ctx) error {
 	})
 }
 
+// Sync - POST /api/v1/gmail/sync - azonnali szinkronizálás a felhasználó
+// gmail accountjára, ugyanazt a services.SyncAccountNow-t hívva, amit a
+// háttérben futó időzített szinkron is használ.
+func (h *GmailAuthHandler) Sync(c *fiber.Ctx) error {
+	userID := c.Locals("userID").(uint)
+
+	var account models.GmailAccount
+	if err := database.GetDB().Where("user_id = ?", userID).First(&account).Error; err != nil {
+		return c.Status(400).JSON(fiber.Map{"success": false, "message": "Connect your Gmail account first"})
+	}
+
+	if err := services.SyncAccountNow(c.Context(), services.NewRealGmailAPI(), &account); err != nil {
+		return c.Status(502).JSON(fiber.Map{"success": false, "message": "Sync failed: " + err.Error()})
+	}
+
+	return c.JSON(fiber.Map{"success": true, "last_synced_at": account.LastSyncedAt})
+}
+
 // Disconnect - POST /api/v1/gmail/disconnect
 func (h *GmailAuthHandler) Disconnect(c *fiber.Ctx) error {
 	userID := c.Locals("userID").(uint)

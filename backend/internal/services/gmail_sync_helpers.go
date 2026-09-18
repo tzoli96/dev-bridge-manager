@@ -151,8 +151,12 @@ func extractBody(part *gmail.MessagePart) (text, html string) {
 	return text, html
 }
 
+// decodeBase64URL decodes Gmail's base64url message body data. Gmail is
+// documented to omit padding, but some messages come back with trailing
+// "=" padding anyway, so any is stripped before decoding with the
+// no-padding decoder rather than assuming one form or the other.
 func decodeBase64URL(s string) string {
-	b, err := base64.URLEncoding.WithPadding(base64.NoPadding).DecodeString(s)
+	b, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(s, "="))
 	if err != nil {
 		return ""
 	}

@@ -20,4 +20,5 @@ func SetupGmailRoutes(api fiber.Router) {
 	gmail.Get("/auth-url", middleware.RequirePermission("gmail.manage"), h.AuthURL)
 	gmail.Get("/status", middleware.RequirePermission("gmail.manage"), h.Status)
 	gmail.Post("/disconnect", middleware.RequirePermission("gmail.manage"), h.Disconnect)
+	gmail.Post("/sync", middleware.RequirePermission("gmail.manage"), h.Sync)
 }

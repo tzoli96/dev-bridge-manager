@@ -4,6 +4,7 @@ package handlers
 import (
 	"dev-bridge-manager/internal/database"
 	"dev-bridge-manager/internal/models"
+	"dev-bridge-manager/internal/services"
 )
 
 // loadUsersByIDs fetches the given user ids and returns them keyed by id.
@@ -65,12 +66,13 @@ func buildCommentDTO(c models.TaskComment, users map[uint]models.User, projectID
 		UserID:      models.IDToStr(c.UserID),
 		User:        userRefDTO(c.UserID, users),
 		IsEdited:    c.IsEdited,
+		Attachments: attachmentDTOs,
 		CreatedAt:   c.CreatedAt,
 		UpdatedAt:   c.UpdatedAt,
 	}
 }
 
-func buildTimeEntryDTO(e models.TaskTimeEntry, users map[uint]models.User) models.TimeEntryDTO {
+func buildTimeEntryDTO(e models.TaskTimeEntry, users map[uint]models.User, invoicedPeriods []services.InvoicedPeriod) models.TimeEntryDTO {
 	return models.TimeEntryDTO{
 		ID:          models.IDToStr(e.ID),
 		TaskID:      models.IDToStr(e.TaskID),
@@ -79,6 +81,7 @@ func buildTimeEntryDTO(e models.TaskTimeEntry, users map[uint]models.User) model
 		Date:        e.Date.Format("2006-01-02"),
 		UserID:      models.IDToStr(e.UserID),
 		User:        userRefDTO(e.UserID, users),
+		Invoiced:    services.IsDateInvoiced(e.Date, invoicedPeriods),
 		CreatedAt:   e.CreatedAt,
 		UpdatedAt:   e.UpdatedAt,
 	}
@@ -101,6 +104,18 @@ func buildAttachmentDTO(a models.Attachment, users map[uint]models.User, project
 		CreatedAt:    a.CreatedAt,
 		DownloadUrl:  "/projects/" + models.IDToStr(projectID) + "/attachments/" + models.IDToStr(a.ID) + "/download",
 	}
+}
+
+// invoicedPeriodsForProject looks up a single project's billed hourly-invoice
+// periods (see services.InvoicedPeriodsByProject). Errors are swallowed to
+// "no periods" since this only drives a non-critical billed/unbilled badge,
+// not billing correctness itself.
+func invoicedPeriodsForProject(projectID uint) []services.InvoicedPeriod {
+	byProject, err := services.InvoicedPeriodsByProject([]uint{projectID})
+	if err != nil {
+		return nil
+	}
+	return byProject[projectID]
 }
 
 // taskProjectID looks up a task's project id (needed by call sites — comment
@@ -169,6 +184,30 @@ func tasksInDoneColumn(taskIDs []uint) map[uint]bool {
 	return result
 }
 
+// taskBoardIDs returns each task's current board id (via its placement), for
+// tasks that have one. A task with multiple placements resolves to whichever
+// one the query returns first.
+func taskBoardIDs(taskIDs []uint) map[uint]uint {
+	result := make(map[uint]uint)
+	if len(taskIDs) == 0 {
+		return result
+	}
+	var rows []struct {
+		TaskID  uint
+		BoardID uint
+	}
+	database.GetDB().Raw(`
+		SELECT DISTINCT ON (task_id) task_id AS task_id, board_id AS board_id
+		FROM task_placements
+		WHERE task_id IN ?
+		ORDER BY task_id, id
+	`, taskIDs).Scan(&rows)
+	for _, r := range rows {
+		result[r.TaskID] = r.BoardID
+	}
+	return result
+}
+
 // parentTaskRefsByID batch-loads {id, title} for a set of task ids, used to
 // resolve the parentTask reference on a subtask's own DTO.
 func parentTaskRefsByID(ids []uint) map[uint]models.TaskParentRefDTO {
@@ -189,7 +228,7 @@ func parentTaskRefsByID(ids []uint) map[uint]models.TaskParentRefDTO {
 // placement is optional: when nil (project-scoped, placement-independent contexts)
 // ColumnID/Position come back as the zero value ("" / 0); otherwise they're sourced
 // from the given board placement.
-func buildTaskDTO(t models.Task, placement *models.TaskPlacement, comments []models.TaskComment, entries []models.TaskTimeEntry, taskAttachments []models.Attachment, commentAttachments map[uint][]models.Attachment, users map[uint]models.User, subtaskProgress *models.SubtaskProgressDTO, parentTask *models.TaskParentRefDTO) models.TaskDTO {
+func buildTaskDTO(t models.Task, placement *models.TaskPlacement, comments []models.TaskComment, entries []models.TaskTimeEntry, taskAttachments []models.Attachment, commentAttachments map[uint][]models.Attachment, users map[uint]models.User, subtaskProgress *models.SubtaskProgressDTO, parentTask *models.TaskParentRefDTO, invoicedPeriods []services.InvoicedPeriod) models.TaskDTO {
 	commentDTOs := make([]models.TaskCommentDTO, 0, len(comments))
 	for _, c := range comments {
 		commentDTOs = append(commentDTOs, buildCommentDTO(c, users, t.ProjectID, commentAttachments[c.ID]))
@@ -197,9 +236,14 @@ func buildTaskDTO(t models.Task, placement *models.TaskPlacement, comments []mod
 
 	entryDTOs := make([]models.TimeEntryDTO, 0, len(entries))
 	var loggedHours float64
+	var hasUninvoicedHours bool
 	for _, e := range entries {
-		entryDTOs = append(entryDTOs, buildTimeEntryDTO(e, users))
+		entryDTO := buildTimeEntryDTO(e, users, invoicedPeriods)
+		entryDTOs = append(entryDTOs, entryDTO)
 		loggedHours += e.Hours
+		if e.Hours > 0 && !entryDTO.Invoiced {
+			hasUninvoicedHours = true
+		}
 	}
 
 	attachmentDTOs := make([]models.AttachmentDTO, 0, len(taskAttachments))
@@ -229,21 +273,22 @@ func buildTaskDTO(t models.Task, placement *models.TaskPlacement, comments []mod
 			}
 			return ""
 		}(),
-		Assignee:        assigneeDTO(t.AssigneeID, users),
-		EstimatedHours:  t.EstimatedHours,
-		LoggedHours:     loggedHours,
-		Tags:            models.TagsFromJSON(t.Tags),
-		TimeEntries:     entryDTOs,
-		Comments:        commentDTOs,
-		Attachments:     attachmentDTOs,
-		Position:        position,
-		DueDate:         models.FormatDate(t.DueDate),
-		SubtaskProgress: subtaskProgress,
-		ParentTask:      parentTask,
-		CreatedAt:       t.CreatedAt,
-		UpdatedAt:       t.UpdatedAt,
-		CreatedBy:       models.IDToStr(t.CreatedBy),
-		UpdatedBy:       models.IDToStr(t.UpdatedBy),
+		Assignee:           assigneeDTO(t.AssigneeID, users),
+		EstimatedHours:     t.EstimatedHours,
+		LoggedHours:        loggedHours,
+		Tags:               models.TagsFromJSON(t.Tags),
+		TimeEntries:        entryDTOs,
+		Comments:           commentDTOs,
+		Attachments:        attachmentDTOs,
+		Position:           position,
+		DueDate:            models.FormatDate(t.DueDate),
+		SubtaskProgress:    subtaskProgress,
+		ParentTask:         parentTask,
+		HasUninvoicedHours: hasUninvoicedHours,
+		CreatedAt:          t.CreatedAt,
+		UpdatedAt:          t.UpdatedAt,
+		CreatedBy:          models.IDToStr(t.CreatedBy),
+		UpdatedBy:          models.IDToStr(t.UpdatedBy),
 	}
 }
 
@@ -317,6 +362,9 @@ func loadTaskDTOs(projectID uint) ([]models.TaskDTO, error) {
 	}
 	parentRefs := parentTaskRefsByID(parentIDs)
 
+	invoicedPeriods := invoicedPeriodsForProject(projectID)
+	boardIDs := taskBoardIDs(taskIDs)
+
 	dtos := make([]models.TaskDTO, 0, len(tasks))
 	for _, t := range tasks {
 		var progress *models.SubtaskProgressDTO
@@ -329,7 +377,11 @@ func loadTaskDTOs(projectID uint) ([]models.TaskDTO, error) {
 				parentRef = &ref
 			}
 		}
-		dtos = append(dtos, buildTaskDTO(t, nil, commentsByTask[t.ID], entriesByTask[t.ID], taskAttachmentsByTask[t.ID], commentAttachmentsByComment, users, progress, parentRef))
+		dto := buildTaskDTO(t, nil, commentsByTask[t.ID], entriesByTask[t.ID], taskAttachmentsByTask[t.ID], commentAttachmentsByComment, users, progress, parentRef, invoicedPeriods)
+		if boardID, ok := boardIDs[t.ID]; ok {
+			dto.BoardID = models.IDToStr(boardID)
+		}
+		dtos = append(dtos, dto)
 	}
 	return dtos, nil
 }
@@ -415,6 +467,16 @@ func loadBoardTaskDTOs(boardID uint) ([]models.TaskDTO, error) {
 	}
 	parentRefs := parentTaskRefsByID(parentIDs)
 
+	projectIDSet := make(map[uint]struct{})
+	for _, t := range tasks {
+		projectIDSet[t.ProjectID] = struct{}{}
+	}
+	projectIDs := make([]uint, 0, len(projectIDSet))
+	for id := range projectIDSet {
+		projectIDs = append(projectIDs, id)
+	}
+	invoicedPeriodsByProject, _ := services.InvoicedPeriodsByProject(projectIDs)
+
 	dtos := make([]models.TaskDTO, 0, len(tasks))
 	for _, t := range tasks {
 		p := placementByTask[t.ID]
@@ -428,7 +490,7 @@ func loadBoardTaskDTOs(boardID uint) ([]models.TaskDTO, error) {
 				parentRef = &ref
 			}
 		}
-		dtos = append(dtos, buildTaskDTO(t, &p, commentsByTask[t.ID], entriesByTask[t.ID], taskAttachmentsByTask[t.ID], commentAttachmentsByComment, users, progress, parentRef))
+		dtos = append(dtos, buildTaskDTO(t, &p, commentsByTask[t.ID], entriesByTask[t.ID], taskAttachmentsByTask[t.ID], commentAttachmentsByComment, users, progress, parentRef, invoicedPeriodsByProject[t.ProjectID]))
 	}
 	return dtos, nil
 }
@@ -483,7 +545,7 @@ func loadSingleTaskDTO(task models.Task, placement *models.TaskPlacement) models
 		}
 	}
 
-	return buildTaskDTO(task, placement, comments, entries, taskAttachments, commentAttachments, users, progress, parentRef)
+	return buildTaskDTO(task, placement, comments, entries, taskAttachments, commentAttachments, users, progress, parentRef, invoicedPeriodsForProject(task.ProjectID))
 }
 
 // loadSubtaskDTOs loads all (non-archived) subtasks of a given parent task, each
@@ -564,6 +626,16 @@ func loadSubtaskDTOs(parentTaskID uint) ([]models.TaskDTO, error) {
 
 	doneSet := tasksInDoneColumn(taskIDs)
 
+	projectIDSet := make(map[uint]struct{})
+	for _, t := range tasks {
+		projectIDSet[t.ProjectID] = struct{}{}
+	}
+	projectIDs := make([]uint, 0, len(projectIDSet))
+	for id := range projectIDSet {
+		projectIDs = append(projectIDs, id)
+	}
+	invoicedPeriodsByProject, _ := services.InvoicedPeriodsByProject(projectIDs)
+
 	dtos := make([]models.TaskDTO, 0, len(tasks))
 	for _, t := range tasks {
 		var pt *models.TaskParentRefDTO
@@ -575,7 +647,7 @@ func loadSubtaskDTOs(parentTaskID uint) ([]models.TaskDTO, error) {
 		if p, ok := placementByTask[t.ID]; ok {
 			placement = &p
 		}
-		dto := buildTaskDTO(t, placement, commentsByTask[t.ID], entriesByTask[t.ID], taskAttachmentsByTask[t.ID], commentAttachmentsByComment, users, nil, pt)
+		dto := buildTaskDTO(t, placement, commentsByTask[t.ID], entriesByTask[t.ID], taskAttachmentsByTask[t.ID], commentAttachmentsByComment, users, nil, pt, invoicedPeriodsByProject[t.ProjectID])
 		dto.IsDoneColumn = doneSet[t.ID]
 		dtos = append(dtos, dto)
 	}

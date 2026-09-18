@@ -19,6 +19,8 @@ export interface Project {
     pricing_type?: 'hourly' | 'fixed' | ''
     hourly_rate?: number | null
     fixed_price?: number | null
+    auto_invoice_enabled?: boolean
+    auto_invoice_client_id?: number | null
     clients?: ProjectClient[]
     created_by: number
     created_by_name: string
@@ -42,6 +44,8 @@ export interface ProjectUpdateRequest {
     pricing_type?: 'hourly' | 'fixed' | ''
     hourly_rate?: number | null
     fixed_price?: number | null
+    auto_invoice_enabled?: boolean
+    auto_invoice_client_id?: number | null
 }
 
 export interface ProjectsResponse {

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useClients } from '@/hooks/useClients'
 import { ClientsService, Client } from '@/services/clientsService'
 import { hasAnyPermission, hasPermission } from '@/utils/permissions'
@@ -96,7 +97,9 @@ export default function ClientsPage() {
                                 {clients.map(client => (
                                     <tr key={client.id} className="hover:bg-muted/50">
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm font-medium text-foreground">{client.name}</div>
+                                            <Link href={`/dashboard/clients/${client.id}`} className="text-sm font-medium text-foreground hover:text-primary hover:underline">
+                                                {client.name}
+                                            </Link>
                                             <div className="text-sm text-muted-foreground">{client.billing_city}</div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">

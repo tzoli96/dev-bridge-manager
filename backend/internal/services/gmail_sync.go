@@ -15,6 +15,7 @@ import (
 
 const gmailSyncInterval = 3 * time.Hour
 const gmailInitialBackfillDays = 30
+const emailRetentionDays = 30
 
 // StartGmailSyncScheduler mirrors services.StartAutoInvoiceScheduler's plain
 // time.Ticker pattern: no cron dependency exists in this codebase, and a
@@ -40,6 +41,13 @@ func RunGmailSync(api GmailAPI) {
 			log.Printf("gmail sync: account %d failed: %v", accounts[i].ID, err)
 		}
 	}
+}
+
+// SyncAccountNow runs a single sync pass for one account, reusing the same
+// syncAccount logic the periodic scheduler uses, so an on-demand "sync now"
+// button never diverges from the scheduled sync behavior.
+func SyncAccountNow(ctx context.Context, api GmailAPI, account *models.GmailAccount) error {
+	return syncAccount(ctx, api, account)
 }
 
 func syncAccount(ctx context.Context, api GmailAPI, account *models.GmailAccount) error {
@@ -79,7 +87,19 @@ func syncAccount(ctx context.Context, api GmailAPI, account *models.GmailAccount
 	now := time.Now()
 	db.Model(account).Update("last_synced_at", now)
 	account.LastSyncedAt = &now
+
+	purgeOldEmails(db, account.ID)
 	return nil
+}
+
+// purgeOldEmails drops locally stored messages past the retention window so
+// the local mirror stays a rolling window rather than an ever-growing copy
+// of the mailbox; the messages themselves remain untouched in Gmail.
+func purgeOldEmails(db *gorm.DB, accountID uint) {
+	cutoff := time.Now().AddDate(0, 0, -emailRetentionDays)
+	if err := db.Where("gmail_account_id = ? AND received_at < ?", accountID, cutoff).Delete(&models.Email{}).Error; err != nil {
+		log.Printf("gmail sync: failed to purge emails older than %d days for account %d: %v", emailRetentionDays, accountID, err)
+	}
 }
 
 // recordSyncFailure flags the account for reconnect when the failure is an

@@ -34,6 +34,9 @@ func (h *ClientHandler) validateClientCreateRequest(req *models.ClientCreateRequ
 	if req.Type != "individual" && strings.TrimSpace(req.TaxNumber) == "" {
 		return fiber.NewError(400, "Tax number is required for company clients")
 	}
+	if req.BillingoUnitPriceType != "" && req.BillingoUnitPriceType != "net" && req.BillingoUnitPriceType != "gross" {
+		return fiber.NewError(400, "billingo_unit_price_type must be one of: net, gross")
+	}
 	return nil
 }
 
@@ -44,6 +47,9 @@ func (h *ClientHandler) validateClientUpdateRequest(req *models.ClientUpdateRequ
 	}
 	if req.Type != "" && req.Type != "company" && req.Type != "individual" {
 		return fiber.NewError(400, "Type must be one of: company, individual")
+	}
+	if req.BillingoUnitPriceType != "" && req.BillingoUnitPriceType != "net" && req.BillingoUnitPriceType != "gross" {
+		return fiber.NewError(400, "billingo_unit_price_type must be one of: net, gross")
 	}
 	return nil
 }
@@ -65,24 +71,26 @@ func (h *ClientHandler) checkClientPermission(userID uint, permission string) er
 
 func toClientResponse(client models.Client) models.ClientResponse {
 	return models.ClientResponse{
-		ID:                client.ID,
-		Type:              client.Type,
-		Name:              client.Name,
-		TaxNumber:         client.TaxNumber,
-		EUVatNumber:       client.EUVatNumber,
-		CompanyRegNumber:  client.CompanyRegNumber,
-		BillingZip:        client.BillingZip,
-		BillingCity:       client.BillingCity,
-		BillingAddress:    client.BillingAddress,
-		BankAccountNumber: client.BankAccountNumber,
-		Email:             client.Email,
-		Phone:             client.Phone,
-		Notes:             client.Notes,
-		IsActive:          client.IsActive,
-		CreatedBy:         client.CreatedBy,
-		CreatedByName:     client.CreatedByName,
-		CreatedAt:         client.CreatedAt,
-		UpdatedAt:         client.UpdatedAt,
+		ID:                    client.ID,
+		Type:                  client.Type,
+		Name:                  client.Name,
+		TaxNumber:             client.TaxNumber,
+		EUVatNumber:           client.EUVatNumber,
+		CompanyRegNumber:      client.CompanyRegNumber,
+		BillingZip:            client.BillingZip,
+		BillingCity:           client.BillingCity,
+		BillingAddress:        client.BillingAddress,
+		BankAccountNumber:     client.BankAccountNumber,
+		Email:                 client.Email,
+		Phone:                 client.Phone,
+		Notes:                 client.Notes,
+		BillingoUnit:          client.BillingoUnit,
+		BillingoUnitPriceType: client.BillingoUnitPriceType,
+		IsActive:              client.IsActive,
+		CreatedBy:             client.CreatedBy,
+		CreatedByName:         client.CreatedByName,
+		CreatedAt:             client.CreatedAt,
+		UpdatedAt:             client.UpdatedAt,
 	}
 }
 
@@ -182,19 +190,21 @@ func (h *ClientHandler) CreateClient(c *fiber.Ctx) error {
 	}
 
 	client := models.Client{
-		Type:              clientType,
-		Name:              req.Name,
-		TaxNumber:         req.TaxNumber,
-		EUVatNumber:       req.EUVatNumber,
-		CompanyRegNumber:  req.CompanyRegNumber,
-		BillingZip:        req.BillingZip,
-		BillingCity:       req.BillingCity,
-		BillingAddress:    req.BillingAddress,
-		BankAccountNumber: req.BankAccountNumber,
-		Email:             req.Email,
-		Phone:             req.Phone,
-		Notes:             req.Notes,
-		CreatedBy:         currentUserID,
+		Type:                  clientType,
+		Name:                  req.Name,
+		TaxNumber:             req.TaxNumber,
+		EUVatNumber:           req.EUVatNumber,
+		CompanyRegNumber:      req.CompanyRegNumber,
+		BillingZip:            req.BillingZip,
+		BillingCity:           req.BillingCity,
+		BillingAddress:        req.BillingAddress,
+		BankAccountNumber:     req.BankAccountNumber,
+		Email:                 req.Email,
+		Phone:                 req.Phone,
+		Notes:                 req.Notes,
+		BillingoUnit:          req.BillingoUnit,
+		BillingoUnitPriceType: req.BillingoUnitPriceType,
+		CreatedBy:             currentUserID,
 	}
 
 	if err := database.GetDB().Create(&client).Error; err != nil {
@@ -294,6 +304,12 @@ func (h *ClientHandler) UpdateClient(c *fiber.Ctx) error {
 	}
 	if req.Notes != "" {
 		updates["notes"] = req.Notes
+	}
+	if req.BillingoUnit != "" {
+		updates["billingo_unit"] = req.BillingoUnit
+	}
+	if req.BillingoUnitPriceType != "" {
+		updates["billingo_unit_price_type"] = req.BillingoUnitPriceType
 	}
 	if req.IsActive != nil {
 		updates["is_active"] = *req.IsActive

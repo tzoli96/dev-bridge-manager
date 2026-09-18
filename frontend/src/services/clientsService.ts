@@ -14,6 +14,8 @@ export interface Client {
     email: string
     phone: string
     notes: string
+    billingo_unit: string
+    billingo_unit_price_type: '' | 'net' | 'gross'
     is_active: boolean
     created_by: number
     created_by_name: string
@@ -34,6 +36,8 @@ export interface ClientCreateRequest {
     email?: string
     phone?: string
     notes?: string
+    billingo_unit?: string
+    billingo_unit_price_type?: '' | 'net' | 'gross'
 }
 
 export interface ClientUpdateRequest {
@@ -49,6 +53,8 @@ export interface ClientUpdateRequest {
     email?: string
     phone?: string
     notes?: string
+    billingo_unit?: string
+    billingo_unit_price_type?: '' | 'net' | 'gross'
     is_active?: boolean
 }
 

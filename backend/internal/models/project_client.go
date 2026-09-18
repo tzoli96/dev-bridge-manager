@@ -32,9 +32,9 @@ type ProjectClientResponse struct {
 }
 
 type ProjectClientListResponse struct {
-	Success        bool                     `json:"success"`
-	Message        string                   `json:"message"`
-	ProjectClient  *ProjectClientResponse   `json:"project_client,omitempty"`
-	ProjectClients []ProjectClientResponse  `json:"project_clients,omitempty"`
-	Count          int                      `json:"count,omitempty"`
+	Success        bool                    `json:"success"`
+	Message        string                  `json:"message"`
+	ProjectClient  *ProjectClientResponse  `json:"project_client,omitempty"`
+	ProjectClients []ProjectClientResponse `json:"project_clients,omitempty"`
+	Count          int                     `json:"count,omitempty"`
 }

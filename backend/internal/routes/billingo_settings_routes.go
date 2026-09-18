@@ -19,4 +19,7 @@ func SetupBillingoSettingsRoutes(api fiber.Router) {
 
 	// PUT /api/v1/admin/billingo-settings - Billingo beállítások frissítése
 	admin.Put("/billingo-settings", billingoSettingsHandler.UpdateBillingoSettings)
+
+	// GET /api/v1/admin/billingo-settings/blocks - Billingo számlatömbök lekérése
+	admin.Get("/billingo-settings/blocks", billingoSettingsHandler.ListBillingoBlocks)
 }

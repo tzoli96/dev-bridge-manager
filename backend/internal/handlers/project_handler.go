@@ -91,17 +91,19 @@ func (h *ProjectHandler) GetAllProjects(c *fiber.Ctx) error {
 	var response []models.ProjectResponse
 	for _, project := range projects {
 		response = append(response, models.ProjectResponse{
-			ID:            project.ID,
-			Name:          project.Name,
-			Description:   project.Description,
-			Status:        project.Status,
-			PricingType:   project.PricingType,
-			HourlyRate:    project.HourlyRate,
-			FixedPrice:    project.FixedPrice,
-			CreatedBy:     project.CreatedBy,
-			CreatedByName: project.CreatedByName,
-			CreatedAt:     project.CreatedAt,
-			UpdatedAt:     project.UpdatedAt,
+			ID:                  project.ID,
+			Name:                project.Name,
+			Description:         project.Description,
+			Status:              project.Status,
+			PricingType:         project.PricingType,
+			HourlyRate:          project.HourlyRate,
+			FixedPrice:          project.FixedPrice,
+			AutoInvoiceEnabled:  project.AutoInvoiceEnabled,
+			AutoInvoiceClientID: project.AutoInvoiceClientID,
+			CreatedBy:           project.CreatedBy,
+			CreatedByName:       project.CreatedByName,
+			CreatedAt:           project.CreatedAt,
+			UpdatedAt:           project.UpdatedAt,
 		})
 	}
 
@@ -139,18 +141,20 @@ func (h *ProjectHandler) GetProject(c *fiber.Ctx) error {
 	}
 
 	response := models.ProjectResponse{
-		ID:            project.ID,
-		Name:          project.Name,
-		Description:   project.Description,
-		Status:        project.Status,
-		PricingType:   project.PricingType,
-		HourlyRate:    project.HourlyRate,
-		FixedPrice:    project.FixedPrice,
-		CreatedBy:     project.CreatedBy,
-		CreatedByName: project.CreatedByName,
-		CreatedAt:     project.CreatedAt,
-		UpdatedAt:     project.UpdatedAt,
-		Clients:       fetchProjectClients(uint(id)),
+		ID:                  project.ID,
+		Name:                project.Name,
+		Description:         project.Description,
+		Status:              project.Status,
+		PricingType:         project.PricingType,
+		HourlyRate:          project.HourlyRate,
+		FixedPrice:          project.FixedPrice,
+		AutoInvoiceEnabled:  project.AutoInvoiceEnabled,
+		AutoInvoiceClientID: project.AutoInvoiceClientID,
+		CreatedBy:           project.CreatedBy,
+		CreatedByName:       project.CreatedByName,
+		CreatedAt:           project.CreatedAt,
+		UpdatedAt:           project.UpdatedAt,
+		Clients:             fetchProjectClients(uint(id)),
 	}
 
 	return c.JSON(models.ProjectListResponse{
@@ -244,17 +248,19 @@ func (h *ProjectHandler) CreateProject(c *fiber.Ctx) error {
 		First(&createdProject)
 
 	response := models.ProjectResponse{
-		ID:            createdProject.ID,
-		Name:          createdProject.Name,
-		Description:   createdProject.Description,
-		Status:        createdProject.Status,
-		PricingType:   createdProject.PricingType,
-		HourlyRate:    createdProject.HourlyRate,
-		FixedPrice:    createdProject.FixedPrice,
-		CreatedBy:     createdProject.CreatedBy,
-		CreatedByName: createdProject.CreatedByName,
-		CreatedAt:     createdProject.CreatedAt,
-		UpdatedAt:     createdProject.UpdatedAt,
+		ID:                  createdProject.ID,
+		Name:                createdProject.Name,
+		Description:         createdProject.Description,
+		Status:              createdProject.Status,
+		PricingType:         createdProject.PricingType,
+		HourlyRate:          createdProject.HourlyRate,
+		FixedPrice:          createdProject.FixedPrice,
+		AutoInvoiceEnabled:  createdProject.AutoInvoiceEnabled,
+		AutoInvoiceClientID: createdProject.AutoInvoiceClientID,
+		CreatedBy:           createdProject.CreatedBy,
+		CreatedByName:       createdProject.CreatedByName,
+		CreatedAt:           createdProject.CreatedAt,
+		UpdatedAt:           createdProject.UpdatedAt,
 	}
 
 	return c.Status(201).JSON(models.ProjectListResponse{
@@ -339,6 +345,46 @@ func (h *ProjectHandler) UpdateProject(c *fiber.Ctx) error {
 		updates["fixed_price"] = req.FixedPrice
 	}
 
+	if req.AutoInvoiceEnabled != nil || req.AutoInvoiceClientID != nil {
+		effectivePricingType := project.PricingType
+		if req.PricingType != "" {
+			effectivePricingType = req.PricingType
+		}
+		effectiveEnabled := project.AutoInvoiceEnabled
+		if req.AutoInvoiceEnabled != nil {
+			effectiveEnabled = *req.AutoInvoiceEnabled
+		}
+		effectiveClientID := project.AutoInvoiceClientID
+		if req.AutoInvoiceClientID != nil {
+			effectiveClientID = req.AutoInvoiceClientID
+		}
+
+		if effectiveEnabled {
+			if effectivePricingType != "hourly" {
+				return c.Status(400).JSON(models.ProjectListResponse{
+					Success: false,
+					Message: "Automatic invoicing requires hourly pricing",
+				})
+			}
+			if effectiveClientID == nil {
+				return c.Status(400).JSON(models.ProjectListResponse{
+					Success: false,
+					Message: "Automatic invoicing requires a client",
+				})
+			}
+			var projectClient models.ProjectClient
+			if err := database.GetDB().Where("project_id = ? AND client_id = ?", id, *effectiveClientID).First(&projectClient).Error; err != nil {
+				return c.Status(400).JSON(models.ProjectListResponse{
+					Success: false,
+					Message: "Automatic invoicing client is not attached to this project",
+				})
+			}
+		}
+
+		updates["auto_invoice_enabled"] = effectiveEnabled
+		updates["auto_invoice_client_id"] = effectiveClientID
+	}
+
 	if len(updates) > 0 {
 		if err := database.GetDB().Model(&project).Updates(updates).Error; err != nil {
 			return c.Status(500).JSON(models.ProjectListResponse{
@@ -357,17 +403,19 @@ func (h *ProjectHandler) UpdateProject(c *fiber.Ctx) error {
 		First(&updatedProject)
 
 	response := models.ProjectResponse{
-		ID:            updatedProject.ID,
-		Name:          updatedProject.Name,
-		Description:   updatedProject.Description,
-		Status:        updatedProject.Status,
-		PricingType:   updatedProject.PricingType,
-		HourlyRate:    updatedProject.HourlyRate,
-		FixedPrice:    updatedProject.FixedPrice,
-		CreatedBy:     updatedProject.CreatedBy,
-		CreatedByName: updatedProject.CreatedByName,
-		CreatedAt:     updatedProject.CreatedAt,
-		UpdatedAt:     updatedProject.UpdatedAt,
+		ID:                  updatedProject.ID,
+		Name:                updatedProject.Name,
+		Description:         updatedProject.Description,
+		Status:              updatedProject.Status,
+		PricingType:         updatedProject.PricingType,
+		HourlyRate:          updatedProject.HourlyRate,
+		FixedPrice:          updatedProject.FixedPrice,
+		AutoInvoiceEnabled:  updatedProject.AutoInvoiceEnabled,
+		AutoInvoiceClientID: updatedProject.AutoInvoiceClientID,
+		CreatedBy:           updatedProject.CreatedBy,
+		CreatedByName:       updatedProject.CreatedByName,
+		CreatedAt:           updatedProject.CreatedAt,
+		UpdatedAt:           updatedProject.UpdatedAt,
 	}
 
 	return c.JSON(models.ProjectListResponse{

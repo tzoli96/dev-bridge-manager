@@ -554,6 +554,61 @@ func (h *InvoiceHandler) GetProjectInvoices(c *fiber.Ctx) error {
 	})
 }
 
+// ListAllInvoices - GET /api/v1/invoices - minden invoice, projektenkénti
+// szűréssel (opcionális ?project_id=), a Számlázás menüponthoz.
+func (h *InvoiceHandler) ListAllInvoices(c *fiber.Ctx) error {
+	currentUserID := c.Locals("userID").(uint)
+	if err := checkInvoiceAccess(h.permissionService, currentUserID, "invoices.read"); err != nil {
+		return err
+	}
+
+	var rows []struct {
+		models.Invoice
+		ProjectName   string `gorm:"column:project_name"`
+		ClientName    string `gorm:"column:client_name"`
+		CreatedByName string `gorm:"column:created_by_name"`
+	}
+
+	query := database.GetDB().Table("invoices").
+		Select("invoices.*, projects.name as project_name, clients.name as client_name, users.name as created_by_name").
+		Joins("LEFT JOIN projects ON invoices.project_id = projects.id").
+		Joins("LEFT JOIN clients ON invoices.client_id = clients.id").
+		Joins("LEFT JOIN users ON invoices.created_by = users.id")
+
+	if projectIDParam := c.Query("project_id"); projectIDParam != "" {
+		projectID, err := strconv.Atoi(projectIDParam)
+		if err != nil {
+			return c.Status(400).JSON(models.InvoiceListResponse{Success: false, Message: "Invalid project_id"})
+		}
+		query = query.Where("invoices.project_id = ?", projectID)
+	}
+
+	if err := query.Order("invoices.created_at DESC").Scan(&rows).Error; err != nil {
+		return c.Status(500).JSON(models.InvoiceListResponse{Success: false, Message: "Error fetching invoices"})
+	}
+
+	invoiceIDs := make([]uint, len(rows))
+	for i, row := range rows {
+		invoiceIDs[i] = row.ID
+	}
+	itemsByInvoice := loadInvoiceItemsByInvoiceIDs(invoiceIDs)
+
+	response := make([]models.InvoiceResponse, 0, len(rows))
+	for _, row := range rows {
+		r := toInvoiceResponse(row.Invoice, row.ClientName, row.CreatedByName)
+		r.ProjectName = row.ProjectName
+		r.Items = itemsByInvoice[row.ID]
+		response = append(response, r)
+	}
+
+	return c.JSON(models.InvoiceListResponse{
+		Success:  true,
+		Message:  "Invoices retrieved successfully",
+		Invoices: response,
+		Count:    len(response),
+	})
+}
+
 // loadInvoiceItemsByInvoiceIDs batch-loads invoice_items rows for a set of
 // invoice ids, keyed by invoice id.
 func loadInvoiceItemsByInvoiceIDs(invoiceIDs []uint) map[uint][]models.InvoiceItem {

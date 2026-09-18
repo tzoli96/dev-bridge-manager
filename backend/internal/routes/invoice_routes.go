@@ -43,4 +43,7 @@ func SetupInvoiceRoutes(api fiber.Router) {
 
 	// GET /api/v1/clients/:id/invoices/analytics - Ügyfél bevétel elemzése (havi/éves/összesen, minden projektjén)
 	clients.Get("/:id/invoices/analytics", invoiceHandler.GetClientRevenueAnalytics)
+
+	// GET /api/v1/invoices - Minden számla listázása, opcionális ?project_id= szűréssel (Számlázás menüpont)
+	api.Get("/invoices", middleware.JWTMiddleware(), invoiceHandler.ListAllInvoices)
 }

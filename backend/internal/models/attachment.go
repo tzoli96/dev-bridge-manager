@@ -3,8 +3,8 @@ package models
 import "time"
 
 type Attachment struct {
-	ID           uint `gorm:"primaryKey"`
-	TaskID       uint `gorm:"not null;index"`
+	ID           uint  `gorm:"primaryKey"`
+	TaskID       uint  `gorm:"not null;index"`
 	CommentID    *uint `gorm:"index"`
 	Filename     string
 	OriginalName string

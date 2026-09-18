@@ -94,7 +94,7 @@ func (h *InvoiceNoticeHandler) SendInvoiceNotice(c *fiber.Ctx) error {
 		client.Name, project.Name, periodText,
 	)
 
-	raw := services.BuildRawMessage(account.EmailAddress, client.Email, subject, body, "", "")
+	raw := services.BuildRawMessage(account.EmailAddress, client.Email, subject, body, "", "", "", nil)
 	gmailMessageID, err := services.NewRealGmailAPI().SendMessage(c.Context(), &account, raw)
 	if err != nil {
 		return c.Status(502).JSON(models.InvoiceNoticeResponse{Success: false, Message: "Failed to send notice email: " + err.Error()})

@@ -19,7 +19,9 @@ const initialFormData: ClientCreateRequest = {
     bank_account_number: '',
     email: '',
     phone: '',
-    notes: ''
+    notes: '',
+    billingo_unit: '',
+    billingo_unit_price_type: ''
 }
 
 export default function CreateClientModal({ isOpen, onClose, onSuccess }: CreateClientModalProps) {
@@ -276,6 +278,39 @@ export default function CreateClientModal({ isOpen, onClose, onSuccess }: Create
                             rows={2}
                             disabled={loading}
                         />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label htmlFor="billingo_unit" className="block text-sm font-medium text-foreground mb-1">
+                                Invoice Unit
+                            </label>
+                            <input
+                                type="text"
+                                id="billingo_unit"
+                                value={formData.billingo_unit}
+                                onChange={(e) => setFormData(prev => ({ ...prev, billingo_unit: e.target.value }))}
+                                placeholder="Uses account default if left empty"
+                                className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                                disabled={loading}
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="billingo_unit_price_type" className="block text-sm font-medium text-foreground mb-1">
+                                Invoice Price Type
+                            </label>
+                            <select
+                                id="billingo_unit_price_type"
+                                value={formData.billingo_unit_price_type}
+                                onChange={(e) => setFormData(prev => ({ ...prev, billingo_unit_price_type: e.target.value as '' | 'net' | 'gross' }))}
+                                className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                                disabled={loading}
+                            >
+                                <option value="">Account default</option>
+                                <option value="net">Net</option>
+                                <option value="gross">Gross</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div className="flex space-x-3 pt-4">

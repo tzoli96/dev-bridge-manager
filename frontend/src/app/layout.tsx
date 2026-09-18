@@ -21,7 +21,7 @@ export default function RootLayout({
 }) {
     return (
         <html lang="en" className={cn("font-sans", geist.variable, geistMono.variable)} suppressHydrationWarning>
-        <body>
+        <body suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
             <AuthProvider>
                 {children}

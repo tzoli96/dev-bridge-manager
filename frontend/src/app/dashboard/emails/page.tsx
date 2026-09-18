@@ -1,14 +1,77 @@
 // frontend/src/app/dashboard/emails/page.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Mail, Send, Paperclip, RefreshCw, LogOut, X } from 'lucide-react'
+import { Mail, Send, Paperclip, RefreshCw, LogOut, X, Plus } from 'lucide-react'
 import { GmailService, GmailStatus } from '@/services/gmailService'
 import { EmailsService, EmailListItem, EmailDetail } from '@/services/emailsService'
 import LoadingState from '@/components/ui/LoadingState'
+import ComposeEditor, { ComposeEditorHandle } from '@/components/emails/ComposeEditor'
 
 type Folder = 'inbox' | 'sent'
+
+const MAX_ATTACHMENTS = 5
+const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024 // 10MB, mirrors the backend limit
+
+const AVATAR_COLORS = [
+    'bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500',
+    'bg-violet-500', 'bg-cyan-500', 'bg-orange-500', 'bg-teal-500',
+]
+
+function avatarColor(seed: string): string {
+    let hash = 0
+    for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0
+    return AVATAR_COLORS[hash % AVATAR_COLORS.length]
+}
+
+function initials(name: string): string {
+    const trimmed = name.trim()
+    if (!trimmed) return '?'
+    const parts = trimmed.split(/\s+/)
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
+
+function formatListDate(iso: string): string {
+    const date = new Date(iso)
+    const now = new Date()
+    const isToday = date.toDateString() === now.toDateString()
+    return isToday
+        ? date.toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' })
+        : date.toLocaleDateString('hu-HU', { month: 'short', day: 'numeric' })
+}
+
+function formatFileSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+// Renders email HTML inside a sandboxed iframe so the message's own styling
+// (and any embedded CSS/markup) can't bleed into or clash with the app's
+// own layout. No "allow-scripts" is granted, so scripts in the email don't run.
+function EmailHtmlFrame({ html }: { html: string }) {
+    const iframeRef = useRef<HTMLIFrameElement>(null)
+    const [height, setHeight] = useState(200)
+
+    return (
+        <iframe
+            ref={iframeRef}
+            srcDoc={html}
+            sandbox="allow-same-origin"
+            title="E-mail tartalom"
+            className="w-full border-0"
+            style={{ height }}
+            onLoad={() => {
+                const doc = iframeRef.current?.contentWindow?.document
+                if (doc?.body) {
+                    setHeight(doc.body.scrollHeight + 16)
+                }
+            }}
+        />
+    )
+}
 
 export default function EmailsPage() {
     const searchParams = useSearchParams()
@@ -19,7 +82,10 @@ export default function EmailsPage() {
 
     const [folder, setFolder] = useState<Folder>('inbox')
     const [emails, setEmails] = useState<EmailListItem[]>([])
+    const [emailsPage, setEmailsPage] = useState(1)
+    const [emailsTotal, setEmailsTotal] = useState(0)
     const [loadingEmails, setLoadingEmails] = useState(false)
+    const [loadingMore, setLoadingMore] = useState(false)
     const [listError, setListError] = useState<string | null>(null)
     const [selected, setSelected] = useState<EmailDetail | null>(null)
     const [selectedId, setSelectedId] = useState<number | null>(null)
@@ -28,10 +94,14 @@ export default function EmailsPage() {
     const [composeOpen, setComposeOpen] = useState(false)
     const [composeTo, setComposeTo] = useState('')
     const [composeSubject, setComposeSubject] = useState('')
-    const [composeBody, setComposeBody] = useState('')
     const [replyToId, setReplyToId] = useState<number | undefined>(undefined)
+    const [composeFiles, setComposeFiles] = useState<File[]>([])
     const [sending, setSending] = useState(false)
     const [sendError, setSendError] = useState<string | null>(null)
+    const [syncing, setSyncing] = useState(false)
+    const [syncError, setSyncError] = useState<string | null>(null)
+    const fileInputRef = useRef<HTMLInputElement>(null)
+    const composeEditorRef = useRef<ComposeEditorHandle>(null)
 
     useEffect(() => {
         GmailService.getStatus()
@@ -40,15 +110,55 @@ export default function EmailsPage() {
             .finally(() => setLoadingStatus(false))
     }, [])
 
-    useEffect(() => {
-        if (!status?.connected) return
+    const refreshEmails = () => {
         setLoadingEmails(true)
         setListError(null)
-        EmailsService.list(folder)
-            .then(res => setEmails(res.emails || []))
+        setEmailsPage(1)
+        return EmailsService.list(folder, 1)
+            .then(res => {
+                setEmails(res.emails || [])
+                setEmailsTotal(res.total || 0)
+            })
             .catch((err: any) => setListError(err.message))
             .finally(() => setLoadingEmails(false))
+    }
+
+    const loadMoreEmails = () => {
+        const nextPage = emailsPage + 1
+        setLoadingMore(true)
+        setListError(null)
+        EmailsService.list(folder, nextPage)
+            .then(res => {
+                setEmails(prev => [...prev, ...(res.emails || [])])
+                setEmailsTotal(res.total || 0)
+                setEmailsPage(nextPage)
+            })
+            .catch((err: any) => setListError(err.message))
+            .finally(() => setLoadingMore(false))
+    }
+
+    useEffect(() => {
+        if (!status?.connected) return
+        refreshEmails()
     }, [status?.connected, folder])
+
+    const handleSync = async () => {
+        setSyncing(true)
+        setSyncError(null)
+        try {
+            const res = await GmailService.sync()
+            if (!res.success) {
+                setSyncError(res.message || 'Szinkronizálás sikertelen')
+                return
+            }
+            setStatus(prev => (prev ? { ...prev, last_synced_at: res.last_synced_at || prev.last_synced_at } : prev))
+            await refreshEmails()
+        } catch (err: any) {
+            setSyncError(err.message)
+        } finally {
+            setSyncing(false)
+        }
+    }
 
     const handleConnect = async () => {
         setConnecting(true)
@@ -86,18 +196,37 @@ export default function EmailsPage() {
 
     const openCompose = (reply?: EmailDetail) => {
         setSendError(null)
+        setComposeFiles([])
         if (reply) {
             setComposeTo(reply.from || '')
             setComposeSubject(reply.subject?.startsWith('Re:') ? reply.subject : `Re: ${reply.subject || ''}`)
-            setComposeBody('')
             setReplyToId(reply.id)
         } else {
             setComposeTo('')
             setComposeSubject('')
-            setComposeBody('')
             setReplyToId(undefined)
         }
         setComposeOpen(true)
+    }
+
+    const handleFilesSelected = (files: FileList | null) => {
+        if (!files) return
+        setSendError(null)
+        const incoming = Array.from(files)
+        if (composeFiles.length + incoming.length > MAX_ATTACHMENTS) {
+            setSendError(`Legfeljebb ${MAX_ATTACHMENTS} fájl csatolható.`)
+            return
+        }
+        const tooLarge = incoming.find(f => f.size > MAX_ATTACHMENT_SIZE)
+        if (tooLarge) {
+            setSendError(`${tooLarge.name} mérete meghaladja a 10MB-os limitet.`)
+            return
+        }
+        setComposeFiles(prev => [...prev, ...incoming])
+    }
+
+    const removeComposeFile = (index: number) => {
+        setComposeFiles(prev => prev.filter((_, i) => i !== index))
     }
 
     const handleSend = async () => {
@@ -108,11 +237,14 @@ export default function EmailsPage() {
         }
         try {
             setSending(true)
+            const isEmpty = composeEditorRef.current?.isEmpty() ?? true
             const res = await EmailsService.send({
                 to: composeTo.trim(),
                 subject: composeSubject.trim(),
-                body: composeBody,
+                body: isEmpty ? '' : (composeEditorRef.current?.getText() ?? ''),
+                body_html: isEmpty ? '' : (composeEditorRef.current?.getHTML() ?? ''),
                 in_reply_to_email_id: replyToId,
+                files: composeFiles,
             })
             if (!res.success) {
                 setSendError(res.message || 'Küldés sikertelen')
@@ -175,8 +307,19 @@ export default function EmailsPage() {
                     {statusError && (
                         <p className="text-sm text-destructive mt-1">{statusError}</p>
                     )}
+                    {syncError && (
+                        <p className="text-sm text-destructive mt-1">{syncError}</p>
+                    )}
                 </div>
                 <div className="flex gap-2">
+                    <button
+                        onClick={handleSync}
+                        disabled={syncing}
+                        className="flex items-center gap-2 px-3 py-2 text-muted-foreground hover:text-foreground rounded-lg transition-colors disabled:opacity-50"
+                        title="Szinkronizálás most"
+                    >
+                        <RefreshCw size={16} className={syncing ? 'animate-spin' : ''} />
+                    </button>
                     <button
                         onClick={() => openCompose()}
                         className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-colors"
@@ -216,32 +359,54 @@ export default function EmailsPage() {
                     ) : listError ? (
                         <p className="p-6 text-sm text-destructive text-center">{listError}</p>
                     ) : emails.length === 0 ? (
-                        <p className="p-6 text-sm text-muted-foreground text-center">Nincs megjeleníthető e-mail.</p>
+                        <div className="p-10 text-center space-y-2">
+                            <Mail className="mx-auto text-muted-foreground/40" size={32} />
+                            <p className="text-sm text-muted-foreground">
+                                {folder === 'inbox' ? 'Nincs beérkezett e-mail.' : 'Nincs elküldött e-mail.'}
+                            </p>
+                        </div>
                     ) : (
                         <div className="divide-y divide-border max-h-[70vh] overflow-y-auto">
-                            {emails.map(item => (
+                            {emails.map(item => {
+                                const label = folder === 'inbox' ? (item.from_name || item.from_address) : item.to_addresses
+                                return (
+                                    <button
+                                        key={item.id}
+                                        onClick={() => openEmail(item)}
+                                        className={`w-full text-left px-4 py-3 flex gap-3 hover:bg-muted/50 transition-colors ${
+                                            selectedId === item.id ? 'bg-primary/5 border-l-2 border-primary' : 'border-l-2 border-transparent'
+                                        }`}
+                                    >
+                                        <div className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold text-white ${avatarColor(label)}`}>
+                                            {initials(label)}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex justify-between items-baseline gap-2">
+                                                <span className={`text-sm truncate ${!item.is_read ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
+                                                    {label}
+                                                </span>
+                                                <span className="text-xs text-muted-foreground shrink-0">
+                                                    {formatListDate(item.received_at)}
+                                                </span>
+                                            </div>
+                                            <div className={`text-sm truncate ${!item.is_read ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
+                                                {item.subject || '(nincs tárgy)'}
+                                                {item.has_attachments && <Paperclip size={12} className="inline ml-1 align-text-top" />}
+                                            </div>
+                                            <div className="text-xs text-muted-foreground truncate">{item.snippet}</div>
+                                        </div>
+                                    </button>
+                                )
+                            })}
+                            {emails.length < emailsTotal && (
                                 <button
-                                    key={item.id}
-                                    onClick={() => openEmail(item)}
-                                    className={`w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors ${
-                                        selectedId === item.id ? 'bg-primary/5' : ''
-                                    }`}
+                                    onClick={loadMoreEmails}
+                                    disabled={loadingMore}
+                                    className="w-full py-3 text-sm font-medium text-primary hover:bg-muted/50 transition-colors disabled:opacity-50"
                                 >
-                                    <div className="flex justify-between items-baseline gap-2">
-                                        <span className={`text-sm truncate ${!item.is_read ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
-                                            {folder === 'inbox' ? (item.from_name || item.from_address) : item.to_addresses}
-                                        </span>
-                                        <span className="text-xs text-muted-foreground shrink-0">
-                                            {new Date(item.received_at).toLocaleDateString('hu-HU')}
-                                        </span>
-                                    </div>
-                                    <div className={`text-sm truncate ${!item.is_read ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
-                                        {item.subject || '(nincs tárgy)'}
-                                        {item.has_attachments && <Paperclip size={12} className="inline ml-1 align-text-top" />}
-                                    </div>
-                                    <div className="text-xs text-muted-foreground truncate">{item.snippet}</div>
+                                    {loadingMore ? 'Betöltés...' : 'Továbbiak betöltése'}
                                 </button>
-                            ))}
+                            )}
                         </div>
                     )}
                 </div>
@@ -262,15 +427,12 @@ export default function EmailsPage() {
                                 <p className="text-sm text-muted-foreground">Feladó: {selected.from}</p>
                                 <p className="text-sm text-muted-foreground">Címzett: {selected.to}</p>
                             </div>
-                            {selected.body_text ? (
+                            {selected.body_html ? (
+                                <EmailHtmlFrame html={selected.body_html} />
+                            ) : selected.body_text ? (
                                 <div className="prose prose-sm max-w-none text-foreground whitespace-pre-wrap">
                                     {selected.body_text}
                                 </div>
-                            ) : selected.body_html ? (
-                                <div
-                                    className="prose prose-sm max-w-none text-foreground"
-                                    dangerouslySetInnerHTML={{ __html: selected.body_html }}
-                                />
                             ) : (
                                 <div className="prose prose-sm max-w-none text-foreground whitespace-pre-wrap">(üres törzs)</div>
                             )}
@@ -300,41 +462,94 @@ export default function EmailsPage() {
             </div>
 
             {composeOpen && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-                    <div className="bg-card rounded-xl shadow-xl p-6 w-full max-w-lg space-y-4">
-                        <div className="flex justify-between items-center">
-                            <h3 className="text-lg font-semibold">{replyToId ? 'Válasz' : 'Új levél'}</h3>
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-card rounded-2xl shadow-xl w-full max-w-xl overflow-hidden">
+                        <div className="flex justify-between items-center px-6 py-4 border-b border-border">
+                            <h3 className="text-lg font-semibold text-foreground">{replyToId ? 'Válasz' : 'Új levél'}</h3>
                             <button onClick={() => setComposeOpen(false)} className="text-muted-foreground hover:text-foreground">
                                 <X size={18} />
                             </button>
                         </div>
-                        {sendError && (
-                            <div className="bg-destructive/10 border border-destructive/20 text-destructive px-3 py-2 rounded text-sm">
-                                {sendError}
+
+                        <div className="px-6 py-5 space-y-4">
+                            {sendError && (
+                                <div className="bg-destructive/10 border border-destructive/20 text-destructive px-3 py-2 rounded-lg text-sm">
+                                    {sendError}
+                                </div>
+                            )}
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-medium text-muted-foreground">Címzett</label>
+                                <input
+                                    type="email"
+                                    placeholder="cimzett@example.com"
+                                    value={composeTo}
+                                    onChange={e => setComposeTo(e.target.value)}
+                                    className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                                />
                             </div>
-                        )}
-                        <input
-                            type="email"
-                            placeholder="Címzett"
-                            value={composeTo}
-                            onChange={e => setComposeTo(e.target.value)}
-                            className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
-                        />
-                        <input
-                            type="text"
-                            placeholder="Tárgy"
-                            value={composeSubject}
-                            onChange={e => setComposeSubject(e.target.value)}
-                            className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
-                        />
-                        <textarea
-                            placeholder="Üzenet"
-                            rows={6}
-                            value={composeBody}
-                            onChange={e => setComposeBody(e.target.value)}
-                            className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
-                        />
-                        <div className="flex justify-end gap-3">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-medium text-muted-foreground">Tárgy</label>
+                                <input
+                                    type="text"
+                                    placeholder="Tárgy"
+                                    value={composeSubject}
+                                    onChange={e => setComposeSubject(e.target.value)}
+                                    className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-medium text-muted-foreground">Üzenet</label>
+                                <ComposeEditor ref={composeEditorRef} />
+                            </div>
+
+                            <div className="space-y-2">
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    multiple
+                                    className="hidden"
+                                    onChange={e => {
+                                        handleFilesSelected(e.target.files)
+                                        e.target.value = ''
+                                    }}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    disabled={composeFiles.length >= MAX_ATTACHMENTS}
+                                    className="flex items-center gap-1.5 text-sm text-primary hover:underline disabled:opacity-50 disabled:no-underline"
+                                >
+                                    <Plus size={14} /> Csatolmány hozzáadása
+                                </button>
+                                {composeFiles.length > 0 && (
+                                    <ul className="space-y-1.5">
+                                        {composeFiles.map((file, i) => (
+                                            <li
+                                                key={`${file.name}-${i}`}
+                                                className="flex items-center justify-between gap-2 bg-muted/60 rounded-lg px-3 py-1.5 text-sm"
+                                            >
+                                                <span className="flex items-center gap-1.5 min-w-0 truncate text-foreground">
+                                                    <Paperclip size={13} className="shrink-0 text-muted-foreground" />
+                                                    <span className="truncate">{file.name}</span>
+                                                </span>
+                                                <span className="flex items-center gap-2 shrink-0">
+                                                    <span className="text-xs text-muted-foreground">{formatFileSize(file.size)}</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeComposeFile(i)}
+                                                        className="text-muted-foreground hover:text-destructive"
+                                                    >
+                                                        <X size={14} />
+                                                    </button>
+                                                </span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-3 px-6 py-4 border-t border-border bg-muted/30">
                             <button onClick={() => setComposeOpen(false)} className="px-4 py-2 text-foreground bg-muted rounded-lg hover:bg-muted/70">
                                 Mégse
                             </button>

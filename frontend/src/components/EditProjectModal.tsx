@@ -16,7 +16,7 @@ export default function EditProjectModal({ isOpen, project, onClose, onSuccess }
         status: 'active',
         pricing_type: '',
         hourly_rate: null,
-        fixed_price: null
+        fixed_price: null,
     })
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -75,15 +75,6 @@ export default function EditProjectModal({ isOpen, project, onClose, onSuccess }
             setLoading(true)
             setError(null)
 
-            await ProjectsService.updateProject(project.id, {
-                name: formData.name?.trim(),
-                description: formData.description?.trim() || '',
-                status: formData.status,
-                pricing_type: formData.pricing_type || undefined,
-                hourly_rate: formData.pricing_type === 'hourly' ? formData.hourly_rate : undefined,
-                fixed_price: formData.pricing_type === 'fixed' ? formData.fixed_price : undefined
-            })
-
             const existingClientIds = (project.clients || []).map(c => c.client_id)
             const toAdd = selectedClientIds.filter(id => !existingClientIds.includes(id))
             const toRemove = existingClientIds.filter(id => !selectedClientIds.includes(id))
@@ -94,6 +85,15 @@ export default function EditProjectModal({ isOpen, project, onClose, onSuccess }
             for (const clientId of toRemove) {
                 await ProjectsService.removeClientFromProject(project.id, clientId)
             }
+
+            await ProjectsService.updateProject(project.id, {
+                name: formData.name?.trim(),
+                description: formData.description?.trim() || '',
+                status: formData.status,
+                pricing_type: formData.pricing_type || undefined,
+                hourly_rate: formData.pricing_type === 'hourly' ? formData.hourly_rate : undefined,
+                fixed_price: formData.pricing_type === 'fixed' ? formData.fixed_price : undefined
+            })
 
             onSuccess()
             onClose()

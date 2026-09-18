@@ -46,7 +46,9 @@ export interface SendEmailRequest {
     to: string
     subject: string
     body: string
+    body_html?: string
     in_reply_to_email_id?: number
+    files?: File[]
 }
 
 export const EmailsService = {
@@ -56,6 +58,11 @@ export const EmailsService = {
 
     async get(id: number): Promise<EmailDetail> {
         return apiClient.get<EmailDetail>(`/emails/${id}`)
+    },
+
+    async getUnreadCount(): Promise<number> {
+        const res = await apiClient.get<{ success: boolean; count: number }>('/emails/unread-count')
+        return res.count
     },
 
     getAttachmentUrl(emailId: number, attachmentId: string): string {
@@ -73,6 +80,17 @@ export const EmailsService = {
     },
 
     async send(payload: SendEmailRequest): Promise<{ success: boolean; message?: string; gmail_message_id?: string }> {
-        return apiClient.post('/emails/send', payload)
+        const extraFields: Record<string, string> = {
+            to: payload.to,
+            subject: payload.subject,
+            body: payload.body,
+        }
+        if (payload.body_html !== undefined) {
+            extraFields.body_html = payload.body_html
+        }
+        if (payload.in_reply_to_email_id !== undefined) {
+            extraFields.in_reply_to_email_id = String(payload.in_reply_to_email_id)
+        }
+        return apiClient.uploadFiles('/emails/send', payload.files || [], extraFields)
     },
 }
