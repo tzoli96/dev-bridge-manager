@@ -54,8 +54,8 @@ func main() {
 	// Setup all routes
 	routes.SetupRoutes(app)
 
-	// Monthly auto-invoicing for hourly projects with it enabled (see
-	// services.RunAutoInvoicing)
+	// Monthly auto-invoice notices for hourly projects with it enabled (see
+	// services.RunAutoInvoiceNotices)
 	go services.StartAutoInvoiceScheduler()
 
 	// Gmail inbox/sent mirror sync, every 3 hours (see services.RunGmailSync)

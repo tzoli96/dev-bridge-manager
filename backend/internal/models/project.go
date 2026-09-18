@@ -13,10 +13,12 @@ type Project struct {
 	HourlyRate  *float64 `json:"hourly_rate"`
 	FixedPrice  *float64 `json:"fixed_price"`
 	// AutoInvoiceEnabled/AutoInvoiceClientID configure unattended monthly
-	// invoicing for hourly projects: when enabled, the scheduler (see
-	// services.RunAutoInvoicing) bills the previous calendar month to this
-	// client on the 1st of every month, the same way a user would via
-	// POST /projects/:id/invoices.
+	// pre-invoice notices for hourly projects: when enabled, the scheduler
+	// (see services.RunAutoInvoiceNotices) sends a notice e-mail for the
+	// previous calendar month to this client on the 1st of every month.
+	// Actual invoice creation always requires an explicit approval (the
+	// manual "create invoice" button or approving the resulting notice via
+	// InvoiceNoticeHandler.ApproveInvoiceNotice), regardless of this flag.
 	AutoInvoiceEnabled  bool      `json:"auto_invoice_enabled" gorm:"default:false"`
 	AutoInvoiceClientID *uint     `json:"auto_invoice_client_id"`
 	CreatedBy           uint      `json:"created_by" gorm:"not null"`
