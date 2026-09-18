@@ -4,7 +4,7 @@ import React from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ProjectsService, Project, ProjectClient } from '@/services/projectsService';
-import { InvoicesService, Invoice, InvoiceExtraItemInput, InvoiceNoticesService } from '@/services/invoicesService';
+import { InvoicesService, Invoice, InvoiceExtraItemInput, InvoiceNoticesService, InvoiceNotice } from '@/services/invoicesService';
 import { timeEntryService } from '@/services/kanban';
 import type { TimeEntry } from '@/types/kanban';
 import { Button } from '@/components/ui/button';
@@ -77,8 +77,9 @@ export default function InvoicePreviewPage() {
     const [autoInvoiceError, setAutoInvoiceError] = React.useState<string | null>(null);
 
     const [noticeSending, setNoticeSending] = React.useState(false);
-    const [noticeSentAt, setNoticeSentAt] = React.useState<string | null>(null);
+    const [notice, setNotice] = React.useState<InvoiceNotice | null>(null);
     const [noticeError, setNoticeError] = React.useState<string | null>(null);
+    const [approvingNotice, setApprovingNotice] = React.useState(false);
 
     const addExtraItem = () => {
         setExtraItems((prev) => [
@@ -134,16 +135,16 @@ export default function InvoicePreviewPage() {
 
     React.useEffect(() => {
         if (!project || !selectedClientId) {
-            setNoticeSentAt(null);
+            setNotice(null);
             return;
         }
         InvoiceNoticesService.list(project.id, periodStart || undefined, periodEnd || undefined)
             .then((res) => {
                 const forClient = (res.notices || []).filter((n) => n.client_id === selectedClientId);
-                setNoticeSentAt(forClient.length > 0 ? forClient[0].sent_at : null);
+                setNotice(forClient.length > 0 ? forClient[0] : null);
             })
             .catch(() => {
-                // non-fatal: leave whatever noticeSentAt already holds
+                // non-fatal: leave whatever notice already holds
             });
     }, [project, selectedClientId, periodStart, periodEnd]);
 
@@ -277,11 +278,36 @@ export default function InvoicePreviewPage() {
                 setNoticeError(res.message || 'Az értesítő küldése sikertelen');
                 return;
             }
-            setNoticeSentAt(res.notice?.sent_at || new Date().toISOString());
+            setNotice(res.notice || null);
         } catch (err: any) {
             setNoticeError(err.message);
         } finally {
             setNoticeSending(false);
+        }
+    };
+
+    const handleApproveNotice = async () => {
+        if (!project || !notice) return;
+        setNoticeError(null);
+        try {
+            setApprovingNotice(true);
+            const res = await InvoiceNoticesService.approve(project.id, notice.id);
+            if (!res.success && !res.notice) {
+                setNoticeError(res.message || 'A jóváhagyás sikertelen');
+                return;
+            }
+            if (res.message) {
+                setNoticeError(res.message);
+            }
+            if (res.notice) {
+                setNotice(res.notice);
+            }
+            const refreshed = await InvoicesService.getProjectInvoices(project.id);
+            setInvoices(refreshed);
+        } catch (err: any) {
+            setNoticeError(err.message);
+        } finally {
+            setApprovingNotice(false);
         }
     };
 
@@ -357,11 +383,12 @@ export default function InvoicePreviewPage() {
                             onChange={(e) => handleAutoInvoiceToggle(e.target.checked)}
                             disabled={savingAutoInvoice || clients.length === 0}
                         />
-                        Automatikus havi számlázás
+                        Automatikus havi értesítő
                         {savingAutoInvoice && <span className="text-xs text-muted-foreground font-normal">(mentés...)</span>}
                     </label>
                     <p className="text-xs text-muted-foreground mb-2">
-                        Minden hónap 1-jén automatikusan kiszámlázza az előző havi órákat a kiválasztott ügyfélnek.
+                        Minden hónap 1-jén automatikusan e-mailt küld a kiválasztott ügyfélnek az előző havi órák alapján
+                        tervezett számláról. A tényleges számla csak jóváhagyás után jön létre a Számlázás oldalon.
                     </p>
                     {clients.length === 0 && (
                         <p className="text-xs text-muted-foreground">Előbb adjon hozzá egy ügyfelet a projekthez.</p>
@@ -661,10 +688,18 @@ export default function InvoicePreviewPage() {
                             >
                                 {noticeSending ? 'Küldés...' : 'Értesítő küldése'}
                             </button>
-                            {noticeSentAt && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                    Elküldve: {new Date(noticeSentAt).toLocaleString('hu-HU')}
-                                </p>
+                            {notice && (
+                                <div className="mt-1 flex items-center gap-2">
+                                    <p className="text-xs text-muted-foreground">
+                                        Elküldve: {new Date(notice.sent_at).toLocaleString('hu-HU')}
+                                        {notice.status === 'approved' ? ' · jóváhagyva' : ' · jóváhagyásra vár'}
+                                    </p>
+                                    {notice.status === 'pending' && (
+                                        <Button size="sm" loading={approvingNotice} onClick={handleApproveNotice}>
+                                            Jóváhagyás
+                                        </Button>
+                                    )}
+                                </div>
                             )}
                             {noticeError && <p className="text-xs text-destructive mt-1">{noticeError}</p>}
                         </div>
