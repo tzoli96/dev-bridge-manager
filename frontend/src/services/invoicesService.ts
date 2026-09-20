@@ -119,6 +119,7 @@ export interface InvoiceNotice {
 export interface InvoiceNoticeWithNames extends InvoiceNotice {
     project_name: string
     client_name: string
+    billingo_invoice_number?: string
 }
 
 export const InvoiceNoticesService = {
@@ -245,6 +246,21 @@ export class InvoicesService {
         } catch (error: any) {
             console.error('Error fetching client revenue analytics:', error)
             throw new Error(error.response?.data?.message || error.message || 'Failed to fetch revenue analytics')
+        }
+    }
+
+    static async sendInvoiceEmail(projectId: number, invoiceId: number): Promise<void> {
+        try {
+            const response = await apiClient.post<{ success: boolean; message: string }>(
+                `${this.baseUrl}/${projectId}/invoices/${invoiceId}/send-email`,
+                {}
+            )
+            if (!response.success) {
+                throw new Error(response.message || 'Failed to send invoice e-mail')
+            }
+        } catch (error: any) {
+            console.error('Error sending invoice e-mail:', error)
+            throw new Error(error.response?.data?.message || error.message || 'Failed to send invoice e-mail')
         }
     }
 

@@ -2,7 +2,6 @@
 package handlers
 
 import (
-	"log"
 	"strconv"
 	"time"
 
@@ -17,12 +16,6 @@ type InvoiceNoticeHandler struct {
 	permissionService *services.PermissionService
 	billingoService   *services.BillingoService
 }
-
-// defaultInvoiceDueDays matches the manual "Számla kiállítása" button's
-// INVOICE_DUE_DAYS frontend constant (frontend/.../invoice/page.tsx), so
-// approval-created invoices get the same payment deadline as manually
-// created ones instead of falling back to Billingo's own default.
-const defaultInvoiceDueDays = 8
 
 func NewInvoiceNoticeHandler() *InvoiceNoticeHandler {
 	return &InvoiceNoticeHandler{
@@ -129,10 +122,11 @@ func (h *InvoiceNoticeHandler) ListInvoiceNotices(c *fiber.Ctx) error {
 
 // ApproveInvoiceNotice - POST /api/v1/projects/:id/invoice-notices/:noticeId/approve
 // Jóváhagyja a függőben lévő értesítőt: legyártja a tényleges Billingo
-// számlát (createInvoiceForProject-tal, ugyanazzal a logikával mint a
-// manuális "Számla kiállítása" gomb), majd e-mailben elküldi a PDF-et az
-// ügyfélnek. Ha a PDF-küldés bármilyen okból meghiúsul, a számla attól még
-// létrejön — csak egy figyelmeztető üzenetet kap vissza a jóváhagyó.
+// számlát (services.ApproveInvoiceNotice-szal, ugyanazzal a logikával mint a
+// manuális "Számla kiállítása" gomb és az automatikus jóváhagyás), majd
+// e-mailben elküldi a PDF-et az ügyfélnek. Ha a PDF-küldés bármilyen okból
+// meghiúsul, a számla attól még létrejön — csak egy figyelmeztető üzenetet
+// kap vissza a jóváhagyó.
 func (h *InvoiceNoticeHandler) ApproveInvoiceNotice(c *fiber.Ctx) error {
 	currentUserID := c.Locals("userID").(uint)
 	if err := checkInvoiceAccess(h.permissionService, currentUserID, "invoices.create"); err != nil {
@@ -168,87 +162,20 @@ func (h *InvoiceNoticeHandler) ApproveInvoiceNotice(c *fiber.Ctx) error {
 		return c.Status(404).JSON(models.InvoiceNoticeApproveResponse{Success: false, Message: "Client not found"})
 	}
 
-	// Atomically claim the notice before making any Billingo/Gmail calls, the
-	// same pattern createInvoiceForProject uses (invoice_handler.go) to reserve
-	// a fixed-price invoice slot: a pre-check SELECT here would leave a TOCTOU
-	// window open between the read and the later Updates call, and a client
-	// retry after an axios timeout (frontend's 10s timeout vs. Billingo's own
-	// 15s budget, hit multiple times by this handler) could otherwise create
-	// two real Billingo invoices for one notice.
-	claimTime := time.Now()
-	claim := db.Model(&models.InvoiceNotice{}).
-		Where("id = ? AND status = ?", notice.ID, "pending").
-		Updates(map[string]interface{}{"status": "approved", "approved_by": currentUserID, "approved_at": claimTime})
-	if claim.Error != nil {
-		return c.Status(500).JSON(models.InvoiceNoticeApproveResponse{Success: false, Message: "Failed to claim invoice notice"})
-	}
-	if claim.RowsAffected == 0 {
-		return c.Status(409).JSON(models.InvoiceNoticeApproveResponse{Success: false, Message: "Ez az értesítő már jóvá lett hagyva"})
-	}
-	notice.Status = "approved"
-	notice.ApprovedBy = &currentUserID
-	notice.ApprovedAt = &claimTime
-
-	req := models.InvoiceCreateRequest{ClientID: notice.ClientID}
-	if notice.PeriodStart != nil {
-		req.PeriodStart = notice.PeriodStart.Format("2006-01-02")
-	}
-	if notice.PeriodEnd != nil {
-		req.PeriodEnd = notice.PeriodEnd.Format("2006-01-02")
-	}
-	req.DueDate = time.Now().AddDate(0, 0, defaultInvoiceDueDays).Format("2006-01-02")
-
-	invoice, items, httpStatus, message := createInvoiceForProject(h.billingoService, project, client, req, currentUserID)
+	result, httpStatus, message := services.ApproveInvoiceNotice(notice, project, client, currentUserID, h.billingoService)
 	if httpStatus != 0 {
-		// The notice was already claimed as "approved" above, but no invoice
-		// was created — best-effort revert it back to "pending" so a retry is
-		// possible instead of leaving it stuck.
-		revert := db.Model(&models.InvoiceNotice{}).
-			Where("id = ? AND status = ?", notice.ID, "approved").
-			Updates(map[string]interface{}{"status": "pending", "approved_by": nil, "approved_at": nil})
-		if revert.Error != nil {
-			log.Printf("⚠️ Failed to revert invoice notice %d to pending after failed approval: %v", notice.ID, revert.Error)
-		}
 		return c.Status(httpStatus).JSON(models.InvoiceNoticeApproveResponse{Success: false, Message: message})
 	}
 
-	if err := db.Model(&models.InvoiceNotice{}).Where("id = ?", notice.ID).Update("invoice_id", invoice.ID).Error; err != nil {
-		log.Printf("⚠️ Failed to set invoice_id on invoice notice %d: %v", notice.ID, err)
-	}
-	notice.InvoiceID = &invoice.ID
-
-	emailSent := false
-	warning := ""
-	var account models.GmailAccount
-	if err := db.Where("user_id = ?", currentUserID).First(&account).Error; err != nil {
-		warning = "A számla elkészült, de nincs csatlakoztatott Gmail-fiókod — kérlek küldd el a PDF-et manuálisan."
-	} else {
-		var settings models.BillingoSettings
-		if err := db.First(&settings, 1).Error; err != nil || settings.APIKey == "" {
-			warning = "A számla elkészült, de a Billingo nincs beállítva a PDF letöltéséhez — kérlek küldd el manuálisan."
-		} else {
-			pdfBytes, err := h.billingoService.DownloadInvoicePDF(settings.APIKey, invoice.BillingoInvoiceID)
-			if err != nil {
-				log.Printf("⚠️ Failed to download PDF for invoice %d: %v", invoice.ID, err)
-				warning = "A számla elkészült, de a PDF letöltése sikertelen — kérlek küldd el manuálisan."
-			} else if err := services.SendInvoiceReadyEmail(account, client, project, invoice.BillingoInvoiceNumber, pdfBytes); err != nil {
-				log.Printf("⚠️ Failed to send invoice-ready e-mail for invoice %d: %v", invoice.ID, err)
-				warning = "A számla elkészült, de a PDF-es e-mail küldése sikertelen — kérlek küldd el manuálisan."
-			} else {
-				emailSent = true
-			}
-		}
-	}
-
-	response := toInvoiceResponse(*invoice, client.Name, "")
-	response.Items = items
+	response := toInvoiceResponse(*result.Invoice, client.Name, "")
+	response.Items = result.Items
 
 	return c.JSON(models.InvoiceNoticeApproveResponse{
 		Success:   true,
-		Message:   warning,
+		Message:   result.Warning,
 		Invoice:   &response,
-		Notice:    &notice,
-		EmailSent: emailSent,
+		Notice:    &result.Notice,
+		EmailSent: result.EmailSent,
 	})
 }
 
@@ -262,14 +189,16 @@ func (h *InvoiceNoticeHandler) ListAllInvoiceNotices(c *fiber.Ctx) error {
 
 	var rows []struct {
 		models.InvoiceNotice
-		ProjectName string `gorm:"column:project_name"`
-		ClientName  string `gorm:"column:client_name"`
+		ProjectName           string `gorm:"column:project_name"`
+		ClientName            string `gorm:"column:client_name"`
+		BillingoInvoiceNumber string `gorm:"column:billingo_invoice_number"`
 	}
 
 	query := database.GetDB().Table("invoice_notices").
-		Select("invoice_notices.*, projects.name as project_name, clients.name as client_name").
+		Select("invoice_notices.*, projects.name as project_name, clients.name as client_name, invoices.billingo_invoice_number as billingo_invoice_number").
 		Joins("LEFT JOIN projects ON invoice_notices.project_id = projects.id").
-		Joins("LEFT JOIN clients ON invoice_notices.client_id = clients.id")
+		Joins("LEFT JOIN clients ON invoice_notices.client_id = clients.id").
+		Joins("LEFT JOIN invoices ON invoice_notices.invoice_id = invoices.id")
 
 	if status := c.Query("status"); status != "" {
 		query = query.Where("invoice_notices.status = ?", status)
@@ -282,9 +211,10 @@ func (h *InvoiceNoticeHandler) ListAllInvoiceNotices(c *fiber.Ctx) error {
 	notices := make([]models.InvoiceNoticeWithNames, 0, len(rows))
 	for _, row := range rows {
 		notices = append(notices, models.InvoiceNoticeWithNames{
-			InvoiceNotice: row.InvoiceNotice,
-			ProjectName:   row.ProjectName,
-			ClientName:    row.ClientName,
+			InvoiceNotice:         row.InvoiceNotice,
+			ProjectName:           row.ProjectName,
+			ClientName:            row.ClientName,
+			BillingoInvoiceNumber: row.BillingoInvoiceNumber,
 		})
 	}
 

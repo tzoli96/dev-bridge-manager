@@ -21,6 +21,7 @@ export interface Project {
     fixed_price?: number | null
     auto_invoice_enabled?: boolean
     auto_invoice_client_id?: number | null
+    auto_invoice_auto_approve?: boolean
     clients?: ProjectClient[]
     created_by: number
     created_by_name: string
@@ -46,6 +47,7 @@ export interface ProjectUpdateRequest {
     fixed_price?: number | null
     auto_invoice_enabled?: boolean
     auto_invoice_client_id?: number | null
+    auto_invoice_auto_approve?: boolean
 }
 
 export interface ProjectsResponse {

@@ -82,10 +82,23 @@ func autoNotifyProject(project models.Project, periodStart, periodEnd time.Time)
 		return
 	}
 
-	if _, err := SendInvoiceNoticeEmail(project, client, account, &periodStart, &periodEnd, project.CreatedBy); err != nil {
+	notice, err := SendInvoiceNoticeEmail(project, client, account, &periodStart, &periodEnd, project.CreatedBy)
+	if err != nil {
 		log.Printf("⚠️ Auto-invoicing: failed to send notice for project %d: %v", project.ID, err)
 		return
 	}
 
 	log.Printf("✅ Auto-invoicing: sent notice for project %d (%.2f óra)", project.ID, totalHours)
+
+	if !project.AutoInvoiceAutoApprove {
+		return
+	}
+
+	billingoService := NewBillingoService()
+	if _, httpStatus, message := ApproveInvoiceNotice(*notice, project, client, project.CreatedBy, billingoService); httpStatus != 0 {
+		log.Printf("⚠️ Auto-invoicing: auto-approve failed for project %d notice %d: %s", project.ID, notice.ID, message)
+		return
+	}
+
+	log.Printf("✅ Auto-invoicing: auto-approved notice %d for project %d", notice.ID, project.ID)
 }

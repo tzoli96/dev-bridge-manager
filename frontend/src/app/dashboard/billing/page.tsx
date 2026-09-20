@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ProjectsService, Project, ProjectClient } from '@/services/projectsService';
 import { InvoicesService, Invoice, InvoiceLineItem, InvoiceNoticesService, InvoiceNoticeWithNames } from '@/services/invoicesService';
 import { Button } from '@/components/ui/button';
-import { Eye, ChevronDown, ChevronUp, ArrowUpRight, Receipt } from 'lucide-react';
+import { Eye, ChevronDown, ChevronUp, ArrowUpRight, Receipt, Mail, Check } from 'lucide-react';
 
 const paymentStatusInfo: Record<string, { label: string; className: string }> = {
     paid: { label: 'Kifizetve', className: 'bg-success/10 text-success' },
@@ -23,6 +23,7 @@ interface AutomationRowProps {
 function AutomationRow({ project, clients }: AutomationRowProps) {
     const [enabled, setEnabled] = React.useState(project.auto_invoice_enabled ?? false);
     const [clientId, setClientId] = React.useState<number | null>(project.auto_invoice_client_id ?? null);
+    const [autoApprove, setAutoApprove] = React.useState(project.auto_invoice_auto_approve ?? false);
     const [saving, setSaving] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
 
@@ -37,8 +38,10 @@ function AutomationRow({ project, clients }: AutomationRowProps) {
             await ProjectsService.updateProject(project.id, {
                 auto_invoice_enabled: checked,
                 auto_invoice_client_id: checked ? clientId : null,
+                auto_invoice_auto_approve: checked ? autoApprove : false,
             });
             setEnabled(checked);
+            if (!checked) setAutoApprove(false);
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -57,6 +60,20 @@ function AutomationRow({ project, clients }: AutomationRowProps) {
                 auto_invoice_client_id: newClientId,
             });
         } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleAutoApproveChange = async (checked: boolean) => {
+        setAutoApprove(checked);
+        setError(null);
+        try {
+            setSaving(true);
+            await ProjectsService.updateProject(project.id, { auto_invoice_auto_approve: checked });
+        } catch (err: any) {
+            setAutoApprove(!checked);
             setError(err.message);
         } finally {
             setSaving(false);
@@ -94,6 +111,17 @@ function AutomationRow({ project, clients }: AutomationRowProps) {
                     ))}
                 </select>
             )}
+            {enabled && (
+                <select
+                    value={autoApprove ? 'auto' : 'manual'}
+                    onChange={(e) => handleAutoApproveChange(e.target.value === 'auto')}
+                    className="w-full sm:w-48 px-3 py-1.5 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    disabled={saving}
+                >
+                    <option value="manual">Jóváhagyás szükséges</option>
+                    <option value="auto">Automatikus jóváhagyás</option>
+                </select>
+            )}
             {error && <p className="text-xs text-destructive">{error}</p>}
         </div>
     );
@@ -110,26 +138,30 @@ export default function BillingPage() {
     const [loadingInvoices, setLoadingInvoices] = React.useState(true);
     const [invoicesError, setInvoicesError] = React.useState<string | null>(null);
     const [viewingPdfId, setViewingPdfId] = React.useState<number | null>(null);
+    const [sendingEmailId, setSendingEmailId] = React.useState<number | null>(null);
+    const [sendEmailError, setSendEmailError] = React.useState<string | null>(null);
+    const [sendEmailSuccessId, setSendEmailSuccessId] = React.useState<number | null>(null);
     const [expandedInvoiceId, setExpandedInvoiceId] = React.useState<number | null>(null);
     const [breakdowns, setBreakdowns] = React.useState<Record<number, InvoiceLineItem[]>>({});
     const [breakdownLoading, setBreakdownLoading] = React.useState<number | null>(null);
 
-    const [pendingNotices, setPendingNotices] = React.useState<InvoiceNoticeWithNames[]>([]);
+    const [notices, setNotices] = React.useState<InvoiceNoticeWithNames[]>([]);
+    const [noticeFilter, setNoticeFilter] = React.useState<'pending' | 'approved' | 'all'>('pending');
     const [loadingNotices, setLoadingNotices] = React.useState(true);
     const [approvingNoticeId, setApprovingNoticeId] = React.useState<number | null>(null);
     const [noticeApprovalError, setNoticeApprovalError] = React.useState<string | null>(null);
 
-    const fetchPendingNotices = React.useCallback(() => {
+    const fetchNotices = React.useCallback(() => {
         setLoadingNotices(true);
-        InvoiceNoticesService.listAll('pending')
-            .then((res) => setPendingNotices(res.notices || []))
-            .catch(() => setPendingNotices([]))
+        InvoiceNoticesService.listAll(noticeFilter === 'all' ? undefined : noticeFilter)
+            .then((res) => setNotices(res.notices || []))
+            .catch(() => setNotices([]))
             .finally(() => setLoadingNotices(false));
-    }, []);
+    }, [noticeFilter]);
 
     React.useEffect(() => {
-        fetchPendingNotices();
-    }, [fetchPendingNotices]);
+        fetchNotices();
+    }, [fetchNotices]);
 
     const handleApproveNotice = async (notice: InvoiceNoticeWithNames) => {
         setNoticeApprovalError(null);
@@ -143,7 +175,7 @@ export default function BillingPage() {
             if (res.message) {
                 setNoticeApprovalError(res.message);
             }
-            fetchPendingNotices();
+            fetchNotices();
             InvoicesService.getAllInvoices(selectedProjectId || undefined).then(setInvoices).catch(() => {});
         } catch (err: any) {
             setNoticeApprovalError(err.message);
@@ -187,6 +219,20 @@ export default function BillingPage() {
             console.error('Error viewing invoice PDF:', error);
         } finally {
             setViewingPdfId(null);
+        }
+    };
+
+    const handleSendEmail = async (invoice: Invoice) => {
+        setSendEmailError(null);
+        try {
+            setSendingEmailId(invoice.id);
+            await InvoicesService.sendInvoiceEmail(invoice.project_id, invoice.id);
+            setSendEmailSuccessId(invoice.id);
+            setTimeout(() => setSendEmailSuccessId((current) => (current === invoice.id ? null : current)), 4000);
+        } catch (error: any) {
+            setSendEmailError(error.message);
+        } finally {
+            setSendingEmailId(null);
         }
     };
 
@@ -239,6 +285,11 @@ export default function BillingPage() {
                         {invoicesError}
                     </div>
                 )}
+                {sendEmailError && (
+                    <div className="bg-destructive/10 border border-destructive/20 text-destructive px-3 py-2 rounded text-sm mb-3">
+                        {sendEmailError}
+                    </div>
+                )}
 
                 {loadingInvoices ? (
                     <div className="flex items-center justify-center h-32">
@@ -258,6 +309,7 @@ export default function BillingPage() {
                                     <th className="px-4 py-2 font-medium">Állapot</th>
                                     <th className="px-4 py-2 font-medium">Esedékesség</th>
                                     <th className="px-4 py-2 font-medium">Kiállítva</th>
+                                    <th className="px-4 py-2 font-medium w-10" />
                                     <th className="px-4 py-2 font-medium w-10" />
                                     <th className="px-4 py-2 font-medium w-10" />
                                 </tr>
@@ -320,6 +372,18 @@ export default function BillingPage() {
                                             )}
                                         </td>
                                         <td className="px-4 py-2">
+                                            {invoice.status === 'created' && invoice.billingo_invoice_id && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon-sm"
+                                                    icon={sendEmailSuccessId === invoice.id ? Check : Mail}
+                                                    loading={sendingEmailId === invoice.id}
+                                                    onClick={() => handleSendEmail(invoice)}
+                                                    title="E-mail küldése"
+                                                />
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-2">
                                             {hasExpandable && (
                                                 <Button
                                                     variant="ghost"
@@ -333,7 +397,7 @@ export default function BillingPage() {
                                     </tr>
                                     {isExpanded && (
                                         <tr>
-                                            <td colSpan={9} className="px-4 py-4 bg-muted/20 border-t border-border">
+                                            <td colSpan={10} className="px-4 py-4 bg-muted/20 border-t border-border">
                                                 <div className="space-y-4">
                                                     {extraItems.length > 0 && (
                                                         <div>
@@ -394,7 +458,18 @@ export default function BillingPage() {
             </div>
 
             <div>
-                <h2 className="text-lg font-semibold text-foreground mb-3">Jóváhagyásra váró értesítők</h2>
+                <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-lg font-semibold text-foreground">Számla-értesítők</h2>
+                    <select
+                        value={noticeFilter}
+                        onChange={(e) => setNoticeFilter(e.target.value as 'pending' | 'approved' | 'all')}
+                        className="px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                        <option value="pending">Jóváhagyásra vár</option>
+                        <option value="approved">Jóváhagyva</option>
+                        <option value="all">Összes</option>
+                    </select>
+                </div>
                 {noticeApprovalError && (
                     <div className="bg-destructive/10 border border-destructive/20 text-destructive px-3 py-2 rounded text-sm mb-3">
                         {noticeApprovalError}
@@ -404,27 +479,37 @@ export default function BillingPage() {
                     <div className="flex items-center justify-center h-20">
                         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                     </div>
-                ) : pendingNotices.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Nincs jóváhagyásra váró értesítő.</p>
+                ) : notices.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Nincs megjeleníthető értesítő.</p>
                 ) : (
                     <div className="bg-card border border-border rounded-lg divide-y divide-border">
-                        {pendingNotices.map((notice) => (
+                        {notices.map((notice) => (
                             <div key={notice.id} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 px-4 py-3">
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-foreground">{notice.project_name}</p>
-                                    <p className="text-xs text-muted-foreground">
+                                    <p className="text-sm font-medium text-foreground">
+                                        {notice.project_name}
+                                        {' · '}
                                         {notice.client_name}
-                                        {notice.period_start && notice.period_end ? ` · ${notice.period_start} – ${notice.period_end}` : ''}
-                                        {' · elküldve: '}{new Date(notice.sent_at).toLocaleString('hu-HU')}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {notice.period_start && notice.period_end ? `${notice.period_start} – ${notice.period_end} · ` : ''}
+                                        {'elküldve: '}{new Date(notice.sent_at).toLocaleString('hu-HU')}
+                                        {notice.status === 'approved' && notice.billingo_invoice_number ? ` · számla: ${notice.billingo_invoice_number}` : ''}
                                     </p>
                                 </div>
-                                <Button
-                                    size="sm"
-                                    loading={approvingNoticeId === notice.id}
-                                    onClick={() => handleApproveNotice(notice)}
-                                >
-                                    Jóváhagyás
-                                </Button>
+                                {notice.status === 'approved' ? (
+                                    <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-success/10 text-success flex-shrink-0">
+                                        Jóváhagyva
+                                    </span>
+                                ) : (
+                                    <Button
+                                        size="sm"
+                                        loading={approvingNoticeId === notice.id}
+                                        onClick={() => handleApproveNotice(notice)}
+                                    >
+                                        Jóváhagyás
+                                    </Button>
+                                )}
                             </div>
                         ))}
                     </div>

@@ -24,8 +24,9 @@ func (InvoiceNotice) TableName() string { return "invoice_notices" }
 // ListAllInvoiceNotices joins in, for the Billing page's pending-notices list.
 type InvoiceNoticeWithNames struct {
 	InvoiceNotice
-	ProjectName string `json:"project_name"`
-	ClientName  string `json:"client_name"`
+	ProjectName           string `json:"project_name"`
+	ClientName            string `json:"client_name"`
+	BillingoInvoiceNumber string `json:"billingo_invoice_number,omitempty"`
 }
 
 type InvoiceNoticeSendRequest struct {

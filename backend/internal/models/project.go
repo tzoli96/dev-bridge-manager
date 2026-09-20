@@ -16,15 +16,18 @@ type Project struct {
 	// pre-invoice notices for hourly projects: when enabled, the scheduler
 	// (see services.RunAutoInvoiceNotices) sends a notice e-mail for the
 	// previous calendar month to this client on the 1st of every month.
-	// Actual invoice creation always requires an explicit approval (the
-	// manual "create invoice" button or approving the resulting notice via
-	// InvoiceNoticeHandler.ApproveInvoiceNotice), regardless of this flag.
-	AutoInvoiceEnabled  bool      `json:"auto_invoice_enabled" gorm:"default:false"`
-	AutoInvoiceClientID *uint     `json:"auto_invoice_client_id"`
-	CreatedBy           uint      `json:"created_by" gorm:"not null"`
-	CreatedByName       string    `json:"created_by_name" gorm:"-"`
-	CreatedAt           time.Time `json:"created_at"`
-	UpdatedAt           time.Time `json:"updated_at"`
+	// By default, actual invoice creation still requires an explicit
+	// approval (the manual "create invoice" button or approving the
+	// resulting notice via services.ApproveInvoiceNotice) — unless
+	// AutoInvoiceAutoApprove is also set, in which case the scheduler
+	// approves the notice itself right after sending it.
+	AutoInvoiceEnabled     bool      `json:"auto_invoice_enabled" gorm:"default:false"`
+	AutoInvoiceClientID    *uint     `json:"auto_invoice_client_id"`
+	AutoInvoiceAutoApprove bool      `json:"auto_invoice_auto_approve" gorm:"default:false"`
+	CreatedBy              uint      `json:"created_by" gorm:"not null"`
+	CreatedByName          string    `json:"created_by_name" gorm:"-"`
+	CreatedAt              time.Time `json:"created_at"`
+	UpdatedAt              time.Time `json:"updated_at"`
 
 	// Kapcsolat a User modellel
 	Creator User `json:"creator,omitempty" gorm:"foreignKey:CreatedBy"`
@@ -50,25 +53,27 @@ type ProjectUpdateRequest struct {
 	FixedPrice  *float64 `json:"fixed_price"`
 	// AutoInvoiceEnabled is a pointer so "not present in the request" (leave
 	// as-is) can be distinguished from an explicit false (turn off).
-	AutoInvoiceEnabled  *bool `json:"auto_invoice_enabled"`
-	AutoInvoiceClientID *uint `json:"auto_invoice_client_id"`
+	AutoInvoiceEnabled     *bool `json:"auto_invoice_enabled"`
+	AutoInvoiceClientID    *uint `json:"auto_invoice_client_id"`
+	AutoInvoiceAutoApprove *bool `json:"auto_invoice_auto_approve"`
 }
 
 type ProjectResponse struct {
-	ID                  uint                    `json:"id"`
-	Name                string                  `json:"name"`
-	Description         string                  `json:"description"`
-	Status              string                  `json:"status"`
-	PricingType         string                  `json:"pricing_type"`
-	HourlyRate          *float64                `json:"hourly_rate"`
-	FixedPrice          *float64                `json:"fixed_price"`
-	AutoInvoiceEnabled  bool                    `json:"auto_invoice_enabled"`
-	AutoInvoiceClientID *uint                   `json:"auto_invoice_client_id"`
-	CreatedBy           uint                    `json:"created_by"`
-	CreatedByName       string                  `json:"created_by_name"`
-	CreatedAt           time.Time               `json:"created_at"`
-	UpdatedAt           time.Time               `json:"updated_at"`
-	Clients             []ProjectClientResponse `json:"clients,omitempty"`
+	ID                     uint                    `json:"id"`
+	Name                   string                  `json:"name"`
+	Description            string                  `json:"description"`
+	Status                 string                  `json:"status"`
+	PricingType            string                  `json:"pricing_type"`
+	HourlyRate             *float64                `json:"hourly_rate"`
+	FixedPrice             *float64                `json:"fixed_price"`
+	AutoInvoiceEnabled     bool                    `json:"auto_invoice_enabled"`
+	AutoInvoiceClientID    *uint                   `json:"auto_invoice_client_id"`
+	AutoInvoiceAutoApprove bool                    `json:"auto_invoice_auto_approve"`
+	CreatedBy              uint                    `json:"created_by"`
+	CreatedByName          string                  `json:"created_by_name"`
+	CreatedAt              time.Time               `json:"created_at"`
+	UpdatedAt              time.Time               `json:"updated_at"`
+	Clients                []ProjectClientResponse `json:"clients,omitempty"`
 }
 
 type ProjectListResponse struct {

@@ -37,6 +37,9 @@ func SetupInvoiceRoutes(api fiber.Router) {
 	// GET /api/v1/projects/:id/invoices/:invoiceId/pdf - Számla PDF megtekintése
 	projects.Get("/:id/invoices/:invoiceId/pdf", invoiceHandler.DownloadInvoicePDF)
 
+	// POST /api/v1/projects/:id/invoices/:invoiceId/send-email - Számla PDF (újra)küldése e-mailben
+	projects.Post("/:id/invoices/:invoiceId/send-email", invoiceHandler.SendInvoiceEmail)
+
 	// POST /api/v1/projects/:id/invoices/refresh-payment-status - Fizetettség frissítése Billingóból
 	projects.Post("/:id/invoices/refresh-payment-status", invoiceHandler.RefreshPaymentStatuses)
 
