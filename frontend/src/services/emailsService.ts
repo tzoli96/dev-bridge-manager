@@ -18,6 +18,7 @@ export interface EmailListItem {
     has_attachments: boolean
     attachments: EmailAttachment[]
     is_read: boolean
+    category: string | null
     received_at: string
 }
 
@@ -52,8 +53,10 @@ export interface SendEmailRequest {
 }
 
 export const EmailsService = {
-    async list(folder: 'inbox' | 'sent', page = 1): Promise<EmailListResponse> {
-        return apiClient.get<EmailListResponse>('/emails', { folder, page })
+    async list(folder: 'inbox' | 'sent', page = 1, category?: string): Promise<EmailListResponse> {
+        const params: Record<string, string | number> = { folder, page }
+        if (category) params.category = category
+        return apiClient.get<EmailListResponse>('/emails', params)
     },
 
     async get(id: number): Promise<EmailDetail> {
