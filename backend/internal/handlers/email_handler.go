@@ -8,6 +8,7 @@ import (
 	"mime"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"dev-bridge-manager/internal/database"
@@ -18,11 +19,15 @@ import (
 )
 
 type EmailHandler struct {
-	gmailAPI services.GmailAPI
+	gmailAPI     services.GmailAPI
+	draftReplier services.DraftReplier
 }
 
 func NewEmailHandler() *EmailHandler {
-	return &EmailHandler{gmailAPI: services.NewRealGmailAPI()}
+	return &EmailHandler{
+		gmailAPI:     services.NewRealGmailAPI(),
+		draftReplier: services.NewDraftReplyService(),
+	}
 }
 
 func currentGmailAccount(userID uint) (*models.GmailAccount, error) {
@@ -149,6 +154,56 @@ func (h *EmailHandler) GetEmail(c *fiber.Ctx) error {
 		Attachments: full.Attachments,
 		ReceivedAt:  full.ReceivedAt,
 	})
+}
+
+// DraftReply - POST /api/v1/emails/:id/draft-reply - fetches the email body,
+// combines it with the global profile context, and asks the AI service for
+// a draft. Returns text only - never saves or sends anything.
+func (h *EmailHandler) DraftReply(c *fiber.Ctx) error {
+	userID := c.Locals("userID").(uint)
+	account, err := currentGmailAccount(userID)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"success": false, "message": "Connect your Gmail account first"})
+	}
+
+	id, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"success": false, "message": "Invalid email id"})
+	}
+
+	var email models.Email
+	if err := database.GetDB().Where("id = ? AND gmail_account_id = ?", id, account.ID).First(&email).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{"success": false, "message": "Email not found"})
+	}
+
+	full, err := h.gmailAPI.GetFullMessage(c.Context(), account, email.GmailMessageID)
+	if err != nil {
+		return c.Status(502).JSON(fiber.Map{"success": false, "message": "Failed to fetch email body from Gmail: " + err.Error()})
+	}
+
+	content := full.BodyText
+	if strings.TrimSpace(content) == "" {
+		content = full.Subject
+	}
+	const maxContentLen = 4000
+	if len(content) > maxContentLen {
+		content = content[:maxContentLen]
+	}
+
+	var profile models.Profile
+	profileContext := ""
+	if err := database.GetDB().Preload("Samples").First(&profile, 1).Error; err == nil {
+		profileContext = services.BuildProfileContext(&profile)
+	}
+	// A missing/unreadable profile row degrades to no persona rather than
+	// failing the whole request - drafting a plain reply is still useful.
+
+	draft, err := h.draftReplier.DraftReply(c.Context(), content, profileContext)
+	if err != nil {
+		return c.Status(502).JSON(fiber.Map{"success": false, "message": "Failed to generate draft: " + err.Error()})
+	}
+
+	return c.JSON(fiber.Map{"success": true, "draft": draft})
 }
 
 // GetAttachment - GET /api/v1/emails/:id/attachments/:attachmentId - proxyzott

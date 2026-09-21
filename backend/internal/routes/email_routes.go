@@ -17,6 +17,7 @@ func SetupEmailRoutes(api fiber.Router) {
 	emails.Get("/", h.ListEmails)
 	emails.Get("/unread-count", h.GetUnreadCount)
 	emails.Get("/:id", h.GetEmail)
+	emails.Post("/:id/draft-reply", h.DraftReply)
 	emails.Get("/:id/attachments/:attachmentId", h.GetAttachment)
 	emails.Post("/send", h.SendEmail)
 }
