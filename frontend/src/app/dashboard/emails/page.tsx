@@ -25,6 +25,14 @@ function avatarColor(seed: string): string {
     return AVATAR_COLORS[hash % AVATAR_COLORS.length]
 }
 
+const CATEGORY_STYLES: Record<string, { label: string; className: string }> = {
+    ugyfel: { label: 'Ügyfél', className: 'bg-blue-500/10 text-blue-600' },
+    szamla: { label: 'Számla', className: 'bg-emerald-500/10 text-emerald-600' },
+    marketing: { label: 'Marketing', className: 'bg-amber-500/10 text-amber-600' },
+    rendszeruzenet: { label: 'Rendszer', className: 'bg-slate-500/10 text-slate-600' },
+    egyeb: { label: 'Egyéb', className: 'bg-muted text-muted-foreground' },
+}
+
 function initials(name: string): string {
     const trimmed = name.trim()
     if (!trimmed) return '?'
@@ -81,6 +89,7 @@ export default function EmailsPage() {
     const [statusError, setStatusError] = useState<string | null>(null)
 
     const [folder, setFolder] = useState<Folder>('inbox')
+    const [category, setCategory] = useState<string | undefined>(undefined)
     const [emails, setEmails] = useState<EmailListItem[]>([])
     const [emailsPage, setEmailsPage] = useState(1)
     const [emailsTotal, setEmailsTotal] = useState(0)
@@ -114,7 +123,7 @@ export default function EmailsPage() {
         setLoadingEmails(true)
         setListError(null)
         setEmailsPage(1)
-        return EmailsService.list(folder, 1)
+        return EmailsService.list(folder, 1, category)
             .then(res => {
                 setEmails(res.emails || [])
                 setEmailsTotal(res.total || 0)
@@ -127,7 +136,7 @@ export default function EmailsPage() {
         const nextPage = emailsPage + 1
         setLoadingMore(true)
         setListError(null)
-        EmailsService.list(folder, nextPage)
+        EmailsService.list(folder, nextPage, category)
             .then(res => {
                 setEmails(prev => [...prev, ...(res.emails || [])])
                 setEmailsTotal(res.total || 0)
@@ -140,7 +149,7 @@ export default function EmailsPage() {
     useEffect(() => {
         if (!status?.connected) return
         refreshEmails()
-    }, [status?.connected, folder])
+    }, [status?.connected, folder, category])
 
     const handleSync = async () => {
         setSyncing(true)
@@ -342,7 +351,7 @@ export default function EmailsPage() {
                         {(['inbox', 'sent'] as Folder[]).map(f => (
                             <button
                                 key={f}
-                                onClick={() => { setFolder(f); setSelected(null); setSelectedId(null) }}
+                                onClick={() => { setFolder(f); setCategory(undefined); setSelected(null); setSelectedId(null) }}
                                 className={`flex-1 py-3 text-sm font-medium transition-colors ${
                                     folder === f
                                         ? 'text-primary border-b-2 border-primary bg-primary/5'
@@ -353,6 +362,30 @@ export default function EmailsPage() {
                             </button>
                         ))}
                     </div>
+
+                    {folder === 'inbox' && (
+                        <div className="flex flex-wrap gap-1.5 px-4 py-2 border-b border-border">
+                            <button
+                                onClick={() => setCategory(undefined)}
+                                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                                    !category ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground hover:bg-muted/70'
+                                }`}
+                            >
+                                Mind
+                            </button>
+                            {Object.entries(CATEGORY_STYLES).map(([key, { label }]) => (
+                                <button
+                                    key={key}
+                                    onClick={() => setCategory(key)}
+                                    className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                                        category === key ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground hover:bg-muted/70'
+                                    }`}
+                                >
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
 
                     {loadingEmails ? (
                         <div className="p-6"><LoadingState message="E-mailek betöltése..." /></div>
@@ -389,9 +422,14 @@ export default function EmailsPage() {
                                                     {formatListDate(item.received_at)}
                                                 </span>
                                             </div>
-                                            <div className={`text-sm truncate ${!item.is_read ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
-                                                {item.subject || '(nincs tárgy)'}
-                                                {item.has_attachments && <Paperclip size={12} className="inline ml-1 align-text-top" />}
+                                            <div className={`text-sm truncate flex items-center gap-1.5 ${!item.is_read ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
+                                                <span className="truncate">{item.subject || '(nincs tárgy)'}</span>
+                                                {item.has_attachments && <Paperclip size={12} className="inline shrink-0" />}
+                                                {item.category && CATEGORY_STYLES[item.category] && (
+                                                    <span className={`shrink-0 px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${CATEGORY_STYLES[item.category].className}`}>
+                                                        {CATEGORY_STYLES[item.category].label}
+                                                    </span>
+                                                )}
                                             </div>
                                             <div className="text-xs text-muted-foreground truncate">{item.snippet}</div>
                                         </div>
