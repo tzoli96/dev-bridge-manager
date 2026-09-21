@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import { User } from '@/types/user'
-import { hasPermission } from '@/utils/permissions'
+import { hasPermission, isSuperAdmin } from '@/utils/permissions'
 import BillingoSettingsModal from '@/components/BillingoSettingsModal'
+import ProfileModal from '@/components/ProfileModal'
 
 interface AdminTabProps {
     user: User | null
@@ -11,6 +12,7 @@ interface AdminTabProps {
 
 export default function AdminTab({ user }: AdminTabProps) {
     const [isBillingoModalOpen, setIsBillingoModalOpen] = useState(false)
+    const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
 
     const adminCards = [
         {
@@ -44,6 +46,15 @@ export default function AdminTab({ user }: AdminTabProps) {
             permission: null, // Available for all admins
             action: () => {},
             comingSoon: true
+        },
+        {
+            title: "AI Profil / Perszóna",
+            description: "Háttér, szakterület és írásminták beállítása, amit az AI-alapú funkciók a te stílusodban való válaszadáshoz használnak",
+            buttonLabel: "Szerkesztés",
+            permission: null,
+            requireSuperAdmin: true,
+            action: () => setIsProfileModalOpen(true),
+            comingSoon: false
         }
     ]
 
@@ -56,7 +67,7 @@ export default function AdminTab({ user }: AdminTabProps) {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {adminCards
-                    .filter(card => !card.permission || hasPermission(user, card.permission))
+                    .filter(card => (card as any).requireSuperAdmin ? isSuperAdmin(user) : (!card.permission || hasPermission(user, card.permission)))
                     .map(card => (
                         <div key={card.title} className="bg-card rounded-xl shadow-sm border border-border p-6 transition-shadow hover:shadow-sm">
                             <div className="flex items-center gap-2 mb-1">
@@ -82,6 +93,10 @@ export default function AdminTab({ user }: AdminTabProps) {
             <BillingoSettingsModal
                 isOpen={isBillingoModalOpen}
                 onClose={() => setIsBillingoModalOpen(false)}
+            />
+            <ProfileModal
+                isOpen={isProfileModalOpen}
+                onClose={() => setIsProfileModalOpen(false)}
             />
         </div>
     )

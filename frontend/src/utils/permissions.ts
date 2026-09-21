@@ -11,3 +11,7 @@ export const hasAnyPermission = (user: User | null, permissions: string[]): bool
 export const isAdmin = (user: User | null): boolean => {
     return user?.role?.name === 'admin' || user?.role?.name === 'super_admin'
 }
+
+export const isSuperAdmin = (user: User | null): boolean => {
+    return user?.role?.name === 'super_admin'
+}
