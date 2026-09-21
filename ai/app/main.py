@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request
 import logfire
 
 from app.categorize_email import CategorizeEmailRequest, CategorizeEmailResult, categorize_email
+from app.draft_reply import DraftReplyRequest, DraftReplyResult, draft_reply
 
 logger = logging.getLogger("devbridge_ai")
 # No observability existed before this: not one call logged its latency, and
@@ -60,3 +61,9 @@ def health():
 async def categorize_email_endpoint(payload: CategorizeEmailRequest) -> CategorizeEmailResult:
     category = await categorize_email(payload)
     return CategorizeEmailResult(category=category)
+
+
+@app.post("/draft-reply", response_model=DraftReplyResult)
+async def draft_reply_endpoint(payload: DraftReplyRequest) -> DraftReplyResult:
+    draft = await draft_reply(payload)
+    return DraftReplyResult(draft=draft)
