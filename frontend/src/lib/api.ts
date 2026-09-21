@@ -59,8 +59,8 @@ class ApiClient {
     }
 
     // POST request
-    async post<T>(endpoint: string, data?: any): Promise<T> {
-        const response = await this.client.post<T>(endpoint, data)
+    async post<T>(endpoint: string, data?: any, timeout?: number): Promise<T> {
+        const response = await this.client.post<T>(endpoint, data, timeout ? { timeout } : undefined)
         return response.data
     }
 
