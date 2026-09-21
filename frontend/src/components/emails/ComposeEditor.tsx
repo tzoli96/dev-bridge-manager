@@ -21,6 +21,11 @@ export interface ComposeEditorHandle {
     getHTML: () => string
     getText: () => string
     isEmpty: () => boolean
+    setText: (text: string) => void
+}
+
+function escapeHtml(value: string): string {
+    return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
 function ToolbarButton({
@@ -159,6 +164,13 @@ const ComposeEditor = forwardRef<ComposeEditorHandle, { placeholder?: string }>(
         getHTML: () => editor?.getHTML() ?? '',
         getText: () => editor?.getText() ?? '',
         isEmpty: () => editor?.isEmpty ?? true,
+        setText: (text: string) => {
+            const html = text
+                .split(/\n{2,}/)
+                .map(paragraph => `<p>${escapeHtml(paragraph).replace(/\n/g, '<br>')}</p>`)
+                .join('')
+            editor?.commands.setContent(html)
+        },
     }), [editor])
 
     useEffect(() => () => editor?.destroy(), [editor])

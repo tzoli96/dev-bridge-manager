@@ -96,4 +96,12 @@ export const EmailsService = {
         }
         return apiClient.uploadFiles('/emails/send', payload.files || [], extraFields)
     },
+
+    async draftReply(id: number): Promise<{ success: boolean; message?: string; draft?: string }> {
+        // The AI service can take a while to generate a full draft, and the
+        // backend's own AI-service HTTP client waits up to 30s - give the
+        // browser a longer timeout so it doesn't give up before the backend
+        // itself would (same reasoning as GmailService.sync's longer timeout).
+        return apiClient.post(`/emails/${id}/draft-reply`, undefined, 40000)
+    },
 }

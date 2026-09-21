@@ -3,7 +3,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Mail, Send, Paperclip, RefreshCw, LogOut, X, Plus } from 'lucide-react'
+import { Mail, Send, Paperclip, RefreshCw, LogOut, X, Plus, Sparkles } from 'lucide-react'
 import { GmailService, GmailStatus } from '@/services/gmailService'
 import { EmailsService, EmailListItem, EmailDetail } from '@/services/emailsService'
 import LoadingState from '@/components/ui/LoadingState'
@@ -107,6 +107,9 @@ export default function EmailsPage() {
     const [composeFiles, setComposeFiles] = useState<File[]>([])
     const [sending, setSending] = useState(false)
     const [sendError, setSendError] = useState<string | null>(null)
+    const [draftingReply, setDraftingReply] = useState(false)
+    const [draftError, setDraftError] = useState<string | null>(null)
+    const [pendingDraftText, setPendingDraftText] = useState<string | null>(null)
     const [syncing, setSyncing] = useState(false)
     const [syncError, setSyncError] = useState<string | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
@@ -218,6 +221,25 @@ export default function EmailsPage() {
         setComposeOpen(true)
     }
 
+    const handleDraftReply = async () => {
+        if (!selected?.id) return
+        setDraftError(null)
+        openCompose(selected)
+        try {
+            setDraftingReply(true)
+            const res = await EmailsService.draftReply(selected.id)
+            if (!res.success || !res.draft) {
+                setDraftError(res.message || 'Nem sikerült javaslatot generálni.')
+                return
+            }
+            setPendingDraftText(res.draft)
+        } catch (err: any) {
+            setDraftError(err.message)
+        } finally {
+            setDraftingReply(false)
+        }
+    }
+
     const handleFilesSelected = (files: FileList | null) => {
         if (!files) return
         setSendError(null)
@@ -266,6 +288,13 @@ export default function EmailsPage() {
             setSending(false)
         }
     }
+
+    useEffect(() => {
+        if (composeOpen && pendingDraftText) {
+            composeEditorRef.current?.setText(pendingDraftText)
+            setPendingDraftText(null)
+        }
+    }, [composeOpen, pendingDraftText])
 
     if (loadingStatus) return <LoadingState message="Gmail állapot betöltése..." />
 
@@ -488,12 +517,21 @@ export default function EmailsPage() {
                                     ))}
                                 </div>
                             )}
-                            <button
-                                onClick={() => openCompose(selected)}
-                                className="flex items-center gap-2 px-4 py-2 bg-muted text-foreground rounded-lg text-sm font-medium hover:bg-muted/70 transition-colors"
-                            >
-                                <RefreshCw size={14} /> Válasz
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => openCompose(selected)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-muted text-foreground rounded-lg text-sm font-medium hover:bg-muted/70 transition-colors"
+                                >
+                                    <RefreshCw size={14} /> Válasz
+                                </button>
+                                <button
+                                    onClick={handleDraftReply}
+                                    disabled={draftingReply}
+                                    className="flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-lg text-sm font-medium hover:bg-primary/20 disabled:opacity-50 transition-colors"
+                                >
+                                    <Sparkles size={14} /> {draftingReply ? 'Javaslat készül...' : 'AI válasz-javaslat'}
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -513,6 +551,11 @@ export default function EmailsPage() {
                             {sendError && (
                                 <div className="bg-destructive/10 border border-destructive/20 text-destructive px-3 py-2 rounded-lg text-sm">
                                     {sendError}
+                                </div>
+                            )}
+                            {draftError && (
+                                <div className="bg-destructive/10 border border-destructive/20 text-destructive px-3 py-2 rounded-lg text-sm">
+                                    {draftError}
                                 </div>
                             )}
                             <div className="space-y-1.5">
