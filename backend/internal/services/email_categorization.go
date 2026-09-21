@@ -19,6 +19,8 @@ type EmailCategorizer interface {
 	Categorize(ctx context.Context, subject, snippet, fromAddress, fromName string) (*string, error)
 }
 
+var _ EmailCategorizer = (*EmailCategorizationService)(nil)
+
 // EmailCategorizationService calls the AI service's /categorize-email
 // endpoint. baseURL defaults to the AI service's docker-network address but
 // is overridable via AI_SERVICE_URL for other environments, and is set

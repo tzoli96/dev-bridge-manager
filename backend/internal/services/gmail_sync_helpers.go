@@ -45,6 +45,9 @@ func classifyFolder(labelIDs []string) (folder string, ok bool) {
 // the AI service is unreachable or returned something unexpected (see
 // EmailCategorizationService.Categorize's own validation).
 func categorizeIfInbox(ctx context.Context, categorizer EmailCategorizer, meta *GmailMessageMeta) *string {
+	if categorizer == nil {
+		return nil
+	}
 	if meta.Folder != "inbox" {
 		return nil
 	}

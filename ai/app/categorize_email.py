@@ -28,6 +28,7 @@ class CategorizeEmailResult(BaseModel):
 categorize_agent = Agent(
     f"google:{GEMINI_MODEL}",
     output_type=CategorizeEmailResult,
+    defer_model_check=True,
     instructions=(
         "Categorize a business email into exactly one category based on its "
         "subject, snippet, and sender.\n"

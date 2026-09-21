@@ -6,6 +6,8 @@ import (
 	"errors"
 	"testing"
 
+	"dev-bridge-manager/internal/models"
+
 	"golang.org/x/oauth2"
 	"google.golang.org/api/googleapi"
 )
@@ -119,14 +121,14 @@ func TestCategorizeIfInboxSkipsSentFolder(t *testing.T) {
 }
 
 func TestCategorizeIfInboxCallsCategorizerForInbox(t *testing.T) {
-	category := "ugyfel"
+	category := models.EmailCategoryClient
 	cat := &fakeCategorizer{result: &category}
 	meta := &GmailMessageMeta{Folder: "inbox", Subject: "hi", Snippet: "snip", FromAddress: "a@b.com", FromName: "A"}
 
 	got := categorizeIfInbox(context.Background(), cat, meta)
 
-	if got == nil || *got != "ugyfel" {
-		t.Fatalf("expected category 'ugyfel', got %v", got)
+	if got == nil || *got != models.EmailCategoryClient {
+		t.Fatalf("expected category %q, got %v", models.EmailCategoryClient, got)
 	}
 	if cat.gotArgs != [4]string{"hi", "snip", "a@b.com", "A"} {
 		t.Errorf("categorizer called with unexpected args: %+v", cat.gotArgs)
