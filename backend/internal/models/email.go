@@ -12,6 +12,25 @@ type EmailAttachmentMeta struct {
 	AttachmentID string `json:"attachment_id"`
 }
 
+// EmailCategory* constants and ValidEmailCategories are the canonical list
+// of categories the AI service (ai/app/categorize_email.py) can return -
+// kept in sync manually since the two live in different languages.
+const (
+	EmailCategoryClient    = "ugyfel"
+	EmailCategoryBilling   = "szamla"
+	EmailCategoryMarketing = "marketing"
+	EmailCategorySystem    = "rendszeruzenet"
+	EmailCategoryOther     = "egyeb"
+)
+
+var ValidEmailCategories = map[string]bool{
+	EmailCategoryClient:    true,
+	EmailCategoryBilling:   true,
+	EmailCategoryMarketing: true,
+	EmailCategorySystem:    true,
+	EmailCategoryOther:     true,
+}
+
 type Email struct {
 	ID             uint      `json:"id" gorm:"primaryKey"`
 	GmailAccountID uint      `json:"gmail_account_id" gorm:"not null"`
@@ -28,6 +47,7 @@ type Email struct {
 	IsRead         bool      `json:"is_read"`
 	ReceivedAt     time.Time `json:"received_at"`
 	SyncedAt       time.Time `json:"synced_at"`
+	Category       *string   `json:"category" gorm:"size:20"`
 }
 
 func (Email) TableName() string { return "emails" }
@@ -64,6 +84,7 @@ type EmailListItem struct {
 	Attachments    []EmailAttachmentMeta `json:"attachments"`
 	IsRead         bool                  `json:"is_read"`
 	ReceivedAt     time.Time             `json:"received_at"`
+	Category       *string               `json:"category"`
 }
 
 type EmailListResponse struct {

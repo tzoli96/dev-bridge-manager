@@ -1,0 +1,1 @@
+ALTER TABLE emails ADD COLUMN category VARCHAR(20);
