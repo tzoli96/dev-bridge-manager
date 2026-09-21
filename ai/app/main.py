@@ -6,6 +6,8 @@ from fastapi import FastAPI, Request
 
 import logfire
 
+from app.categorize_email import CategorizeEmailRequest, CategorizeEmailResult, categorize_email
+
 logger = logging.getLogger("devbridge_ai")
 # No observability existed before this: not one call logged its latency, and
 # a plain getLogger() without basicConfig defaults to WARNING, so info-level
@@ -43,11 +45,6 @@ async def log_request_timing(request: Request, call_next):
     return response
 
 
-# pydantic-ai reads GEMINI_API_KEY (via GOOGLE_API_KEY fallback) from the
-# environment on its own - no client object is constructed here.
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
-
-
 @app.get("/health")
 def health():
     # Liveness only - no live Gemini call on every poll (the docker-compose
@@ -57,3 +54,9 @@ def health():
     # once a feature tries to use an AI-backed endpoint.
     gemini_configured = bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"))
     return {"status": "ok", "service": "ai", "geminiConfigured": gemini_configured}
+
+
+@app.post("/categorize-email", response_model=CategorizeEmailResult)
+async def categorize_email_endpoint(payload: CategorizeEmailRequest) -> CategorizeEmailResult:
+    category = await categorize_email(payload)
+    return CategorizeEmailResult(category=category)
