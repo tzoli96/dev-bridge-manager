@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "devbridge-ai"
+version = "0.1.0"
+description = "AI service for Dev Bridge Manager"
+authors = ["Dev Bridge Manager"]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = ">=3.12,<3.14"
+fastapi = "^0.115.0"
+uvicorn = {extras = ["standard"], version = ">=0.32.0"}
+pydantic-ai = ">=1.0.0"
+logfire = {extras = ["system-metrics", "fastapi"], version = ">=3.0.0"}
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.0"
+httpx = ">=0.27.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

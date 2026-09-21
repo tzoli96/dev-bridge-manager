@@ -51,6 +51,32 @@ services:
     networks:
       - devbridge
 
+  ai:
+    build:
+      context: ..
+      dockerfile: .docker/ai.Dockerfile
+      target: development
+    container_name: devbridge_ai
+    environment:
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      # Empty locally on purpose: with no token Logfire configures to a no-op
+      # and the service makes no network call. See ai/app/main.py.
+      LOGFIRE_TOKEN: ${LOGFIRE_TOKEN:-}
+    ports:
+      - "8001:8000"
+    volumes:
+      - ../ai:/app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - devbridge
+
   adminer:
     image: adminer:latest
     container_name: devbridge_adminer
