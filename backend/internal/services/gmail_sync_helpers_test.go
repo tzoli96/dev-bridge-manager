@@ -2,6 +2,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -87,5 +88,58 @@ func TestSplitNameAddress(t *testing.T) {
 	name, addr = splitNameAddress("plain@example.com")
 	if name != "" || addr != "plain@example.com" {
 		t.Errorf("got (%q, %q), want (\"\", plain@example.com)", name, addr)
+	}
+}
+
+type fakeCategorizer struct {
+	called  bool
+	gotArgs [4]string // subject, snippet, fromAddress, fromName
+	result  *string
+	err     error
+}
+
+func (f *fakeCategorizer) Categorize(ctx context.Context, subject, snippet, fromAddress, fromName string) (*string, error) {
+	f.called = true
+	f.gotArgs = [4]string{subject, snippet, fromAddress, fromName}
+	return f.result, f.err
+}
+
+func TestCategorizeIfInboxSkipsSentFolder(t *testing.T) {
+	cat := &fakeCategorizer{}
+	meta := &GmailMessageMeta{Folder: "sent", Subject: "hi"}
+
+	got := categorizeIfInbox(context.Background(), cat, meta)
+
+	if got != nil {
+		t.Errorf("expected nil category for sent folder, got %v", got)
+	}
+	if cat.called {
+		t.Error("expected categorizer not to be called for sent folder")
+	}
+}
+
+func TestCategorizeIfInboxCallsCategorizerForInbox(t *testing.T) {
+	category := "ugyfel"
+	cat := &fakeCategorizer{result: &category}
+	meta := &GmailMessageMeta{Folder: "inbox", Subject: "hi", Snippet: "snip", FromAddress: "a@b.com", FromName: "A"}
+
+	got := categorizeIfInbox(context.Background(), cat, meta)
+
+	if got == nil || *got != "ugyfel" {
+		t.Fatalf("expected category 'ugyfel', got %v", got)
+	}
+	if cat.gotArgs != [4]string{"hi", "snip", "a@b.com", "A"} {
+		t.Errorf("categorizer called with unexpected args: %+v", cat.gotArgs)
+	}
+}
+
+func TestCategorizeIfInboxReturnsNilOnCategorizerError(t *testing.T) {
+	cat := &fakeCategorizer{err: errors.New("ai service down")}
+	meta := &GmailMessageMeta{Folder: "inbox", Subject: "hi"}
+
+	got := categorizeIfInbox(context.Background(), cat, meta)
+
+	if got != nil {
+		t.Errorf("expected nil category on categorizer error, got %v", got)
 	}
 }

@@ -22,22 +22,23 @@ const emailRetentionDays = 30
 // 3-hour cadence tolerates the occasional missed tick from a restart.
 func StartGmailSyncScheduler() {
 	api := NewRealGmailAPI()
-	RunGmailSync(api)
+	categorizer := NewEmailCategorizationService()
+	RunGmailSync(api, categorizer)
 
 	ticker := time.NewTicker(gmailSyncInterval)
 	for range ticker.C {
-		RunGmailSync(api)
+		RunGmailSync(api, categorizer)
 	}
 }
 
-func RunGmailSync(api GmailAPI) {
+func RunGmailSync(api GmailAPI, categorizer EmailCategorizer) {
 	var accounts []models.GmailAccount
 	if err := database.GetDB().Find(&accounts).Error; err != nil {
 		log.Printf("gmail sync: failed to load accounts: %v", err)
 		return
 	}
 	for i := range accounts {
-		if err := syncAccount(context.Background(), api, &accounts[i]); err != nil {
+		if err := syncAccount(context.Background(), api, &accounts[i], categorizer); err != nil {
 			log.Printf("gmail sync: account %d failed: %v", accounts[i].ID, err)
 		}
 	}
@@ -46,16 +47,16 @@ func RunGmailSync(api GmailAPI) {
 // SyncAccountNow runs a single sync pass for one account, reusing the same
 // syncAccount logic the periodic scheduler uses, so an on-demand "sync now"
 // button never diverges from the scheduled sync behavior.
-func SyncAccountNow(ctx context.Context, api GmailAPI, account *models.GmailAccount) error {
-	return syncAccount(ctx, api, account)
+func SyncAccountNow(ctx context.Context, api GmailAPI, account *models.GmailAccount, categorizer EmailCategorizer) error {
+	return syncAccount(ctx, api, account, categorizer)
 }
 
-func syncAccount(ctx context.Context, api GmailAPI, account *models.GmailAccount) error {
+func syncAccount(ctx context.Context, api GmailAPI, account *models.GmailAccount, categorizer EmailCategorizer) error {
 	db := database.GetDB()
 
 	if account.LastHistoryID == "" {
 		cutoff := time.Now().AddDate(0, 0, -gmailInitialBackfillDays)
-		if err := backfillAccount(ctx, api, db, account, cutoff); err != nil {
+		if err := backfillAccount(ctx, api, db, account, cutoff, categorizer); err != nil {
 			return recordSyncFailure(db, account, err)
 		}
 	} else {
@@ -66,14 +67,14 @@ func syncAccount(ctx context.Context, api GmailAPI, account *models.GmailAccount
 				if account.LastSyncedAt != nil {
 					cutoff = *account.LastSyncedAt
 				}
-				if err := backfillAccount(ctx, api, db, account, cutoff); err != nil {
+				if err := backfillAccount(ctx, api, db, account, cutoff, categorizer); err != nil {
 					return recordSyncFailure(db, account, err)
 				}
 			} else {
 				return recordSyncFailure(db, account, err)
 			}
 		} else {
-			if err := applyAddedMessages(ctx, api, db, account, added); err != nil {
+			if err := applyAddedMessages(ctx, api, db, account, added, categorizer); err != nil {
 				return recordSyncFailure(db, account, err)
 			}
 			if len(deleted) > 0 {
@@ -111,14 +112,14 @@ func recordSyncFailure(db *gorm.DB, account *models.GmailAccount, err error) err
 	return err
 }
 
-func backfillAccount(ctx context.Context, api GmailAPI, db *gorm.DB, account *models.GmailAccount, after time.Time) error {
+func backfillAccount(ctx context.Context, api GmailAPI, db *gorm.DB, account *models.GmailAccount, after time.Time, categorizer EmailCategorizer) error {
 	query := fmt.Sprintf("after:%d", after.Unix())
 	ids, err := api.ListMessageIDs(ctx, account, query)
 	if err != nil {
 		return err
 	}
 
-	if err := applyAddedMessages(ctx, api, db, account, ids); err != nil {
+	if err := applyAddedMessages(ctx, api, db, account, ids, categorizer); err != nil {
 		return err
 	}
 
@@ -131,7 +132,7 @@ func backfillAccount(ctx context.Context, api GmailAPI, db *gorm.DB, account *mo
 	return nil
 }
 
-func applyAddedMessages(ctx context.Context, api GmailAPI, db *gorm.DB, account *models.GmailAccount, ids []string) error {
+func applyAddedMessages(ctx context.Context, api GmailAPI, db *gorm.DB, account *models.GmailAccount, ids []string, categorizer EmailCategorizer) error {
 	if len(ids) == 0 {
 		return nil
 	}
@@ -155,6 +156,8 @@ func applyAddedMessages(ctx context.Context, api GmailAPI, db *gorm.DB, account 
 			continue // skipped: no INBOX/SENT label (see classifyFolder)
 		}
 
+		category := categorizeIfInbox(ctx, categorizer, meta)
+
 		if err := db.Create(&models.Email{
 			GmailAccountID: account.ID,
 			GmailMessageID: meta.GmailMessageID,
@@ -170,6 +173,7 @@ func applyAddedMessages(ctx context.Context, api GmailAPI, db *gorm.DB, account 
 			IsRead:         meta.IsRead,
 			ReceivedAt:     meta.ReceivedAt,
 			SyncedAt:       time.Now(),
+			Category:       category,
 		}).Error; err != nil {
 			log.Printf("gmail sync: failed to store message %s for account %d: %v", meta.GmailMessageID, account.ID, err)
 			continue

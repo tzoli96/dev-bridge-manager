@@ -81,7 +81,7 @@ func (h *GmailAuthHandler) Sync(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"success": false, "message": "Connect your Gmail account first"})
 	}
 
-	if err := services.SyncAccountNow(c.Context(), services.NewRealGmailAPI(), &account); err != nil {
+	if err := services.SyncAccountNow(c.Context(), services.NewRealGmailAPI(), &account, services.NewEmailCategorizationService()); err != nil {
 		return c.Status(502).JSON(fiber.Map{"success": false, "message": "Sync failed: " + err.Error()})
 	}
 

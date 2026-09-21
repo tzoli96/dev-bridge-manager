@@ -2,8 +2,10 @@
 package services
 
 import (
+	"context"
 	"encoding/base64"
 	"errors"
+	"log"
 	"strings"
 
 	"dev-bridge-manager/internal/models"
@@ -35,6 +37,23 @@ func classifyFolder(labelIDs []string) (folder string, ok bool) {
 	default:
 		return "", false
 	}
+}
+
+// categorizeIfInbox asks the categorizer for meta's category when meta is
+// an inbox message. On any categorizer error, or for non-inbox messages,
+// it returns nil rather than failing — the sync must not stop just because
+// the AI service is unreachable or returned something unexpected (see
+// EmailCategorizationService.Categorize's own validation).
+func categorizeIfInbox(ctx context.Context, categorizer EmailCategorizer, meta *GmailMessageMeta) *string {
+	if meta.Folder != "inbox" {
+		return nil
+	}
+	category, err := categorizer.Categorize(ctx, meta.Subject, meta.Snippet, meta.FromAddress, meta.FromName)
+	if err != nil {
+		log.Printf("gmail sync: failed to categorize message %s: %v", meta.GmailMessageID, err)
+		return nil
+	}
+	return category
 }
 
 // pendingMessageIDs returns the ids in fetched that are not already in
