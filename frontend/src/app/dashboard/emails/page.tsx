@@ -208,6 +208,7 @@ export default function EmailsPage() {
 
     const openCompose = (reply?: EmailDetail) => {
         setSendError(null)
+        setDraftError(null)
         setComposeFiles([])
         if (reply) {
             setComposeTo(reply.from || '')
@@ -295,6 +296,12 @@ export default function EmailsPage() {
             setPendingDraftText(null)
         }
     }, [composeOpen, pendingDraftText])
+
+    useEffect(() => {
+        if (!composeOpen) {
+            setPendingDraftText(null)
+        }
+    }, [composeOpen])
 
     if (loadingStatus) return <LoadingState message="Gmail állapot betöltése..." />
 

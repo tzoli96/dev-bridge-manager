@@ -4,7 +4,6 @@ package handlers
 import (
 	"dev-bridge-manager/internal/database"
 	"dev-bridge-manager/internal/models"
-	"dev-bridge-manager/internal/services"
 
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -75,16 +74,4 @@ func (h *ProfileHandler) UpdateProfile(c *fiber.Ctx) error {
 		return c.Status(500).JSON(models.ProfileResponse{Success: false, Message: "Failed to load updated profile"})
 	}
 	return c.JSON(models.ProfileResponse{Success: true, Profile: profile})
-}
-
-// GetProfileContext - GET /api/v1/internal/profile-context - called by other
-// services on the docker-internal network, not by end users; unauthenticated,
-// mirroring the AI service's own unauthenticated endpoints (network
-// isolation is the guard, same accepted risk model as ai:8000 today).
-func (h *ProfileHandler) GetProfileContext(c *fiber.Ctx) error {
-	profile, err := loadProfile(database.GetDB())
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"context": ""})
-	}
-	return c.JSON(fiber.Map{"context": services.BuildProfileContext(profile)})
 }

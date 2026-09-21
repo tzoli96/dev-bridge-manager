@@ -21,7 +21,4 @@ func SetupProfileRoutes(api fiber.Router) {
 	// profile_handler.go's doc comment for why that matters.
 	admin.Get("/profile", middleware.RequireRole("super_admin"), h.GetProfile)
 	admin.Put("/profile", middleware.RequireRole("super_admin"), h.UpdateProfile)
-
-	internal := api.Group("/internal")
-	internal.Get("/profile-context", h.GetProfileContext)
 }
