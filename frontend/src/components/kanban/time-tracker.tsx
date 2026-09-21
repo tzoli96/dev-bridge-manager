@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { useTimeEntries, useTasks } from '@/hooks/kanban';
+import { useProject } from '@/hooks/projects/use-project';
 import { formatDistanceToNow } from 'date-fns';
 import { hu } from 'date-fns/locale';
 import {
@@ -24,6 +25,8 @@ interface TimeTrackerProps {
 
 export const TimeTracker: React.FC<TimeTrackerProps> = ({ taskId }) => {
     const { projectId } = useParams<{ projectId: string }>();
+    const { project } = useProject(projectId);
+    const isHobby = project?.pricing_type === 'hobby';
     const { getTask } = useTasks(projectId);
     const {
         getEntriesByTask,
@@ -126,45 +129,51 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({ taskId }) => {
             {/* Add Time Entry */}
             <div className="bg-muted rounded-lg p-4">
                 <h4 className="font-semibold text-foreground mb-3">Log Time</h4>
-                <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
+                {isHobby ? (
+                    <p className="text-sm text-muted-foreground">
+                        Hobbi projektre nem lehet órát logolni.
+                    </p>
+                ) : (
+                    <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                            <Input
+                                label="Hours"
+                                type="number"
+                                value={newEntry.hours}
+                                onChange={(value) => setNewEntry(prev => ({
+                                    ...prev,
+                                    hours: parseFloat(value) || 0
+                                }))}
+                                placeholder="0"
+                                min="0"
+                                step="0.25"
+                            />
+                            <Input
+                                label="Date"
+                                type="date"
+                                value={newEntry.date}
+                                onChange={(value) => setNewEntry(prev => ({ ...prev, date: value }))}
+                            />
+                        </div>
+
                         <Input
-                            label="Hours"
-                            type="number"
-                            value={newEntry.hours}
-                            onChange={(value) => setNewEntry(prev => ({
-                                ...prev,
-                                hours: parseFloat(value) || 0
-                            }))}
-                            placeholder="0"
-                            min="0"
-                            step="0.25"
+                            label="Description"
+                            value={newEntry.description}
+                            onChange={(value) => setNewEntry(prev => ({ ...prev, description: value }))}
+                            placeholder="What did you work on?"
                         />
-                        <Input
-                            label="Date"
-                            type="date"
-                            value={newEntry.date}
-                            onChange={(value) => setNewEntry(prev => ({ ...prev, date: value }))}
-                        />
+
+                        <Button
+                            onClick={handleAddTimeEntry}
+                            disabled={newEntry.hours <= 0 || isLoading}
+                            loading={isLoading}
+                            icon={Plus}
+                            className="w-full"
+                        >
+                            Log Time
+                        </Button>
                     </div>
-
-                    <Input
-                        label="Description"
-                        value={newEntry.description}
-                        onChange={(value) => setNewEntry(prev => ({ ...prev, description: value }))}
-                        placeholder="What did you work on?"
-                    />
-
-                    <Button
-                        onClick={handleAddTimeEntry}
-                        disabled={newEntry.hours <= 0 || isLoading}
-                        loading={isLoading}
-                        icon={Plus}
-                        className="w-full"
-                    >
-                        Log Time
-                    </Button>
-                </div>
+                )}
             </div>
 
             {/* Time Entries List */}

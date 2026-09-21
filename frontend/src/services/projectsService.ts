@@ -16,7 +16,7 @@ export interface Project {
     name: string
     description: string
     status: 'active' | 'completed' | 'on-hold' | 'cancelled'
-    pricing_type?: 'hourly' | 'fixed' | ''
+    pricing_type?: 'hourly' | 'fixed' | 'hobby' | ''
     hourly_rate?: number | null
     fixed_price?: number | null
     auto_invoice_enabled?: boolean
@@ -33,7 +33,7 @@ export interface ProjectCreateRequest {
     name: string
     description?: string
     status?: 'active' | 'completed' | 'on-hold' | 'cancelled'
-    pricing_type?: 'hourly' | 'fixed' | ''
+    pricing_type?: 'hourly' | 'fixed' | 'hobby' | ''
     hourly_rate?: number | null
     fixed_price?: number | null
 }
@@ -42,7 +42,7 @@ export interface ProjectUpdateRequest {
     name?: string
     description?: string
     status?: 'active' | 'completed' | 'on-hold' | 'cancelled'
-    pricing_type?: 'hourly' | 'fixed' | ''
+    pricing_type?: 'hourly' | 'fixed' | 'hobby' | ''
     hourly_rate?: number | null
     fixed_price?: number | null
     auto_invoice_enabled?: boolean

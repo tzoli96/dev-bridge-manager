@@ -122,6 +122,58 @@ export interface InvoiceNoticeWithNames extends InvoiceNotice {
     billingo_invoice_number?: string
 }
 
+export interface EmailTemplate {
+    email_type: 'notice' | 'ready'
+    subject: string
+    body: string
+    is_custom: boolean
+}
+
+export interface InvoiceReadyEmail {
+    id: number
+    invoice_id: number
+    project_id: number
+    client_id: number
+    client_name: string
+    sent_by: number
+    sent_by_name: string
+    sent_at: string
+    gmail_message_id: string
+}
+
+export const EmailTemplatesService = {
+    async list(projectId: number) {
+        const response = await apiClient.get<{ success: boolean; message?: string; templates?: EmailTemplate[] }>(
+            `/projects/${projectId}/email-templates`
+        )
+        if (!response.success) {
+            throw new Error(response.message || 'Failed to fetch email templates')
+        }
+        return response.templates || []
+    },
+
+    async save(projectId: number, emailType: 'notice' | 'ready', subject: string, body: string) {
+        const response = await apiClient.put<{ success: boolean; message?: string; template: EmailTemplate }>(
+            `/projects/${projectId}/email-templates/${emailType}`,
+            { subject, body }
+        )
+        if (!response.success) {
+            throw new Error(response.message || 'Failed to save email template')
+        }
+        return response.template
+    },
+
+    async reset(projectId: number, emailType: 'notice' | 'ready') {
+        const response = await apiClient.delete<{ success: boolean; message?: string; template: EmailTemplate }>(
+            `/projects/${projectId}/email-templates/${emailType}`
+        )
+        if (!response.success) {
+            throw new Error(response.message || 'Failed to reset email template')
+        }
+        return response.template
+    },
+}
+
 export const InvoiceNoticesService = {
     async send(projectId: number, payload: { client_id: number; period_start?: string; period_end?: string }) {
         return apiClient.post<{ success: boolean; message?: string; notice?: InvoiceNotice }>(
@@ -261,6 +313,21 @@ export class InvoicesService {
         } catch (error: any) {
             console.error('Error sending invoice e-mail:', error)
             throw new Error(error.response?.data?.message || error.message || 'Failed to send invoice e-mail')
+        }
+    }
+
+    static async getInvoiceReadyEmails(projectId: number, invoiceId: number): Promise<InvoiceReadyEmail[]> {
+        try {
+            const response = await apiClient.get<{ success: boolean; message?: string; emails?: InvoiceReadyEmail[] }>(
+                `${this.baseUrl}/${projectId}/invoices/${invoiceId}/emails`
+            )
+            if (response.success) {
+                return response.emails || []
+            }
+            throw new Error(response.message || 'Failed to fetch invoice e-mail history')
+        } catch (error: any) {
+            console.error('Error fetching invoice e-mail history:', error)
+            throw new Error(error.response?.data?.message || error.message || 'Failed to fetch invoice e-mail history')
         }
     }
 

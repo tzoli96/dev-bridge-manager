@@ -90,6 +90,9 @@ func (h *InvoiceHandler) CreateInvoice(c *fiber.Ctx) error {
 	if project.PricingType == "" {
 		return c.Status(400).JSON(models.InvoiceListResponse{Success: false, Message: "Project has no pricing type configured"})
 	}
+	if project.PricingType == "hobby" {
+		return c.Status(400).JSON(models.InvoiceListResponse{Success: false, Message: "Hobbi projektre nem lehet számlázni"})
+	}
 
 	var req models.InvoiceCreateRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -474,8 +477,19 @@ func (h *InvoiceHandler) SendInvoiceEmail(c *fiber.Ctx) error {
 		return c.Status(502).JSON(fiber.Map{"success": false, "message": "Billingo error: " + err.Error()})
 	}
 
-	if err := services.SendInvoiceReadyEmail(account, client, project, invoice.BillingoInvoiceNumber, pdfBytes); err != nil {
+	gmailMessageID, err := services.SendInvoiceReadyEmail(account, client, project, invoice.BillingoInvoiceNumber, pdfBytes)
+	if err != nil {
 		return c.Status(502).JSON(fiber.Map{"success": false, "message": "Failed to send e-mail: " + err.Error()})
+	}
+	if err := database.GetDB().Create(&models.InvoiceReadyEmail{
+		InvoiceID:      invoice.ID,
+		ProjectID:      uint(projectID),
+		ClientID:       client.ID,
+		SentBy:         currentUserID,
+		SentAt:         time.Now(),
+		GmailMessageID: gmailMessageID,
+	}).Error; err != nil {
+		log.Printf("⚠️ Failed to record invoice-ready e-mail for invoice %d: %v", invoice.ID, err)
 	}
 
 	return c.JSON(fiber.Map{"success": true, "message": "E-mail elküldve"})

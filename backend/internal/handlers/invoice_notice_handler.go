@@ -51,6 +51,9 @@ func (h *InvoiceNoticeHandler) SendInvoiceNotice(c *fiber.Ctx) error {
 	if err := db.First(&project, projectID).Error; err != nil {
 		return c.Status(404).JSON(models.InvoiceNoticeResponse{Success: false, Message: "Project not found"})
 	}
+	if project.PricingType == "hobby" {
+		return c.Status(400).JSON(models.InvoiceNoticeResponse{Success: false, Message: "Hobbi projektre nem lehet számla-értesítőt küldeni"})
+	}
 
 	var projectClient models.ProjectClient
 	if err := db.Where("project_id = ? AND client_id = ?", projectID, req.ClientID).First(&projectClient).Error; err != nil {
@@ -155,6 +158,9 @@ func (h *InvoiceNoticeHandler) ApproveInvoiceNotice(c *fiber.Ctx) error {
 	}
 	if project.PricingType == "" {
 		return c.Status(400).JSON(models.InvoiceNoticeApproveResponse{Success: false, Message: "Project has no pricing type configured"})
+	}
+	if project.PricingType == "hobby" {
+		return c.Status(400).JSON(models.InvoiceNoticeApproveResponse{Success: false, Message: "Hobbi projektre nem lehet számlázni"})
 	}
 
 	var client models.Client

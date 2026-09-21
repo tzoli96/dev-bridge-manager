@@ -3,9 +3,10 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { ProjectsService, Project, ProjectClient } from '@/services/projectsService';
-import { InvoicesService, Invoice, InvoiceLineItem, InvoiceNoticesService, InvoiceNoticeWithNames } from '@/services/invoicesService';
+import { InvoicesService, Invoice, InvoiceLineItem, InvoiceNoticesService, InvoiceNoticeWithNames, InvoiceReadyEmail } from '@/services/invoicesService';
 import { Button } from '@/components/ui/button';
-import { Eye, ChevronDown, ChevronUp, ArrowUpRight, Receipt, Mail, Check } from 'lucide-react';
+import { Eye, ChevronDown, ChevronUp, ArrowUpRight, Receipt, Mail, Check, Pencil } from 'lucide-react';
+import EmailTemplatesModal from '@/components/EmailTemplatesModal';
 
 const paymentStatusInfo: Record<string, { label: string; className: string }> = {
     paid: { label: 'Kifizetve', className: 'bg-success/10 text-success' },
@@ -26,6 +27,7 @@ function AutomationRow({ project, clients }: AutomationRowProps) {
     const [autoApprove, setAutoApprove] = React.useState(project.auto_invoice_auto_approve ?? false);
     const [saving, setSaving] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
+    const [showEmailTemplates, setShowEmailTemplates] = React.useState(false);
 
     const handleToggle = async (checked: boolean) => {
         setError(null);
@@ -81,48 +83,75 @@ function AutomationRow({ project, clients }: AutomationRowProps) {
     };
 
     return (
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 py-3 border-b border-border last:border-b-0">
-            <div className="sm:w-56 flex-shrink-0">
-                <p className="text-sm font-medium text-foreground">{project.name}</p>
-                <p className="text-xs text-muted-foreground">{project.pricing_type === 'hourly' ? 'Óradíjas' : 'Fix áras'}</p>
+        <div className="py-4 border-b border-border last:border-b-0">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+                <div>
+                    <p className="text-sm font-medium text-foreground">{project.name}</p>
+                    <p className="text-xs text-muted-foreground">{project.pricing_type === 'hourly' ? 'Óradíjas' : 'Fix áras'}</p>
+                </div>
+                <label className="flex items-center gap-2 text-sm text-foreground flex-shrink-0">
+                    <input
+                        type="checkbox"
+                        checked={enabled}
+                        onChange={(e) => handleToggle(e.target.checked)}
+                        disabled={saving || clients.length === 0}
+                    />
+                    Automatikus havi értesítő
+                    {saving && <span className="text-xs text-muted-foreground font-normal">(mentés...)</span>}
+                </label>
             </div>
-            <label className="flex items-center gap-2 text-sm text-foreground">
-                <input
-                    type="checkbox"
-                    checked={enabled}
-                    onChange={(e) => handleToggle(e.target.checked)}
-                    disabled={saving || clients.length === 0}
-                />
-                Automatikus havi értesítő
-                {saving && <span className="text-xs text-muted-foreground font-normal">(mentés...)</span>}
-            </label>
-            {clients.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Nincs ügyfél a projekthez rendelve.</p>
-            ) : (
-                <select
-                    value={clientId ?? ''}
-                    onChange={(e) => handleClientChange(e.target.value ? Number(e.target.value) : null)}
-                    className="w-full sm:w-56 px-3 py-1.5 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    disabled={saving}
+
+            <div className="flex flex-wrap items-end gap-3">
+                {clients.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Nincs ügyfél a projekthez rendelve.</p>
+                ) : (
+                    <>
+                        <div className="flex flex-col gap-1">
+                            <label className="text-xs text-muted-foreground">Ügyfél</label>
+                            <select
+                                value={clientId ?? ''}
+                                onChange={(e) => handleClientChange(e.target.value ? Number(e.target.value) : null)}
+                                className="w-full sm:w-56 px-3 py-1.5 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                disabled={saving}
+                            >
+                                <option value="">Válasszon ügyfelet...</option>
+                                {clients.map((c) => (
+                                    <option key={c.client_id} value={c.client_id}>{c.client_name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        {enabled && (
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs text-muted-foreground">Jóváhagyás módja</label>
+                                <select
+                                    value={autoApprove ? 'auto' : 'manual'}
+                                    onChange={(e) => handleAutoApproveChange(e.target.value === 'auto')}
+                                    className="w-full sm:w-48 px-3 py-1.5 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                    disabled={saving}
+                                >
+                                    <option value="manual">Jóváhagyás szükséges</option>
+                                    <option value="auto">Automatikus jóváhagyás</option>
+                                </select>
+                            </div>
+                        )}
+                    </>
+                )}
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={Pencil}
+                    onClick={() => setShowEmailTemplates(true)}
                 >
-                    <option value="">Válasszon ügyfelet...</option>
-                    {clients.map((c) => (
-                        <option key={c.client_id} value={c.client_id}>{c.client_name}</option>
-                    ))}
-                </select>
-            )}
-            {enabled && (
-                <select
-                    value={autoApprove ? 'auto' : 'manual'}
-                    onChange={(e) => handleAutoApproveChange(e.target.value === 'auto')}
-                    className="w-full sm:w-48 px-3 py-1.5 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    disabled={saving}
-                >
-                    <option value="manual">Jóváhagyás szükséges</option>
-                    <option value="auto">Automatikus jóváhagyás</option>
-                </select>
-            )}
-            {error && <p className="text-xs text-destructive">{error}</p>}
+                    E-mail sablonok
+                </Button>
+            </div>
+            {error && <p className="text-xs text-destructive mt-2">{error}</p>}
+            <EmailTemplatesModal
+                isOpen={showEmailTemplates}
+                onClose={() => setShowEmailTemplates(false)}
+                projectId={project.id}
+                projectName={project.name}
+            />
         </div>
     );
 }
@@ -144,6 +173,8 @@ export default function BillingPage() {
     const [expandedInvoiceId, setExpandedInvoiceId] = React.useState<number | null>(null);
     const [breakdowns, setBreakdowns] = React.useState<Record<number, InvoiceLineItem[]>>({});
     const [breakdownLoading, setBreakdownLoading] = React.useState<number | null>(null);
+    const [emailHistory, setEmailHistory] = React.useState<Record<number, InvoiceReadyEmail[]>>({});
+    const [emailHistoryLoading, setEmailHistoryLoading] = React.useState<number | null>(null);
 
     const [notices, setNotices] = React.useState<InvoiceNoticeWithNames[]>([]);
     const [noticeFilter, setNoticeFilter] = React.useState<'pending' | 'approved' | 'all'>('pending');
@@ -188,7 +219,7 @@ export default function BillingPage() {
         ProjectsService.getAllProjects()
             .then(async (allProjects) => {
                 setProjects(allProjects);
-                const billable = allProjects.filter((p) => p.pricing_type);
+                const billable = allProjects.filter((p) => p.pricing_type === 'hourly' || p.pricing_type === 'fixed');
                 const clientLists = await Promise.all(
                     billable.map((p) => ProjectsService.getProjectClients(p.id).catch(() => []))
                 );
@@ -253,9 +284,20 @@ export default function BillingPage() {
                 setBreakdownLoading(null);
             }
         }
+        if (invoice.status === 'created' && !emailHistory[invoice.id]) {
+            try {
+                setEmailHistoryLoading(invoice.id);
+                const emails = await InvoicesService.getInvoiceReadyEmails(invoice.project_id, invoice.id);
+                setEmailHistory((prev) => ({ ...prev, [invoice.id]: emails }));
+            } catch (error) {
+                console.error('Error loading invoice e-mail history:', error);
+            } finally {
+                setEmailHistoryLoading(null);
+            }
+        }
     };
 
-    const billableProjects = projects.filter((p) => p.pricing_type);
+    const billableProjects = projects.filter((p) => p.pricing_type === 'hourly' || p.pricing_type === 'fixed');
 
     return (
         <div className="p-6 max-w-6xl space-y-8">
@@ -265,7 +307,69 @@ export default function BillingPage() {
             </div>
 
             <div>
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center justify-between mb-1">
+                    <h2 className="text-lg font-semibold text-foreground">Számla-értesítők</h2>
+                    <select
+                        value={noticeFilter}
+                        onChange={(e) => setNoticeFilter(e.target.value as 'pending' | 'approved' | 'all')}
+                        className="px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                        <option value="pending">Jóváhagyásra vár</option>
+                        <option value="approved">Jóváhagyva</option>
+                        <option value="all">Összes</option>
+                    </select>
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">
+                    Ezek az e-mailek a tényleges számla kiállítása előtt mennek ki az ügyfélnek. Jóváhagyás után jön létre a számla, és megy ki a végleges e-mail.
+                </p>
+                {noticeApprovalError && (
+                    <div className="bg-destructive/10 border border-destructive/20 text-destructive px-3 py-2 rounded text-sm mb-3">
+                        {noticeApprovalError}
+                    </div>
+                )}
+                {loadingNotices ? (
+                    <div className="flex items-center justify-center h-20">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                    </div>
+                ) : notices.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Nincs megjeleníthető értesítő.</p>
+                ) : (
+                    <div className="bg-card border border-border rounded-lg divide-y divide-border">
+                        {notices.map((notice) => (
+                            <div key={notice.id} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 px-4 py-3">
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-foreground">
+                                        {notice.project_name}
+                                        {' · '}
+                                        {notice.client_name}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {notice.period_start && notice.period_end ? `${notice.period_start} – ${notice.period_end} · ` : ''}
+                                        {'elküldve: '}{new Date(notice.sent_at).toLocaleString('hu-HU')}
+                                        {notice.status === 'approved' && notice.billingo_invoice_number ? ` · számla: ${notice.billingo_invoice_number}` : ''}
+                                    </p>
+                                </div>
+                                {notice.status === 'approved' ? (
+                                    <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-success/10 text-success flex-shrink-0">
+                                        Jóváhagyva
+                                    </span>
+                                ) : (
+                                    <Button
+                                        size="sm"
+                                        loading={approvingNoticeId === notice.id}
+                                        onClick={() => handleApproveNotice(notice)}
+                                    >
+                                        Jóváhagyás
+                                    </Button>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            <div>
+                <div className="flex items-center justify-between mb-1">
                     <h2 className="text-lg font-semibold text-foreground">Számlák</h2>
                     <select
                         value={selectedProjectId}
@@ -279,6 +383,7 @@ export default function BillingPage() {
                         ))}
                     </select>
                 </div>
+                <p className="text-xs text-muted-foreground mb-3">Minden kiállított (vagy sikertelen) számla, projektenkénti szűréssel.</p>
 
                 {invoicesError && (
                     <div className="bg-destructive/10 border border-destructive/20 text-destructive px-3 py-2 rounded text-sm mb-3">
@@ -309,9 +414,7 @@ export default function BillingPage() {
                                     <th className="px-4 py-2 font-medium">Állapot</th>
                                     <th className="px-4 py-2 font-medium">Esedékesség</th>
                                     <th className="px-4 py-2 font-medium">Kiállítva</th>
-                                    <th className="px-4 py-2 font-medium w-10" />
-                                    <th className="px-4 py-2 font-medium w-10" />
-                                    <th className="px-4 py-2 font-medium w-10" />
+                                    <th className="px-4 py-2 font-medium text-center" colSpan={3}>Műveletek</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
@@ -319,7 +422,7 @@ export default function BillingPage() {
                                     const isHourlyInvoice = invoice.pricing_type === 'hourly';
                                     const extraItems = (invoice.items || []).filter((it) => !it.is_base);
                                     const isExpanded = expandedInvoiceId === invoice.id;
-                                    const hasExpandable = isHourlyInvoice || extraItems.length > 0;
+                                    const hasExpandable = isHourlyInvoice || extraItems.length > 0 || invoice.status === 'created';
                                     return (
                                     <React.Fragment key={invoice.id}>
                                     <tr>
@@ -444,6 +547,30 @@ export default function BillingPage() {
                                                             )}
                                                         </div>
                                                     )}
+
+                                                    {invoice.status === 'created' && (
+                                                        <div>
+                                                            <div className="text-xs font-medium text-foreground mb-1.5 flex items-center gap-1">
+                                                                <Mail size={12} /> E-mail történet
+                                                            </div>
+                                                            {emailHistoryLoading === invoice.id ? (
+                                                                <p className="text-xs text-muted-foreground">Betöltés...</p>
+                                                            ) : (emailHistory[invoice.id] || []).length === 0 ? (
+                                                                <p className="text-xs text-muted-foreground">Még nem ment ki e-mail ehhez a számlához.</p>
+                                                            ) : (
+                                                                <div className="space-y-1">
+                                                                    {(emailHistory[invoice.id] || []).map((email) => (
+                                                                        <div key={email.id} className="flex items-center justify-between text-xs text-muted-foreground">
+                                                                            <span className="truncate">Kész számla e-mail → {email.client_name}</span>
+                                                                            <span className="flex-shrink-0 text-foreground">
+                                                                                {new Date(email.sent_at).toLocaleString('hu-HU')} · {email.sent_by_name}
+                                                                            </span>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -458,66 +585,10 @@ export default function BillingPage() {
             </div>
 
             <div>
-                <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-lg font-semibold text-foreground">Számla-értesítők</h2>
-                    <select
-                        value={noticeFilter}
-                        onChange={(e) => setNoticeFilter(e.target.value as 'pending' | 'approved' | 'all')}
-                        className="px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    >
-                        <option value="pending">Jóváhagyásra vár</option>
-                        <option value="approved">Jóváhagyva</option>
-                        <option value="all">Összes</option>
-                    </select>
-                </div>
-                {noticeApprovalError && (
-                    <div className="bg-destructive/10 border border-destructive/20 text-destructive px-3 py-2 rounded text-sm mb-3">
-                        {noticeApprovalError}
-                    </div>
-                )}
-                {loadingNotices ? (
-                    <div className="flex items-center justify-center h-20">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                    </div>
-                ) : notices.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Nincs megjeleníthető értesítő.</p>
-                ) : (
-                    <div className="bg-card border border-border rounded-lg divide-y divide-border">
-                        {notices.map((notice) => (
-                            <div key={notice.id} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 px-4 py-3">
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-foreground">
-                                        {notice.project_name}
-                                        {' · '}
-                                        {notice.client_name}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                        {notice.period_start && notice.period_end ? `${notice.period_start} – ${notice.period_end} · ` : ''}
-                                        {'elküldve: '}{new Date(notice.sent_at).toLocaleString('hu-HU')}
-                                        {notice.status === 'approved' && notice.billingo_invoice_number ? ` · számla: ${notice.billingo_invoice_number}` : ''}
-                                    </p>
-                                </div>
-                                {notice.status === 'approved' ? (
-                                    <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-success/10 text-success flex-shrink-0">
-                                        Jóváhagyva
-                                    </span>
-                                ) : (
-                                    <Button
-                                        size="sm"
-                                        loading={approvingNoticeId === notice.id}
-                                        onClick={() => handleApproveNotice(notice)}
-                                    >
-                                        Jóváhagyás
-                                    </Button>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-
-            <div>
-                <h2 className="text-lg font-semibold text-foreground mb-3">Automatikus havi értesítő</h2>
+                <h2 className="text-lg font-semibold text-foreground mb-1">Automatikus havi értesítő</h2>
+                <p className="text-xs text-muted-foreground mb-3">
+                    Projektenként állítható be, hogy induljon-e automatikus havi értesítő, kinek menjen, és kell-e hozzá kézi jóváhagyás.
+                </p>
                 {loadingProjects ? (
                     <div className="flex items-center justify-center h-32">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>

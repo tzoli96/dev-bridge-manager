@@ -18,12 +18,15 @@ const statusStyles: Record<string, string> = {
     cancelled: 'bg-muted text-muted-foreground',
 }
 
-function formatPricing(project: { pricing_type?: 'hourly' | 'fixed' | ''; hourly_rate?: number | null; fixed_price?: number | null }): string {
+function formatPricing(project: { pricing_type?: 'hourly' | 'fixed' | 'hobby' | ''; hourly_rate?: number | null; fixed_price?: number | null }): string {
     if (project.pricing_type === 'hourly' && project.hourly_rate) {
         return `${project.hourly_rate.toLocaleString()} HUF/hr`
     }
     if (project.pricing_type === 'fixed' && project.fixed_price) {
         return `${project.fixed_price.toLocaleString()} HUF fixed`
+    }
+    if (project.pricing_type === 'hobby') {
+        return 'Hobbi projekt'
     }
     return '-'
 }

@@ -9,7 +9,7 @@ type Project struct {
 	Name        string   `json:"name" gorm:"not null" validate:"required,min=1,max=255"`
 	Description string   `json:"description" gorm:"type:text"`
 	Status      string   `json:"status" gorm:"default:active" validate:"oneof=active completed on-hold cancelled"`
-	PricingType string   `json:"pricing_type" validate:"omitempty,oneof=hourly fixed"`
+	PricingType string   `json:"pricing_type" validate:"omitempty,oneof=hourly fixed hobby"`
 	HourlyRate  *float64 `json:"hourly_rate"`
 	FixedPrice  *float64 `json:"fixed_price"`
 	// AutoInvoiceEnabled/AutoInvoiceClientID configure unattended monthly
@@ -39,7 +39,7 @@ type ProjectCreateRequest struct {
 	Name        string   `json:"name" validate:"required,min=1,max=255"`
 	Description string   `json:"description"`
 	Status      string   `json:"status" validate:"omitempty,oneof=active completed on-hold cancelled"`
-	PricingType string   `json:"pricing_type" validate:"omitempty,oneof=hourly fixed"`
+	PricingType string   `json:"pricing_type" validate:"omitempty,oneof=hourly fixed hobby"`
 	HourlyRate  *float64 `json:"hourly_rate"`
 	FixedPrice  *float64 `json:"fixed_price"`
 }
@@ -48,7 +48,7 @@ type ProjectUpdateRequest struct {
 	Name        string   `json:"name" validate:"omitempty,min=1,max=255"`
 	Description string   `json:"description"`
 	Status      string   `json:"status" validate:"omitempty,oneof=active completed on-hold cancelled"`
-	PricingType string   `json:"pricing_type" validate:"omitempty,oneof=hourly fixed"`
+	PricingType string   `json:"pricing_type" validate:"omitempty,oneof=hourly fixed hobby"`
 	HourlyRate  *float64 `json:"hourly_rate"`
 	FixedPrice  *float64 `json:"fixed_price"`
 	// AutoInvoiceEnabled is a pointer so "not present in the request" (leave

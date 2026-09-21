@@ -11,6 +11,7 @@ import (
 func SetupInvoiceRoutes(api fiber.Router) {
 	invoiceHandler := handlers.NewInvoiceHandler()
 	noticeHandler := handlers.NewInvoiceNoticeHandler()
+	emailTemplateHandler := handlers.NewEmailTemplateHandler()
 
 	projects := api.Group("/projects")
 	projects.Use(middleware.JWTMiddleware())
@@ -42,6 +43,16 @@ func SetupInvoiceRoutes(api fiber.Router) {
 
 	// POST /api/v1/projects/:id/invoices/refresh-payment-status - Fizetettség frissítése Billingóból
 	projects.Post("/:id/invoices/refresh-payment-status", invoiceHandler.RefreshPaymentStatuses)
+
+	// GET /api/v1/projects/:id/invoices/:invoiceId/emails - Kiküldött "kész számla" e-mailek előzménye
+	projects.Get("/:id/invoices/:invoiceId/emails", emailTemplateHandler.GetInvoiceReadyEmails)
+
+	// GET /api/v1/projects/:id/email-templates - Értesítő/kész számla e-mail sablonok lekérése
+	projects.Get("/:id/email-templates", emailTemplateHandler.GetEmailTemplates)
+	// PUT /api/v1/projects/:id/email-templates/:type - Egyedi sablon mentése
+	projects.Put("/:id/email-templates/:type", emailTemplateHandler.SaveEmailTemplate)
+	// DELETE /api/v1/projects/:id/email-templates/:type - Alapértelmezett sablon visszaállítása
+	projects.Delete("/:id/email-templates/:type", emailTemplateHandler.DeleteEmailTemplate)
 
 	clients := api.Group("/clients")
 	clients.Use(middleware.JWTMiddleware())

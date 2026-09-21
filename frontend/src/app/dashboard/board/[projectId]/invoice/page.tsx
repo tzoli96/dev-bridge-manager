@@ -708,7 +708,7 @@ export default function InvoicePreviewPage() {
                             icon={FileText}
                             className="w-full"
                             loading={submitting}
-                            disabled={!project?.pricing_type || clients.length === 0}
+                            disabled={!(project?.pricing_type === 'hourly' || project?.pricing_type === 'fixed') || clients.length === 0}
                             onClick={handleSubmit}
                         >
                             Számla kiállítása

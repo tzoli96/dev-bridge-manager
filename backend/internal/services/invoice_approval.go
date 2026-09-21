@@ -106,10 +106,21 @@ func ApproveInvoiceNotice(notice models.InvoiceNotice, project models.Project, c
 		result.Warning = "A számla elkészült, de a PDF letöltése sikertelen — kérlek küldd el manuálisan."
 		return result, 0, ""
 	}
-	if err := SendInvoiceReadyEmail(account, client, project, invoice.BillingoInvoiceNumber, pdfBytes); err != nil {
+	gmailMessageID, err := SendInvoiceReadyEmail(account, client, project, invoice.BillingoInvoiceNumber, pdfBytes)
+	if err != nil {
 		log.Printf("⚠️ Failed to send invoice-ready e-mail for invoice %d: %v", invoice.ID, err)
 		result.Warning = "A számla elkészült, de a PDF-es e-mail küldése sikertelen — kérlek küldd el manuálisan."
 		return result, 0, ""
+	}
+	if err := db.Create(&models.InvoiceReadyEmail{
+		InvoiceID:      invoice.ID,
+		ProjectID:      project.ID,
+		ClientID:       client.ID,
+		SentBy:         approvedBy,
+		SentAt:         time.Now(),
+		GmailMessageID: gmailMessageID,
+	}).Error; err != nil {
+		log.Printf("⚠️ Failed to record invoice-ready e-mail for invoice %d: %v", invoice.ID, err)
 	}
 	result.EmailSent = true
 	return result, 0, ""

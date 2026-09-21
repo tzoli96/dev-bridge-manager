@@ -84,6 +84,11 @@ func (h *TaskTimeEntryHandler) CreateTimeEntry(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"success": false, "message": "Invalid date"})
 	}
 
+	var project models.Project
+	if err := database.GetDB().Select("pricing_type").First(&project, taskProjectID(uint(taskID))).Error; err == nil && project.PricingType == "hobby" {
+		return c.Status(400).JSON(fiber.Map{"success": false, "message": "Hobbi projektre nem lehet órát logolni"})
+	}
+
 	entry := models.TaskTimeEntry{
 		TaskID:      uint(taskID),
 		UserID:      currentUserID(c),

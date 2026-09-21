@@ -56,8 +56,8 @@ func validateProjectPricing(pricingType string, hourlyRate, fixedPrice *float64)
 	if pricingType == "" {
 		return nil
 	}
-	if pricingType != "hourly" && pricingType != "fixed" {
-		return fiber.NewError(400, "Pricing type must be one of: hourly, fixed")
+	if pricingType != "hourly" && pricingType != "fixed" && pricingType != "hobby" {
+		return fiber.NewError(400, "Pricing type must be one of: hourly, fixed, hobby")
 	}
 	if pricingType == "hourly" && (hourlyRate == nil || *hourlyRate <= 0) {
 		return fiber.NewError(400, "Hourly rate is required and must be greater than 0 for hourly pricing")

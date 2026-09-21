@@ -209,6 +209,15 @@ export default function EditProjectModal({ isOpen, project, onClose, onSuccess }
                                 />
                                 Fixed Price
                             </label>
+                            <label className="flex items-center gap-2 text-sm">
+                                <input
+                                    type="radio"
+                                    checked={formData.pricing_type === 'hobby'}
+                                    onChange={() => setFormData(prev => ({ ...prev, pricing_type: 'hobby', hourly_rate: null, fixed_price: null }))}
+                                    disabled={loading}
+                                />
+                                Hobbi projekt
+                            </label>
                             {formData.pricing_type && (
                                 <button
                                     type="button"
@@ -243,6 +252,11 @@ export default function EditProjectModal({ isOpen, project, onClose, onSuccess }
                                 className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
                                 disabled={loading}
                             />
+                        )}
+                        {formData.pricing_type === 'hobby' && (
+                            <p className="text-xs text-muted-foreground">
+                                Hobbi projektre nem lehet órát logolni és nem lehet számlázni.
+                            </p>
                         )}
                     </div>
 

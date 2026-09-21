@@ -155,7 +155,9 @@ export default function BoardsListPage() {
                             <p className="text-sm text-muted-foreground">
                                 {project.pricing_type === 'hourly'
                                     ? `Óradíjas — ${project.hourly_rate} HUF/óra`
-                                    : `Fix áras — ${project.fixed_price} HUF`}
+                                    : project.pricing_type === 'fixed'
+                                        ? `Fix áras — ${project.fixed_price} HUF`
+                                        : 'Hobbi projekt'}
                             </p>
                             {project.auto_invoice_enabled && (
                                 <span
@@ -178,7 +180,7 @@ export default function BoardsListPage() {
                             Áttekintés
                         </Button>
                     )}
-                    {project?.pricing_type && hasPermission(user, 'invoices.create') && (
+                    {(project?.pricing_type === 'hourly' || project?.pricing_type === 'fixed') && hasPermission(user, 'invoices.create') && (
                         <Button icon={FileText} onClick={() => router.push(`/dashboard/board/${projectId}/invoice`)}>
                             Számla kiállítása
                         </Button>

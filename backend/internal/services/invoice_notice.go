@@ -13,7 +13,7 @@ import (
 // BuildInvoiceNoticeText composes the Hungarian subject/body for the
 // pre-invoice notice e-mail. Pure function so it can be unit-tested without a
 // fake Gmail server.
-func BuildInvoiceNoticeText(clientName, projectName string, periodStart, periodEnd *time.Time) (subject, body string) {
+func BuildInvoiceNoticeText(clientName, projectName string, periodStart, periodEnd *time.Time, draftSummary string) (subject, body string) {
 	periodText := ""
 	if periodStart != nil && periodEnd != nil {
 		periodText = fmt.Sprintf(" a %s - %s időszakra vonatkozóan", periodStart.Format("2006.01.02"), periodEnd.Format("2006.01.02"))
@@ -23,6 +23,9 @@ func BuildInvoiceNoticeText(clientName, projectName string, periodStart, periodE
 		"Kedves %s!\n\nÉrtesítjük, hogy hamarosan számlát állítunk ki a(z) \"%s\" projekt kapcsán%s.\n\nÜdvözlettel",
 		clientName, projectName, periodText,
 	)
+	if draftSummary != "" {
+		body += "\n\n" + draftSummary
+	}
 	return subject, body
 }
 
@@ -34,7 +37,8 @@ func BuildInvoiceNoticeText(clientName, projectName string, periodStart, periodE
 // account/sentBy are passed in explicitly rather than read from request
 // context.
 func SendInvoiceNoticeEmail(project models.Project, client models.Client, account models.GmailAccount, periodStart, periodEnd *time.Time, sentBy uint) (*models.InvoiceNotice, error) {
-	subject, body := BuildInvoiceNoticeText(client.Name, project.Name, periodStart, periodEnd)
+	draftSummary := BuildInvoiceDraftSummary(project, periodStart, periodEnd)
+	subject, body := GetInvoiceNoticeText(project.ID, client.Name, project.Name, periodStart, periodEnd, draftSummary)
 	raw := BuildRawMessage(account.EmailAddress, client.Email, subject, body, "", "", "", nil)
 	gmailMessageID, err := NewRealGmailAPI().SendMessage(context.Background(), &account, raw)
 	if err != nil {
@@ -57,22 +61,31 @@ func SendInvoiceNoticeEmail(project models.Project, client models.Client, accoun
 	return &notice, nil
 }
 
+// BuildInvoiceReadyText composes the Hungarian subject/body for the
+// invoice-ready e-mail. Pure function so it can be unit-tested without a
+// fake Gmail server.
+func BuildInvoiceReadyText(clientName, projectName, invoiceNumber string) (subject, body string) {
+	subject = fmt.Sprintf("Számla - %s", projectName)
+	body = fmt.Sprintf(
+		"Kedves %s!\n\nMellékelten küldjük a(z) \"%s\" projekt %s számú számláját.\n\nÜdvözlettel",
+		clientName, projectName, invoiceNumber,
+	)
+	return subject, body
+}
+
 // SendInvoiceReadyEmail notifies the client that their invoice has been
 // issued, with the Billingo PDF attached. Sent automatically right after
 // ApproveInvoiceNotice creates the invoice, and also available as a manual
 // (re-)send via InvoiceHandler.SendInvoiceEmail for any created invoice.
-func SendInvoiceReadyEmail(account models.GmailAccount, client models.Client, project models.Project, invoiceNumber string, pdfBytes []byte) error {
-	subject := fmt.Sprintf("Számla - %s", project.Name)
-	body := fmt.Sprintf(
-		"Kedves %s!\n\nMellékelten küldjük a(z) \"%s\" projekt %s számú számláját.\n\nÜdvözlettel",
-		client.Name, project.Name, invoiceNumber,
-	)
+// Returns the Gmail message id of the sent e-mail so callers can persist it
+// to invoice_ready_emails.
+func SendInvoiceReadyEmail(account models.GmailAccount, client models.Client, project models.Project, invoiceNumber string, pdfBytes []byte) (string, error) {
+	subject, body := GetInvoiceReadyText(project.ID, client.Name, project.Name, invoiceNumber)
 	attachments := []MessageAttachment{{
 		Filename:    invoiceNumber + ".pdf",
 		ContentType: "application/pdf",
 		Data:        pdfBytes,
 	}}
 	raw := BuildRawMessage(account.EmailAddress, client.Email, subject, body, "", "", "", attachments)
-	_, err := NewRealGmailAPI().SendMessage(context.Background(), &account, raw)
-	return err
+	return NewRealGmailAPI().SendMessage(context.Background(), &account, raw)
 }
