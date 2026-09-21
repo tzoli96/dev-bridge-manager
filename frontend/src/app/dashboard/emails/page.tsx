@@ -114,6 +114,18 @@ export default function EmailsPage() {
     const [syncError, setSyncError] = useState<string | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const composeEditorRef = useRef<ComposeEditorHandle>(null)
+    // Async draft requests read these refs after an `await`, when state
+    // variables captured in the closure may be stale - see handleDraftReply.
+    const composeOpenRef = useRef(composeOpen)
+    const replyToIdRef = useRef(replyToId)
+
+    useEffect(() => {
+        composeOpenRef.current = composeOpen
+    }, [composeOpen])
+
+    useEffect(() => {
+        replyToIdRef.current = replyToId
+    }, [replyToId])
 
     useEffect(() => {
         GmailService.getStatus()
@@ -224,18 +236,27 @@ export default function EmailsPage() {
 
     const handleDraftReply = async () => {
         if (!selected?.id) return
+        const targetEmailId = selected.id
         setDraftError(null)
         openCompose(selected)
         try {
             setDraftingReply(true)
-            const res = await EmailsService.draftReply(selected.id)
+            const res = await EmailsService.draftReply(targetEmailId)
+            // The compose modal may have been closed, or switched to a
+            // different email, while this request was in flight - discard
+            // the result rather than injecting a stale draft.
+            if (!composeOpenRef.current || replyToIdRef.current !== targetEmailId) {
+                return
+            }
             if (!res.success || !res.draft) {
                 setDraftError(res.message || 'Nem sikerült javaslatot generálni.')
                 return
             }
             setPendingDraftText(res.draft)
         } catch (err: any) {
-            setDraftError(err.message)
+            if (composeOpenRef.current && replyToIdRef.current === targetEmailId) {
+                setDraftError(err.message)
+            }
         } finally {
             setDraftingReply(false)
         }
