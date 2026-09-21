@@ -33,6 +33,10 @@ func currentGmailAccount(userID uint) (*models.GmailAccount, error) {
 	return &account, nil
 }
 
+func isValidEmailCategory(category string) bool {
+	return models.ValidEmailCategories[category]
+}
+
 // ListEmails - GET /api/v1/emails?folder=inbox|sent&page=
 func (h *EmailHandler) ListEmails(c *fiber.Ctx) error {
 	userID := c.Locals("userID").(uint)
@@ -46,6 +50,11 @@ func (h *EmailHandler) ListEmails(c *fiber.Ctx) error {
 		return c.Status(400).JSON(models.EmailListResponse{Success: false, Message: "folder must be 'inbox' or 'sent'"})
 	}
 
+	category := c.Query("category")
+	if category != "" && !isValidEmailCategory(category) {
+		return c.Status(400).JSON(models.EmailListResponse{Success: false, Message: "invalid category"})
+	}
+
 	page, _ := strconv.Atoi(c.Query("page", "1"))
 	if page < 1 {
 		page = 1
@@ -54,6 +63,9 @@ func (h *EmailHandler) ListEmails(c *fiber.Ctx) error {
 
 	var total int64
 	db := database.GetDB().Model(&models.Email{}).Where("gmail_account_id = ? AND folder = ?", account.ID, folder)
+	if category != "" {
+		db = db.Where("category = ?", category)
+	}
 	db.Count(&total)
 
 	var rows []models.Email
@@ -73,6 +85,7 @@ func (h *EmailHandler) ListEmails(c *fiber.Ctx) error {
 			Attachments:    e.Attachments(),
 			IsRead:         e.IsRead,
 			ReceivedAt:     e.ReceivedAt,
+			Category:       e.Category,
 		})
 	}
 
