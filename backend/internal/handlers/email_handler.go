@@ -42,6 +42,25 @@ func isValidEmailCategory(category string) bool {
 	return models.ValidEmailCategories[category]
 }
 
+const snippetMaxLen = 200
+
+// generateSnippet derives a Gmail-style preview snippet from a plain-text
+// body: whitespace-collapsed, cut to roughly the first 200 characters at a
+// word boundary. Used to backfill the sent-mirror row's snippet, which the
+// incremental Gmail sync (gmail_sync.go) never revisits once a
+// gmail_message_id is known.
+func generateSnippet(body string) string {
+	joined := strings.Join(strings.Fields(body), " ")
+	if len(joined) <= snippetMaxLen {
+		return joined
+	}
+	cut := joined[:snippetMaxLen]
+	if idx := strings.LastIndex(cut, " "); idx > 0 {
+		cut = cut[:idx]
+	}
+	return cut
+}
+
 // ListEmails - GET /api/v1/emails?folder=inbox|sent&page=
 func (h *EmailHandler) ListEmails(c *fiber.Ctx) error {
 	userID := c.Locals("userID").(uint)
@@ -338,7 +357,7 @@ func (h *EmailHandler) SendEmail(c *fiber.Ctx) error {
 		FromAddress:    account.EmailAddress,
 		ToAddresses:    to,
 		Subject:        subject,
-		Snippet:        "",
+		Snippet:        generateSnippet(body),
 		HasAttachments: len(attachments) > 0,
 		AttachmentMeta: models.AttachmentMetaToJSON(attachmentMetas),
 		IsRead:         true,
