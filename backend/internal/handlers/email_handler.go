@@ -274,8 +274,10 @@ func (h *EmailHandler) GetAttachment(c *fiber.Ctx) error {
 
 // SendEmail - POST /api/v1/emails/send - új levél vagy válasz küldése
 // multipart/form-data: mezők "to", "subject", "body", opcionális
-// "in_reply_to_email_id", és opcionális "files" (max maxAttachmentCount db,
-// max maxAttachmentSize/fájl, csak allowedAttachmentMimeTypes típusok).
+// "in_reply_to_email_id", opcionális "ai_draft_text" (ha a compose egy AI
+// válasz-javaslatból indult, visszacsatolás-méréshez), és opcionális
+// "files" (max maxAttachmentCount db, max maxAttachmentSize/fájl, csak
+// allowedAttachmentMimeTypes típusok).
 func (h *EmailHandler) SendEmail(c *fiber.Ctx) error {
 	userID := c.Locals("userID").(uint)
 	account, err := currentGmailAccount(userID)
@@ -287,6 +289,7 @@ func (h *EmailHandler) SendEmail(c *fiber.Ctx) error {
 	subject := c.FormValue("subject")
 	body := c.FormValue("body")
 	bodyHTML := c.FormValue("body_html")
+	aiDraftText := c.FormValue("ai_draft_text")
 	if to == "" || subject == "" {
 		return c.Status(400).JSON(models.EmailSendResponse{Success: false, Message: "to and subject are required"})
 	}
@@ -368,6 +371,17 @@ func (h *EmailHandler) SendEmail(c *fiber.Ctx) error {
 	}
 	if err := database.GetDB().Create(&localEmail).Error; err != nil {
 		log.Printf("email send: failed to mirror sent message %s locally: %v", gmailMessageID, err)
+	} else if strings.TrimSpace(aiDraftText) != "" {
+		similarity := services.JaccardSimilarity(aiDraftText, body)
+		feedback := models.DraftFeedback{
+			EmailID:     localEmail.ID,
+			AIDraftText: aiDraftText,
+			SentText:    body,
+			Similarity:  similarity,
+		}
+		if err := database.GetDB().Create(&feedback).Error; err != nil {
+			log.Printf("email send: failed to log draft feedback for email %d: %v", localEmail.ID, err)
+		}
 	}
 
 	return c.JSON(models.EmailSendResponse{Success: true, GmailMessageID: gmailMessageID})
