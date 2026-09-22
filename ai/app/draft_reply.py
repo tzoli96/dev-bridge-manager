@@ -12,6 +12,7 @@ GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 class DraftReplyRequest(BaseModel):
     email_content: str
     profile_context: str = ""
+    similar_replies: list[str] = []
 
 
 class DraftReplyResult(BaseModel):
@@ -33,7 +34,7 @@ draft_reply_agent = Agent(
 )
 
 
-async def draft_reply(req: DraftReplyRequest) -> str:
+def _build_prompt(req: DraftReplyRequest) -> str:
     prompt_parts = []
     if req.profile_context.strip():
         prompt_parts.append(
@@ -42,7 +43,16 @@ async def draft_reply(req: DraftReplyRequest) -> str:
             "stílusát, az írásmintákat pedig hangnem-referenciaként "
             "használd.\n\n" + req.profile_context
         )
+    if req.similar_replies:
+        examples = "\n---\n".join(req.similar_replies)
+        prompt_parts.append(
+            "Az alábbi, korábban általad írt, hasonló témájú/címzettnek "
+            "szóló válaszok stílusát is vedd figyelembe:\n\n---\n" + examples
+        )
     prompt_parts.append(f"Beérkező email:\n{req.email_content}")
+    return "\n\n".join(prompt_parts)
 
-    result = await draft_reply_agent.run("\n\n".join(prompt_parts))
+
+async def draft_reply(req: DraftReplyRequest) -> str:
+    result = await draft_reply_agent.run(_build_prompt(req))
     return result.output.draft
