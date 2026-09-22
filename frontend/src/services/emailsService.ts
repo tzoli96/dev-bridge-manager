@@ -49,6 +49,7 @@ export interface SendEmailRequest {
     body: string
     body_html?: string
     in_reply_to_email_id?: number
+    ai_draft_text?: string
     files?: File[]
 }
 
@@ -93,6 +94,9 @@ export const EmailsService = {
         }
         if (payload.in_reply_to_email_id !== undefined) {
             extraFields.in_reply_to_email_id = String(payload.in_reply_to_email_id)
+        }
+        if (payload.ai_draft_text) {
+            extraFields.ai_draft_text = payload.ai_draft_text
         }
         return apiClient.uploadFiles('/emails/send', payload.files || [], extraFields)
     },

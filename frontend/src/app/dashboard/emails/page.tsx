@@ -110,6 +110,7 @@ export default function EmailsPage() {
     const [draftingReply, setDraftingReply] = useState(false)
     const [draftError, setDraftError] = useState<string | null>(null)
     const [pendingDraftText, setPendingDraftText] = useState<string | null>(null)
+    const [aiDraftOriginalText, setAiDraftOriginalText] = useState<string | null>(null)
     const [syncing, setSyncing] = useState(false)
     const [syncError, setSyncError] = useState<string | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
@@ -222,6 +223,7 @@ export default function EmailsPage() {
         setSendError(null)
         setDraftError(null)
         setComposeFiles([])
+        setAiDraftOriginalText(null)
         if (reply) {
             setComposeTo(reply.from || '')
             setComposeSubject(reply.subject?.startsWith('Re:') ? reply.subject : `Re: ${reply.subject || ''}`)
@@ -253,6 +255,7 @@ export default function EmailsPage() {
                 return
             }
             setPendingDraftText(res.draft)
+            setAiDraftOriginalText(res.draft)
         } catch (err: any) {
             if (composeOpenRef.current && replyToIdRef.current === targetEmailId) {
                 setDraftError(err.message)
@@ -297,6 +300,7 @@ export default function EmailsPage() {
                 body: isEmpty ? '' : (composeEditorRef.current?.getText() ?? ''),
                 body_html: isEmpty ? '' : (composeEditorRef.current?.getHTML() ?? ''),
                 in_reply_to_email_id: replyToId,
+                ai_draft_text: aiDraftOriginalText ?? undefined,
                 files: composeFiles,
             })
             if (!res.success) {
