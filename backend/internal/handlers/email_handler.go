@@ -330,7 +330,7 @@ func (h *EmailHandler) SendEmail(c *fiber.Ctx) error {
 		}
 	}
 
-	var inReplyToHeader, referencesHeader string
+	var inReplyToHeader, referencesHeader, threadID string
 	if inReplyToEmailID != 0 {
 		var original models.Email
 		if err := database.GetDB().Where("id = ? AND gmail_account_id = ?", inReplyToEmailID, account.ID).First(&original).Error; err == nil {
@@ -338,6 +338,7 @@ func (h *EmailHandler) SendEmail(c *fiber.Ctx) error {
 			if err == nil {
 				inReplyToHeader = full.MessageIDHeader
 				referencesHeader = full.ReferencesHeader
+				threadID = full.ThreadID
 			}
 		}
 	}
@@ -362,6 +363,7 @@ func (h *EmailHandler) SendEmail(c *fiber.Ctx) error {
 		FromAddress:    account.EmailAddress,
 		ToAddresses:    to,
 		Subject:        subject,
+		ThreadID:       threadID,
 		Snippet:        generateSnippet(body),
 		HasAttachments: len(attachments) > 0,
 		AttachmentMeta: models.AttachmentMetaToJSON(attachmentMetas),

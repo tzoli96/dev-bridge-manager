@@ -3,6 +3,7 @@ package services
 
 import (
 	"context"
+	"log"
 	"sort"
 
 	"dev-bridge-manager/internal/models"
@@ -13,6 +14,7 @@ import (
 const (
 	similarReplyCandidateLimit = 200
 	similarReplyTopK           = 2
+	similarReplyBodyMaxLen     = 2000
 )
 
 // FindSimilarReplies returns up to similarReplyTopK bodies of previously
@@ -30,6 +32,7 @@ func FindSimilarReplies(ctx context.Context, db *gorm.DB, account *models.GmailA
 		Order("received_at DESC").
 		Limit(similarReplyCandidateLimit).
 		Find(&candidates).Error; err != nil {
+		log.Printf("draft reply: similar-reply candidate query failed for account %d: %v", account.ID, err)
 		return nil
 	}
 
@@ -57,9 +60,14 @@ func FindSimilarReplies(ctx context.Context, db *gorm.DB, account *models.GmailA
 		}
 		full, err := gmailAPI.GetFullMessage(ctx, account, q.email.GmailMessageID)
 		if err != nil {
+			log.Printf("draft reply: dropping similar-reply candidate %s: %v", q.email.GmailMessageID, err)
 			continue
 		}
-		replies = append(replies, full.BodyText)
+		body := full.BodyText
+		if len(body) > similarReplyBodyMaxLen {
+			body = body[:similarReplyBodyMaxLen]
+		}
+		replies = append(replies, body)
 	}
 	return replies
 }

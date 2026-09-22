@@ -51,6 +51,9 @@ type draftReplyResponse struct {
 }
 
 func (s *DraftReplyService) DraftReply(ctx context.Context, emailContent, profileContext string, similarReplies []string) (string, error) {
+	if similarReplies == nil {
+		similarReplies = []string{}
+	}
 	payload, err := json.Marshal(draftReplyRequest{
 		EmailContent:   emailContent,
 		ProfileContext: profileContext,

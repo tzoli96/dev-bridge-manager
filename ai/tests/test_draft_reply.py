@@ -48,3 +48,12 @@ def test_build_prompt_omits_similar_replies_section_when_empty():
     req = DraftReplyRequest(email_content="Csak egy teszt üzenet.")
     prompt = _build_prompt(req)
     assert "korábban általad írt" not in prompt
+
+
+def test_draft_reply_accepts_explicit_null_similar_replies():
+    with draft_reply_agent.override(model=TestModel(custom_output_args={"draft": "d"})):
+        response = client.post(
+            "/draft-reply",
+            json={"email_content": "Csak egy teszt üzenet.", "similar_replies": None},
+        )
+    assert response.status_code == 200

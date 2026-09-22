@@ -12,7 +12,7 @@ GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 class DraftReplyRequest(BaseModel):
     email_content: str
     profile_context: str = ""
-    similar_replies: list[str] = []
+    similar_replies: list[str] | None = None
 
 
 class DraftReplyResult(BaseModel):

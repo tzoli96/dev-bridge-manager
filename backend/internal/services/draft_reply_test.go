@@ -4,8 +4,10 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -36,6 +38,24 @@ func TestDraftReplySendsFieldsAndReturnsDraft(t *testing.T) {
 	gotSimilar, ok := gotBody["similar_replies"].([]interface{})
 	if !ok || len(gotSimilar) != 2 || gotSimilar[0] != "prior reply one" || gotSimilar[1] != "prior reply two" {
 		t.Fatalf("request body missing expected similar_replies: %+v", gotBody)
+	}
+}
+
+func TestDraftReplyMarshalsNilSimilarRepliesAsEmptyArray(t *testing.T) {
+	var rawBody []byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rawBody, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"draft": "d"})
+	}))
+	defer server.Close()
+
+	svc := &DraftReplyService{httpClient: &http.Client{Timeout: 5 * time.Second}, baseURL: server.URL}
+	if _, err := svc.DraftReply(context.Background(), "s", "p", nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(string(rawBody), `"similar_replies":[]`) {
+		t.Fatalf("expected similar_replies to marshal as [], got raw body: %s", rawBody)
 	}
 }
 
