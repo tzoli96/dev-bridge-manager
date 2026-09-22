@@ -9,7 +9,7 @@ import "time"
 type DraftFeedback struct {
 	ID          uint      `json:"id" gorm:"primaryKey"`
 	EmailID     uint      `json:"email_id" gorm:"not null;index"`
-	AIDraftText string    `json:"ai_draft_text" gorm:"type:text;not null"`
+	AIDraftText string    `json:"ai_draft_text" gorm:"column:ai_draft_text;type:text;not null"`
 	SentText    string    `json:"sent_text" gorm:"type:text;not null"`
 	Similarity  float64   `json:"similarity" gorm:"not null"`
 	CreatedAt   time.Time `json:"created_at"`
