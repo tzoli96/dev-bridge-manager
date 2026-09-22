@@ -217,7 +217,9 @@ func (h *EmailHandler) DraftReply(c *fiber.Ctx) error {
 	// A missing/unreadable profile row degrades to no persona rather than
 	// failing the whole request - drafting a plain reply is still useful.
 
-	draft, err := h.draftReplier.DraftReply(c.Context(), content, profileContext)
+	similarReplies := services.FindSimilarReplies(c.Context(), database.GetDB(), account, &email, content, h.gmailAPI)
+
+	draft, err := h.draftReplier.DraftReply(c.Context(), content, profileContext, similarReplies)
 	if err != nil {
 		return c.Status(502).JSON(fiber.Map{"success": false, "message": "Failed to generate draft: " + err.Error()})
 	}

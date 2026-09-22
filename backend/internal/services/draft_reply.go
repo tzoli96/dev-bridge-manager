@@ -15,7 +15,7 @@ import (
 // DraftReplier is the seam email_handler.go calls through, so tests can
 // inject a fake instead of hitting the real AI service.
 type DraftReplier interface {
-	DraftReply(ctx context.Context, emailContent, profileContext string) (string, error)
+	DraftReply(ctx context.Context, emailContent, profileContext string, similarReplies []string) (string, error)
 }
 
 var _ DraftReplier = (*DraftReplyService)(nil)
@@ -41,16 +41,21 @@ func NewDraftReplyService() *DraftReplyService {
 }
 
 type draftReplyRequest struct {
-	EmailContent   string `json:"email_content"`
-	ProfileContext string `json:"profile_context"`
+	EmailContent   string   `json:"email_content"`
+	ProfileContext string   `json:"profile_context"`
+	SimilarReplies []string `json:"similar_replies"`
 }
 
 type draftReplyResponse struct {
 	Draft string `json:"draft"`
 }
 
-func (s *DraftReplyService) DraftReply(ctx context.Context, emailContent, profileContext string) (string, error) {
-	payload, err := json.Marshal(draftReplyRequest{EmailContent: emailContent, ProfileContext: profileContext})
+func (s *DraftReplyService) DraftReply(ctx context.Context, emailContent, profileContext string, similarReplies []string) (string, error) {
+	payload, err := json.Marshal(draftReplyRequest{
+		EmailContent:   emailContent,
+		ProfileContext: profileContext,
+		SimilarReplies: similarReplies,
+	})
 	if err != nil {
 		return "", fmt.Errorf("encoding draft-reply request: %w", err)
 	}

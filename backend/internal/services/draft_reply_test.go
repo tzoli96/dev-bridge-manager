@@ -11,7 +11,7 @@ import (
 )
 
 func TestDraftReplySendsFieldsAndReturnsDraft(t *testing.T) {
-	var gotBody map[string]string
+	var gotBody map[string]interface{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewDecoder(r.Body).Decode(&gotBody)
 		if r.URL.Path != "/draft-reply" {
@@ -23,7 +23,7 @@ func TestDraftReplySendsFieldsAndReturnsDraft(t *testing.T) {
 	defer server.Close()
 
 	svc := &DraftReplyService{httpClient: &http.Client{Timeout: 5 * time.Second}, baseURL: server.URL}
-	got, err := svc.DraftReply(context.Background(), "email body", "profile context")
+	got, err := svc.DraftReply(context.Background(), "email body", "profile context", []string{"prior reply one", "prior reply two"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -32,6 +32,10 @@ func TestDraftReplySendsFieldsAndReturnsDraft(t *testing.T) {
 	}
 	if gotBody["email_content"] != "email body" || gotBody["profile_context"] != "profile context" {
 		t.Fatalf("request body missing expected fields: %+v", gotBody)
+	}
+	gotSimilar, ok := gotBody["similar_replies"].([]interface{})
+	if !ok || len(gotSimilar) != 2 || gotSimilar[0] != "prior reply one" || gotSimilar[1] != "prior reply two" {
+		t.Fatalf("request body missing expected similar_replies: %+v", gotBody)
 	}
 }
 
@@ -43,7 +47,7 @@ func TestDraftReplyReturnsErrorOnNon2xx(t *testing.T) {
 	defer server.Close()
 
 	svc := &DraftReplyService{httpClient: &http.Client{Timeout: 5 * time.Second}, baseURL: server.URL}
-	_, err := svc.DraftReply(context.Background(), "s", "p")
+	_, err := svc.DraftReply(context.Background(), "s", "p", nil)
 	if err == nil {
 		t.Fatal("expected an error for a 500 response, got nil")
 	}
@@ -58,7 +62,7 @@ func TestDraftReplyReturnsErrorOnTimeout(t *testing.T) {
 	defer server.Close()
 
 	svc := &DraftReplyService{httpClient: &http.Client{Timeout: 5 * time.Millisecond}, baseURL: server.URL}
-	_, err := svc.DraftReply(context.Background(), "s", "p")
+	_, err := svc.DraftReply(context.Background(), "s", "p", nil)
 	if err == nil {
 		t.Fatal("expected a timeout error, got nil")
 	}
