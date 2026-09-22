@@ -4,3 +4,4 @@ backend/tmp/
 frontend/.pnpm-store/
 .worktrees/
 .docker/.env
+.claude/
