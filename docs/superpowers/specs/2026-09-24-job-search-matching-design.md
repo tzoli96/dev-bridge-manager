@@ -43,10 +43,24 @@ jelentkezni. Ez egy tisztán személyes, egyfelhasználós funkció — nem az
   profilban — a CV, a skillek és a szabad szöveges preferenciák mind
   szabad szövegként kerülnek az AI-matching promptjába, ugyanúgy, ahogy a
   meglévő `Profile.Background`/`Expertise` is szabad szöveg.
-- **Nincs kulcsszavas keresés** a scraping oldalán — a profession.hu-s
-  scraper a site saját IT/szoftverfejlesztés kategória-listázóját járja
-  végig, a tényleges illeszkedést kizárólag az AI-matching lépés dönti el
-  a teljes CV alapján.
+- **Nincs kulcsszavas/kategória-szűrés** a scraping oldalán — a
+  profession.hu-s scraper a **szűretlen, összes kategóriát tartalmazó,
+  legfrissebb-elöl** hirdetéslistát járja végig. Ez egy tervezés közbeni
+  technikai vizsgálat eredménye: a `/allasok/informatika`-szerű
+  kategória-URL 301-gyel a szűretlen `/allasok`-ra irányít át, GET-alapú
+  kulcsszó/kategória-paraméter (`?adv_pattern=...` stb.) nincs, a valódi
+  szűrés egy nem dokumentált, 38 tagú pozíciós URL-en megy
+  (`/allasok/1,0,0,...,0,{oldalszám}`), aminek pozíciónkénti jelentését
+  nem lehet felelősségteljesen visszafejteni anélkül, hogy törékeny,
+  találgatáson alapuló kódot írnánk. Ugyanez a pozíciós URL-forma
+  **szűretlenül** viszont megbízhatóan lapozható (csak az utolsó szám
+  változik), és a lista alapértelmezetten a legújabb hirdetéseket mutatja
+  elöl. A tényleges illeszkedést emiatt is kizárólag az AI-matching lépés
+  dönti el a teljes CV alapján — ez ugyanaz az elv, csak nem
+  informatika-specifikus szűkítéssel, hanem az összes kategórián; a
+  meglévő "N egymást követő már ismert URL-nél megáll" lapozás-leállító
+  logika ettől még jobban működik, mert napi szinten valószínűleg csak az
+  1. (esetleg 2.) oldalon lesznek új hirdetések.
 - A funkció kizárólag `super_admin` szerepkörhöz kötött, ugyanúgy, ahogy a
   meglévő `Profile` (AI-perszóna) oldal — nincs admin-fallback.
 
@@ -59,10 +73,11 @@ jelentkezni. Ez egy tisztán személyes, egyfelhasználós funkció — nem az
 [Go: JobScrapingService.RunScrape(ctx)]              [Go: jobscraper.FetchJobFromURL(ctx, url)]
         │  a regisztrált ProfessionHuScraper-re:                 │  robots.txt ellenőrzés a domain-re
         │    - robots.txt betartása                              │  egyetlen GET a megadott URL-re
-        │    - IT/szoftverfejlesztés kategória-lista              │  JobPosting JSON-LD → OG meta-tag →
-        │      lapozott bejárása                                 │  siker esetén ScrapedJob, sikertelen
-        │    - lapozás megáll N egymást követő már                │  kinyerésnél hiba → frontend kézi
-        │      ismert URL-nél                                    │  mezőkitöltést kér
+        │    - szűretlen, összes kategóriás,                     │  JobPosting JSON-LD → OG meta-tag →
+        │      legfrissebb-elöl lista lapozott                   │  siker esetén ScrapedJob, sikertelen
+        │      bejárása                                          │  kinyerésnél hiba → frontend kézi
+        │    - lapozás megáll N egymást követő már                │  mezőkitöltést kér
+        │      ismert URL-nél                                    │
         ▼                                                        ▼
 [Postgres: job_listings]  (INSERT ... ON CONFLICT (site, external_url) DO NOTHING)
         │
@@ -233,6 +248,21 @@ type Scraper interface {
   `fetchListingPages(ctx) ([]string, error)` (nyers HTML lapok) és
   `parseListingPage(html string) ([]ScrapedJob, error)` (tiszta
   függvény — ez teszi lehetővé a hálózat nélküli, fixture-alapú tesztet).
+- Listaoldal URL-formátum (élő teszteléssel — curl, több oldalszámmal,
+  ténylegesen eltérő hirdetés-ID-ket visszaadva — igazolt, konkrét
+  minta): `https://www.profession.hu/allasok/` + egy `1` karakterrel
+  kezdődő, majd 36 db `0`-val folytatódó, vesszővel elválasztott prefix,
+  amihez az utolsó tagként az oldalszám kerül. Az 1. oldal pontos URL-je:
+  `https://www.profession.hu/allasok/1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1`
+  — a 2. oldalé ugyanez, `...,0,2` végződéssel. A `<link rel="canonical">`
+  tag az 1. oldalon (és a szűretlen `/allasok` alap-URL-en) még
+  `https://www.profession.hu/allasok`-ra mutat, de a 2.+ oldalakon már a
+  fenti pozíciós URL-re — ez is megerősíti, hogy ez a hivatalos,
+  kanonikus lapozási forma, nem egy mellékes/nem támogatott útvonal. A
+  pontos prefix egy csomagszintű konstansba kerül
+  (`professionHuListingURLPrefix = "1," + strings.Repeat("0,", 36)`,
+  levágva a záró vesszőt), amihez `fetchListingPages` az aktuális
+  oldalszámot fűzi a végére.
 - Lapozás: legfeljebb 10 oldal per futás, és megáll, ha 1 oldalon belül
   minden hirdetés `external_url`-je már szerepel a `job_listings`
   táblában (a `RunScrape` egy `map[string]bool` már-ismert-URL halmazt ad
