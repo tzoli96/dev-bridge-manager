@@ -8,6 +8,7 @@ import logfire
 
 from app.categorize_email import CategorizeEmailRequest, CategorizeEmailResult, categorize_email
 from app.draft_reply import DraftReplyRequest, DraftReplyResult, draft_reply
+from app.job_application_draft import JobApplicationDraftRequest, JobApplicationDraftResult, job_application_draft
 from app.job_match import JobMatchRequest, JobMatchResult, job_match
 
 logger = logging.getLogger("devbridge_ai")
@@ -73,3 +74,9 @@ async def draft_reply_endpoint(payload: DraftReplyRequest) -> DraftReplyResult:
 @app.post("/job-match", response_model=JobMatchResult)
 async def job_match_endpoint(payload: JobMatchRequest) -> JobMatchResult:
     return await job_match(payload)
+
+
+@app.post("/job-application-draft", response_model=JobApplicationDraftResult)
+async def job_application_draft_endpoint(payload: JobApplicationDraftRequest) -> JobApplicationDraftResult:
+    draft = await job_application_draft(payload)
+    return JobApplicationDraftResult(draft=draft)
