@@ -27,6 +27,7 @@ func SetupRoutes(app *fiber.App) {
 	SetupGmailRoutes(v1)             // Gmail OAuth connect/status endpoints
 	SetupEmailRoutes(v1)             // Synced email list/detail/attachment/send endpoints
 	SetupProfileRoutes(v1)           // Global "who am I" profile - admin CRUD + internal context endpoint
+	SetupJobSearchRoutes(v1)         // Job search: profile, scan-now, manual add, matches - super_admin only
 }
 
 func SetupAPIRoutes(api fiber.Router) {

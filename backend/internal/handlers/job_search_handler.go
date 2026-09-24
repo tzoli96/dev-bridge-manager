@@ -4,7 +4,9 @@ package handlers
 import (
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
+	"time"
 
 	"dev-bridge-manager/internal/database"
 	"dev-bridge-manager/internal/models"
@@ -157,4 +159,93 @@ func siteFromURL(rawURL string) (string, error) {
 		return "", fmt.Errorf("invalid url")
 	}
 	return strings.TrimPrefix(u.Host, "www."), nil
+}
+
+// ListJobMatches - GET /api/v1/admin/job-search/matches?status= (super_admin only, see routes/job_search_routes.go)
+func (h *JobSearchHandler) ListJobMatches(c *fiber.Ctx) error {
+	query := database.GetDB().Preload("JobListing").Order("score DESC")
+	if status := c.Query("status"); status != "" {
+		query = query.Where("status = ?", status)
+	}
+	var matches []models.JobMatch
+	if err := query.Find(&matches).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"success": false, "message": "Failed to load matches"})
+	}
+	return c.JSON(fiber.Map{"success": true, "matches": matches})
+}
+
+var validJobMatchStatuses = map[string]bool{"reviewed": true, "dismissed": true}
+
+// UpdateJobMatchStatus - PATCH /api/v1/admin/job-search/matches/:id/status (super_admin only, see routes/job_search_routes.go)
+func (h *JobSearchHandler) UpdateJobMatchStatus(c *fiber.Ctx) error {
+	id, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"success": false, "message": "Invalid match id"})
+	}
+	var req struct {
+		Status string `json:"status"`
+	}
+	if err := c.BodyParser(&req); err != nil || !validJobMatchStatuses[req.Status] {
+		return c.Status(400).JSON(fiber.Map{"success": false, "message": "Status must be 'reviewed' or 'dismissed'"})
+	}
+	if err := database.GetDB().Model(&models.JobMatch{}).Where("id = ?", id).Update("status", req.Status).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"success": false, "message": "Failed to update status"})
+	}
+	return c.JSON(fiber.Map{"success": true})
+}
+
+// DraftApplication - POST /api/v1/admin/job-search/matches/:id/draft-application (super_admin only, see routes/job_search_routes.go)
+// Generates a draft without persisting it, same "generate only" pattern as
+// email_handler.go's BreakdownEmailIntoTasks.
+func (h *JobSearchHandler) DraftApplication(c *fiber.Ctx) error {
+	id, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"success": false, "message": "Invalid match id"})
+	}
+	var req struct {
+		Instruction string `json:"instruction"`
+	}
+	c.BodyParser(&req)
+
+	var match models.JobMatch
+	if err := database.GetDB().Preload("JobListing").First(&match, id).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{"success": false, "message": "Match not found"})
+	}
+
+	var profile models.JobSearchProfile
+	if err := database.GetDB().First(&profile, 1).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"success": false, "message": "Failed to load job search profile"})
+	}
+
+	draft, err := h.drafter.DraftApplication(c.Context(), profile.CVText, profile.Skills, match.JobListing.Title, match.JobListing.Company, match.JobListing.Description, req.Instruction)
+	if err != nil {
+		return c.Status(502).JSON(fiber.Map{"success": false, "message": "Failed to generate application draft: " + err.Error()})
+	}
+	return c.JSON(fiber.Map{"success": true, "draft": draft})
+}
+
+// MarkApplied - POST /api/v1/admin/job-search/matches/:id/mark-applied (super_admin only, see routes/job_search_routes.go)
+// Called after either the "sent via email" or "applied manually on site"
+// path completes on the frontend.
+func (h *JobSearchHandler) MarkApplied(c *fiber.Ctx) error {
+	id, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"success": false, "message": "Invalid match id"})
+	}
+	var req struct {
+		ApplicationText string `json:"application_text"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"success": false, "message": "Invalid request body"})
+	}
+
+	now := time.Now()
+	if err := database.GetDB().Model(&models.JobMatch{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"status":           "applied",
+		"applied_at":       now,
+		"application_text": req.ApplicationText,
+	}).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"success": false, "message": "Failed to mark as applied"})
+	}
+	return c.JSON(fiber.Map{"success": true})
 }
