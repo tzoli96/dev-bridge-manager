@@ -2,9 +2,14 @@
 package handlers
 
 import (
+	"fmt"
+	"net/url"
+	"strings"
+
 	"dev-bridge-manager/internal/database"
 	"dev-bridge-manager/internal/models"
 	"dev-bridge-manager/internal/services"
+	"dev-bridge-manager/internal/services/jobscraper"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -66,4 +71,90 @@ func (h *JobSearchHandler) UpdateJobSearchProfile(c *fiber.Ctx) error {
 func (h *JobSearchHandler) ScanNow(c *fiber.Ctx) error {
 	newListings, newMatches := services.RunScrape(c.Context(), h.matcher)
 	return c.JSON(fiber.Map{"success": true, "new_listings": newListings, "new_matches": newMatches})
+}
+
+// AddManualListing - POST /api/v1/admin/job-search/listings/manual (super_admin only, see routes/job_search_routes.go)
+func (h *JobSearchHandler) AddManualListing(c *fiber.Ctx) error {
+	var req struct {
+		URL         string `json:"url"`
+		Title       string `json:"title"`
+		Company     string `json:"company"`
+		Location    string `json:"location"`
+		Description string `json:"description"`
+	}
+	if err := c.BodyParser(&req); err != nil || strings.TrimSpace(req.URL) == "" {
+		return c.Status(400).JSON(fiber.Map{"success": false, "message": "A hirdetés URL-je kötelező"})
+	}
+
+	fetchResult, err := jobscraper.FetchJobFromURL(c.Context(), req.URL)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"success": false, "message": "Nem sikerült lekérni az URL-t: " + err.Error()})
+	}
+
+	job := jobscraper.ScrapedJob{ExternalURL: req.URL}
+	if fetchResult.Extracted {
+		job = fetchResult.Job
+	} else {
+		if strings.TrimSpace(req.Title) == "" || strings.TrimSpace(req.Description) == "" {
+			return c.Status(400).JSON(fiber.Map{
+				"success": false,
+				"message": "Az adatok automatikus kinyerése nem sikerült - add meg kézzel a hirdetés adatait",
+			})
+		}
+		job.Title = req.Title
+		job.Company = req.Company
+		job.Location = req.Location
+		job.Description = req.Description
+	}
+
+	site, err := siteFromURL(req.URL)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"success": false, "message": "Érvénytelen URL"})
+	}
+
+	db := database.GetDB()
+	var listing models.JobListing
+	err = db.Raw(`
+		INSERT INTO job_listings (site, external_url, title, company, location, description)
+		VALUES (?, ?, ?, ?, ?, ?)
+		ON CONFLICT (site, external_url) DO NOTHING
+		RETURNING id, site, external_url, title, company, location, description, posted_at, scraped_at
+	`, site, job.ExternalURL, job.Title, job.Company, job.Location, job.Description).Scan(&listing).Error
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"success": false, "message": "Failed to save listing"})
+	}
+	if listing.ID == 0 {
+		// ON CONFLICT DO NOTHING left listing.ID unset - the row already
+		// existed, so load it back by its unique key.
+		if err := db.Where("site = ? AND external_url = ?", site, job.ExternalURL).First(&listing).Error; err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "Failed to load existing listing"})
+		}
+	}
+
+	var match models.JobMatch
+	if err := db.Where("job_listing_id = ?", listing.ID).First(&match).Error; err != nil {
+		var profile models.JobSearchProfile
+		if err := db.First(&profile, 1).Error; err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "Failed to load job search profile"})
+		}
+		score, reasoning, err := h.matcher.MatchJob(c.Context(), profile.CVText, profile.Skills, profile.Preferences, listing.Title, listing.Company, listing.Location, listing.Description)
+		if err != nil {
+			return c.Status(502).JSON(fiber.Map{"success": false, "message": "Failed to score listing: " + err.Error()})
+		}
+		match = models.JobMatch{JobListingID: listing.ID, Score: score, Reasoning: reasoning, Status: "new"}
+		if err := db.Create(&match).Error; err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "Failed to save match"})
+		}
+	}
+	match.JobListing = listing
+
+	return c.JSON(fiber.Map{"success": true, "match": match})
+}
+
+func siteFromURL(rawURL string) (string, error) {
+	u, err := url.Parse(rawURL)
+	if err != nil || u.Host == "" {
+		return "", fmt.Errorf("invalid url")
+	}
+	return strings.TrimPrefix(u.Host, "www."), nil
 }
