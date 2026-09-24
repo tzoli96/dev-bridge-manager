@@ -7,11 +7,19 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
 )
+
+// placeholderDescriptionPattern matches CDN edge-substitution tokens seen in
+// NoFluffJobs' JSON-LD (e.g. "<<ccr:e9c9c5001587,html,1.3KB>>") - their
+// description text is injected client-side/at the edge and never appears in
+// a plain server-side fetch, so a raw fetch sees the token instead of real
+// content.
+var placeholderDescriptionPattern = regexp.MustCompile(`^<<ccr:[^>]*>>$`)
 
 // ManualFetchResult is FetchJobFromURL's return value. Extracted is false
 // (not an error) when neither JSON-LD nor Open Graph tags gave enough data -
@@ -83,37 +91,69 @@ func extractJobPosting(html, sourceURL string) (ScrapedJob, bool) {
 	}
 
 	if job, ok := extractFromJSONLD(doc, sourceURL); ok {
-		return job, true
+		if job.Description == "" || placeholderDescriptionPattern.MatchString(job.Description) {
+			job.Description = ogContent(doc, "og:description")
+		}
+		return job, job.Description != ""
 	}
 	return extractFromOpenGraph(doc, sourceURL)
+}
+
+// jsonLDGraph matches sites (e.g. NoFluffJobs) that wrap multiple schema.org
+// entities in a single script block via "@graph" instead of putting a
+// JobPosting directly at the top level.
+type jsonLDGraph struct {
+	Graph []json.RawMessage `json:"@graph"`
 }
 
 func extractFromJSONLD(doc *goquery.Document, sourceURL string) (ScrapedJob, bool) {
 	var found ScrapedJob
 	var ok bool
 	doc.Find(`script[type="application/ld+json"]`).EachWithBreak(func(_ int, sel *goquery.Selection) bool {
-		var posting jsonLDJobPosting
-		if err := json.Unmarshal([]byte(sel.Text()), &posting); err != nil {
-			return true // keep looking at other script blocks
+		raw := []byte(sel.Text())
+
+		if posting, matched := jobPostingFromJSONLD(raw); matched {
+			found, ok = jobFromPosting(posting, sourceURL), true
+			return false // stop: found a usable JobPosting
 		}
-		if posting.Type != "JobPosting" || posting.Title == "" {
-			return true
+
+		var graph jsonLDGraph
+		if err := json.Unmarshal(raw, &graph); err == nil {
+			for _, item := range graph.Graph {
+				if posting, matched := jobPostingFromJSONLD(item); matched {
+					found, ok = jobFromPosting(posting, sourceURL), true
+					return false
+				}
+			}
 		}
-		location := strings.Trim(strings.TrimSpace(strings.Join([]string{
-			posting.JobLocation.Address.AddressLocality,
-			posting.JobLocation.Address.AddressRegion,
-		}, ", ")), ", ")
-		found = ScrapedJob{
-			ExternalURL: sourceURL,
-			Title:       posting.Title,
-			Company:     posting.HiringOrganization.Name,
-			Location:    location,
-			Description: posting.Description,
-		}
-		ok = true
-		return false // stop: found a usable JobPosting
+		return true // keep looking at other script blocks
 	})
 	return found, ok
+}
+
+func jobPostingFromJSONLD(raw json.RawMessage) (jsonLDJobPosting, bool) {
+	var posting jsonLDJobPosting
+	if err := json.Unmarshal(raw, &posting); err != nil {
+		return jsonLDJobPosting{}, false
+	}
+	if posting.Type != "JobPosting" || posting.Title == "" {
+		return jsonLDJobPosting{}, false
+	}
+	return posting, true
+}
+
+func jobFromPosting(posting jsonLDJobPosting, sourceURL string) ScrapedJob {
+	location := strings.Trim(strings.TrimSpace(strings.Join([]string{
+		posting.JobLocation.Address.AddressLocality,
+		posting.JobLocation.Address.AddressRegion,
+	}, ", ")), ", ")
+	return ScrapedJob{
+		ExternalURL: sourceURL,
+		Title:       posting.Title,
+		Company:     posting.HiringOrganization.Name,
+		Location:    location,
+		Description: posting.Description,
+	}
 }
 
 func extractFromOpenGraph(doc *goquery.Document, sourceURL string) (ScrapedJob, bool) {

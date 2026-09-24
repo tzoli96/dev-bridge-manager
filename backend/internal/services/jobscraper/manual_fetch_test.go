@@ -55,6 +55,20 @@ func TestExtractJobPostingFallsBackToOpenGraph(t *testing.T) {
 	}
 }
 
+func TestExtractJobPostingFindsJSONLDInsideGraph(t *testing.T) {
+	html := readFixture(t, "manual_jobposting_graph_ldjson.html")
+	job, ok := extractJobPosting(html, "https://nofluffjobs.com/hu/job/cpp-siemens")
+	if !ok {
+		t.Fatal("expected extraction to succeed")
+	}
+	if job.Title != "C++ Software Developer – CG LBS" {
+		t.Errorf("unexpected title: %q", job.Title)
+	}
+	if job.Description != "Siemens Mobility Kft. Budapesten keres C++ fejlesztőt a K+F csapatába." {
+		t.Errorf("expected placeholder description to fall back to og:description, got: %q", job.Description)
+	}
+}
+
 func TestExtractJobPostingReturnsNotExtractedWhenNoData(t *testing.T) {
 	html := readFixture(t, "manual_no_data.html")
 	_, ok := extractJobPosting(html, "https://example.com/nothing")
