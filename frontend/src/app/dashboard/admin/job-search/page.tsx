@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import LoadingState from '@/components/ui/LoadingState'
 import ErrorState from '@/components/ui/ErrorState'
 import { JobSearchService, JobSearchProfile, JobMatch } from '@/services/jobSearchService'
+import { JobApplicationModal } from '@/components/jobSearch/JobApplicationModal'
 
 function scoreBadgeClass(score: number): string {
     if (score >= 70) return 'bg-success/10 text-success'
@@ -34,6 +35,7 @@ export default function JobSearchPage() {
 }
 
 function JobSearchPageContent() {
+    const [applicationMatch, setApplicationMatch] = useState<JobMatch | null>(null)
     const [, setProfile] = useState<JobSearchProfile | null>(null)
     const [cvText, setCvText] = useState('')
     const [skills, setSkills] = useState('')
@@ -312,6 +314,9 @@ function JobSearchPageContent() {
                                     <a href={match.job_listing.external_url} target="_blank" rel="noopener noreferrer">
                                         <Button type="button" variant="outline" size="sm">Hirdetés megnyitása</Button>
                                     </a>
+                                    <Button type="button" size="sm" onClick={() => setApplicationMatch(match)}>
+                                        Jelentkezés
+                                    </Button>
                                     {match.status !== 'dismissed' && match.status !== 'applied' && (
                                         <Button type="button" variant="danger" size="sm" onClick={() => handleUpdateStatus(match.id, 'dismissed')}>
                                             Elutasítás
@@ -323,6 +328,17 @@ function JobSearchPageContent() {
                     </div>
                 )}
             </section>
+
+            {applicationMatch && (
+                <JobApplicationModal
+                    match={applicationMatch}
+                    onClose={() => setApplicationMatch(null)}
+                    onApplied={(id) => {
+                        setMatches((prev) => prev.map((m) => (m.id === id ? { ...m, status: 'applied' } : m)))
+                        setApplicationMatch(null)
+                    }}
+                />
+            )}
         </div>
     )
 }
