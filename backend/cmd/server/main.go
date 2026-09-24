@@ -61,6 +61,10 @@ func main() {
 	// Gmail inbox/sent mirror sync, every 3 hours (see services.RunGmailSync)
 	go services.StartGmailSyncScheduler()
 
+	// Job search scraping/scoring, once at startup then every 24h (see
+	// services.RunScrape)
+	go services.StartJobScrapingScheduler()
+
 	// Start server
 	port := getPort()
 	log.Printf("🚀 Server starting on port %s", port)
