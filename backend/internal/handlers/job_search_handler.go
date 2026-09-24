@@ -88,13 +88,10 @@ func (h *JobSearchHandler) AddManualListing(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"success": false, "message": "A hirdetés URL-je kötelező"})
 	}
 
-	fetchResult, err := jobscraper.FetchJobFromURL(c.Context(), req.URL)
-	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"success": false, "message": "Nem sikerült lekérni az URL-t: " + err.Error()})
-	}
+	fetchResult, fetchErr := jobscraper.FetchJobFromURL(c.Context(), req.URL)
 
 	job := jobscraper.ScrapedJob{ExternalURL: req.URL}
-	if fetchResult.Extracted {
+	if fetchErr == nil && fetchResult.Extracted {
 		job = fetchResult.Job
 	} else {
 		if strings.TrimSpace(req.Title) == "" || strings.TrimSpace(req.Description) == "" {

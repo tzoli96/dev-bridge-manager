@@ -4,6 +4,7 @@ package services
 import (
 	"context"
 	"log"
+	"strings"
 
 	"dev-bridge-manager/internal/database"
 	"dev-bridge-manager/internal/models"
@@ -65,6 +66,10 @@ func scoreUnmatchedListings(ctx context.Context, db *gorm.DB, matcher JobMatcher
 	var profile models.JobSearchProfile
 	if err := db.First(&profile, 1).Error; err != nil {
 		log.Printf("job scraping: failed to load job search profile: %v", err)
+		return 0
+	}
+	if strings.TrimSpace(profile.CVText) == "" && strings.TrimSpace(profile.Skills) == "" {
+		log.Printf("job scraping: job search profile is not configured yet, skipping scoring")
 		return 0
 	}
 
