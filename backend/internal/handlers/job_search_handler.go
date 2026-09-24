@@ -67,11 +67,17 @@ func (h *JobSearchHandler) UpdateJobSearchProfile(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true, "profile": profile})
 }
 
+// scanNowMaxPages caps the manual scan to keep it inside the frontend's
+// 40s request timeout (see jobSearchService.ts's scanNow) - the full
+// backfill beyond this many pages happens via the scheduled background
+// scrape instead (see job_scraping_scheduler.go's higher cap).
+const scanNowMaxPages = 10
+
 // ScanNow - POST /api/v1/admin/job-search/scan-now (super_admin only, see routes/job_search_routes.go)
 // Runs RunScrape synchronously and reports how many new listings/matches
 // were created - no queue, matching the design doc's stated low volume.
 func (h *JobSearchHandler) ScanNow(c *fiber.Ctx) error {
-	newListings, newMatches := services.RunScrape(c.Context(), h.matcher)
+	newListings, newMatches := services.RunScrape(c.Context(), h.matcher, scanNowMaxPages)
 	return c.JSON(fiber.Map{"success": true, "new_listings": newListings, "new_matches": newMatches})
 }
 
@@ -163,6 +169,11 @@ func (h *JobSearchHandler) ListJobMatches(c *fiber.Ctx) error {
 	query := database.GetDB().Preload("JobListing").Order("score DESC")
 	if status := c.Query("status"); status != "" {
 		query = query.Where("status = ?", status)
+	}
+	if minScoreStr := c.Query("min_score"); minScoreStr != "" {
+		if minScore, err := strconv.Atoi(minScoreStr); err == nil {
+			query = query.Where("score >= ?", minScore)
+		}
 	}
 	var matches []models.JobMatch
 	if err := query.Find(&matches).Error; err != nil {

@@ -18,9 +18,9 @@ import (
 // listing that doesn't have a match yet. Mirrors RunGmailSync's per-item
 // error tolerance: one scraper (or one match) failing is logged and
 // skipped, the rest of the run continues.
-func RunScrape(ctx context.Context, matcher JobMatcher) (newListings int, newMatches int) {
+func RunScrape(ctx context.Context, matcher JobMatcher, maxPages int) (newListings int, newMatches int) {
 	db := database.GetDB()
-	scrapers := registeredScrapers(db)
+	scrapers := registeredScrapers(maxPages)
 
 	for _, scraper := range scrapers {
 		jobs, err := scraper.Scrape(ctx)
@@ -49,17 +49,9 @@ func RunScrape(ctx context.Context, matcher JobMatcher) (newListings int, newMat
 }
 
 // registeredScrapers builds the one scraper this feature currently
-// supports, pre-loaded with the (site, external_url) pairs already in
-// job_listings so ProfessionHuScraper.Scrape can stop paging once it stops
-// seeing new ads.
-func registeredScrapers(db *gorm.DB) []jobscraper.Scraper {
-	var professionHuURLs []string
-	db.Model(&models.JobListing{}).Where("site = ?", "profession.hu").Pluck("external_url", &professionHuURLs)
-	known := make(map[string]bool, len(professionHuURLs))
-	for _, u := range professionHuURLs {
-		known[u] = true
-	}
-	return []jobscraper.Scraper{jobscraper.NewProfessionHuScraper(known)}
+// supports.
+func registeredScrapers(maxPages int) []jobscraper.Scraper {
+	return []jobscraper.Scraper{jobscraper.NewProfessionHuScraper(maxPages)}
 }
 
 func scoreUnmatchedListings(ctx context.Context, db *gorm.DB, matcher JobMatcher) int {

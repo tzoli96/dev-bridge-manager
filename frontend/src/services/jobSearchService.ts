@@ -104,8 +104,11 @@ export const JobSearchService = {
         throw new Error(response.message || 'Failed to add listing')
     },
 
-    async listMatches(status?: string): Promise<JobMatch[]> {
-        const response = await apiClient.get<MatchesApiResponse>('/admin/job-search/matches', status ? { status } : undefined)
+    async listMatches(status?: string, minScore?: number): Promise<JobMatch[]> {
+        const params: Record<string, string> = {}
+        if (status) params.status = status
+        if (minScore !== undefined) params.min_score = String(minScore)
+        const response = await apiClient.get<MatchesApiResponse>('/admin/job-search/matches', Object.keys(params).length ? params : undefined)
         if (response.success && response.matches) return response.matches
         throw new Error(response.message || 'Failed to fetch matches')
     },

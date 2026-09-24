@@ -11,6 +11,8 @@ import ErrorState from '@/components/ui/ErrorState'
 import { JobSearchService, JobSearchProfile, JobMatch } from '@/services/jobSearchService'
 import { JobApplicationModal } from '@/components/jobSearch/JobApplicationModal'
 
+const GOOD_FIT_MIN_SCORE = 70
+
 function scoreBadgeClass(score: number): string {
     if (score >= 70) return 'bg-success/10 text-success'
     if (score >= 40) return 'bg-amber-500/10 text-amber-700'
@@ -74,7 +76,7 @@ function JobSearchPageContent() {
     const loadMatches = () => {
         setMatchesLoading(true)
         setMatchesError(null)
-        JobSearchService.listMatches()
+        JobSearchService.listMatches(undefined, GOOD_FIT_MIN_SCORE)
             .then(setMatches)
             .catch((err) => setMatchesError(err.message))
             .finally(() => setMatchesLoading(false))
