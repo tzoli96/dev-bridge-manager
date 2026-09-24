@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html><head>
+<meta property="og:title" content="Should not be used - JSON-LD takes priority">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org/",
+  "@type": "JobPosting",
+  "title": "Senior Backend Engineer",
+  "description": "Build and maintain our core Go services.",
+  "hiringOrganization": { "@type": "Organization", "name": "Acme Corp" },
+  "jobLocation": {
+    "@type": "Place",
+    "address": { "@type": "PostalAddress", "addressLocality": "Budapest", "addressRegion": "Hungary" }
+  }
+}
+</script>
+</head><body></body></html>
