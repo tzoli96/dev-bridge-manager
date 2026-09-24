@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { User } from '@/types/user'
 import { hasPermission, isSuperAdmin } from '@/utils/permissions'
 import BillingoSettingsModal from '@/components/BillingoSettingsModal'
@@ -11,6 +12,7 @@ interface AdminTabProps {
 }
 
 export default function AdminTab({ user }: AdminTabProps) {
+    const router = useRouter()
     const [isBillingoModalOpen, setIsBillingoModalOpen] = useState(false)
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
 
@@ -54,6 +56,15 @@ export default function AdminTab({ user }: AdminTabProps) {
             permission: null,
             requireSuperAdmin: true,
             action: () => setIsProfileModalOpen(true),
+            comingSoon: false
+        },
+        {
+            title: "Álláskeresés",
+            description: "profession.hu automatikus figyelése, AI-alapú illeszkedés-értékelés és jelentkezési tervezet",
+            buttonLabel: "Megnyitás",
+            permission: null,
+            requireSuperAdmin: true,
+            action: () => router.push('/dashboard/admin/job-search'),
             comingSoon: false
         }
     ]
