@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, KanbanSquare, Users, Building2, ShieldCheck, Mail, Receipt } from 'lucide-react'
+import { LayoutDashboard, KanbanSquare, Users, Building2, ShieldCheck, Mail, Receipt, Briefcase } from 'lucide-react'
 import { User } from '@/types/user'
-import { hasAnyPermission } from '@/utils/permissions'
+import { hasAnyPermission, isSuperAdmin } from '@/utils/permissions'
 import { EmailsService } from '@/services/emailsService'
 
 interface DashboardNavProps {
@@ -67,6 +67,12 @@ export default function DashboardNav({ user }: DashboardNavProps) {
             label: 'Administration',
             icon: ShieldCheck,
             show: hasAnyPermission(user, ['system.settings', 'roles.list']),
+        },
+        {
+            href: '/dashboard/admin/job-search',
+            label: 'Álláskeresés',
+            icon: Briefcase,
+            show: isSuperAdmin(user),
         },
     ]
 
