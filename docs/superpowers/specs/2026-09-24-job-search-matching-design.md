@@ -2,21 +2,38 @@
 
 ## Cél
 
-Automatikusan figyelje a profession.hu és a nofluffjobs.com álláshirdetéseit,
-pontozza őket a felhasználó (kizárólag a super_admin szerepkörű üzemeltető)
-CV-je és skilljei alapján, és tegye lehetővé, hogy a legjobban illeszkedő
+Automatikusan figyelje a profession.hu álláshirdetéseit, és tegye
+lehetővé más oldalak (pl. nofluffjobs.com, LinkedIn) hirdetéseinek kézi
+hozzáadását linkkel, pontozza mindkét forrásból származó hirdetést a
+felhasználó (kizárólag a super_admin szerepkörű üzemeltető) CV-je és
+skilljei alapján, és tegye lehetővé, hogy a legjobban illeszkedő
 hirdetésekre AI-generált kísérőlevél-tervezettel gyorsan lehessen
 jelentkezni. Ez egy tisztán személyes, egyfelhasználós funkció — nem az
 ügyfélkezelő rendszer más felhasználóinak szól.
 
 ## Hatókör és nem-célok
 
-- **Csak profession.hu és nofluffjobs.com** kerül automatikusan
-  scrapelésre ebben a körben. A LinkedIn kifejezetten kizárt: a
-  felhasználói szerződése tiltja az automatizált scrapelést/botokat, és
-  agresszív bot-detektálása van (CAPTCHA, IP-tiltás, fiók-felfüggesztés
-  kockázata). LinkedIn-integráció egy **külön, jövőbeli spec** tárgya
-  lesz, ha egyáltalán megvalósul.
+- **Csak a profession.hu kerül automatikusan, ütemezetten scrapelésre**
+  ebben a körben. Ez egy tervezés közbeni technikai vizsgálat eredménye:
+  a profession.hu szerver-oldalon renderelt, sima HTML-t ad, és a
+  `robots.txt`-je nem tiltja a listázó oldalt — ez rendben scrapelhető. A
+  nofluffjobs.com viszont egy teljesen kliens-oldalon renderelt (Angular)
+  SPA — a nyers HTML üres váz, a tényleges adatokat egy `/api/...`
+  végponton tölti be, amit a saját `robots.txt`-je kifejezetten tilt
+  (`Disallow: /api/`), és nincs publikus feed/sitemap sem helyette. A
+  LinkedIn-et ezen felül a felhasználói szerződése is kifejezetten tiltja
+  automatizált scrapelésre/botokra, agresszív bot-detektálással
+  (CAPTCHA, IP-tiltás, fiók-felfüggesztés kockázata).
+- **Emiatt a nofluffjobs.com és a LinkedIn (és bármely más oldal)
+  kézi URL-hozzáadással** kerül be a rendszerbe: a felhasználó beilleszt
+  egy konkrét hirdetés-linket, a backend egyszer lekéri azt az egy oldalt
+  (nem crawl, egy explicit, felhasználó által kért egyedi lekérés), és
+  megpróbálja kinyerni belőle a hirdetés adatait (ld. "Kézi hozzáadás
+  link alapján" szakasz). Ha egy adott URL-t a saját `robots.txt`-je
+  tilt, a rendszer nem kéri le automatikusan, hanem a felhasználó
+  kézzel viheti be a hirdetés adatait. Az így hozzáadott hirdetések
+  utána pontosan ugyanazon az AI-matching/jelentkezés-flow-n mennek
+  végig, mint az automatikusan scrapelt profession.hu-s hirdetések.
 - **Nincs teljesen automatizált jelentkezés-beküldés** (nincs headless
   böngésző / form-kitöltő automatizálás egyik site-on sem). A rendszer
   AI-jal elkészíti a kísérőlevél-tervezetet, de a tényleges beküldés
@@ -26,26 +43,27 @@ jelentkezni. Ez egy tisztán személyes, egyfelhasználós funkció — nem az
   profilban — a CV, a skillek és a szabad szöveges preferenciák mind
   szabad szövegként kerülnek az AI-matching promptjába, ugyanúgy, ahogy a
   meglévő `Profile.Background`/`Expertise` is szabad szöveg.
-- **Nincs kulcsszavas keresés** a scraping oldalán — mindkét scraper a
-  site saját IT/szoftverfejlesztés kategória-listázóját járja végig, a
-  tényleges illeszkedést kizárólag az AI-matching lépés dönti el a teljes
-  CV alapján.
+- **Nincs kulcsszavas keresés** a scraping oldalán — a profession.hu-s
+  scraper a site saját IT/szoftverfejlesztés kategória-listázóját járja
+  végig, a tényleges illeszkedést kizárólag az AI-matching lépés dönti el
+  a teljes CV alapján.
 - A funkció kizárólag `super_admin` szerepkörhöz kötött, ugyanúgy, ahogy a
   meglévő `Profile` (AI-perszóna) oldal — nincs admin-fallback.
 
 ## Architektúra
 
 ```
-[Scheduler (time.Ticker) / "Keresés most" gomb]
-        │
-        ▼
-[Go: JobScrapingService.RunScrape(ctx)]
-        │  minden regisztrált JobScraper-re (ProfessionHuScraper,
-        │  NoFluffJobsScraper) egymástól függetlenül:
-        │    - robots.txt betartása
-        │    - IT/szoftverfejlesztés kategória-lista lapozott bejárása
-        │    - lapozás megáll N egymást követő már ismert URL-nél
-        ▼
+[Scheduler (time.Ticker) / "Keresés most" gomb]        [Admin UI: "Hirdetés hozzáadása linkkel"]
+        │                                                        │
+        ▼                                                        ▼
+[Go: JobScrapingService.RunScrape(ctx)]              [Go: jobscraper.FetchJobFromURL(ctx, url)]
+        │  a regisztrált ProfessionHuScraper-re:                 │  robots.txt ellenőrzés a domain-re
+        │    - robots.txt betartása                              │  egyetlen GET a megadott URL-re
+        │    - IT/szoftverfejlesztés kategória-lista              │  JobPosting JSON-LD → OG meta-tag →
+        │      lapozott bejárása                                 │  siker esetén ScrapedJob, sikertelen
+        │    - lapozás megáll N egymást követő már                │  kinyerésnél hiba → frontend kézi
+        │      ismert URL-nél                                    │  mezőkitöltést kér
+        ▼                                                        ▼
 [Postgres: job_listings]  (INSERT ... ON CONFLICT (site, external_url) DO NOTHING)
         │
         ▼ (job_matches nélküli sorokra)
@@ -127,6 +145,15 @@ CREATE INDEX idx_job_matches_score ON job_matches(score DESC);
 az egyetlen sort (`updated_by=1` a rendszer első felhasználójára mutat,
 ugyanaz a minta, amit a `profiles` tábla `000030` migrációja is használt).
 
+A `job_listings.site` mező mindkét beviteli útnál (automatikus scraping
+és kézi URL-hozzáadás) egységesen a hirdetés domain-jét tárolja (pl.
+`"profession.hu"`, `"nofluffjobs.com"`, `"linkedin.com"`) — a kézi
+hozzáadásnál a domain-t a beillesztett URL-ből vonjuk ki (`net/url`
+csomaggal), nem kell külön mezőt/választót kitalálni "forrás típusára".
+Ez azt jelenti, hogy a `UNIQUE(site, external_url)` dedup-mechanizmus
+változtatás nélkül ugyanúgy működik automatikusan scrapelt és kézzel
+hozzáadott hirdetésekre is.
+
 Go modellek (`backend/internal/models/job_search.go`):
 ```go
 type JobSearchProfile struct {
@@ -197,11 +224,10 @@ type Scraper interface {
 }
 ```
 
-- `ProfessionHuScraper` és `NoFluffJobsScraper` mindketten a `goquery`
-  library-t használják a HTML-parsoláshoz (**új, direkt függőség** — a
-  backendben jelenleg semmilyen HTML-parser nincs, kézzel regex-szel
-  parsolni HTML-t törékeny és rossz gyakorlat, erre nincs kiváltó meglévő
-  mechanizmus).
+- `ProfessionHuScraper` a `goquery` library-t használja a HTML-parsoláshoz
+  (**új, direkt függőség** — a backendben jelenleg semmilyen HTML-parser
+  nincs, kézzel regex-szel parsolni HTML-t törékeny és rossz gyakorlat,
+  erre nincs kiváltó meglévő mechanizmus).
 - A HTML-letöltés és a DOM-ból való kinyerés (`ScrapedJob` mezőnkénti
   CSS-szelektorok) két külön, tiszta függvénybe kerül site-onként:
   `fetchListingPages(ctx) ([]string, error)` (nyers HTML lapok) és
@@ -237,6 +263,43 @@ type Scraper interface {
   meghívja a `JobMatchService`-t (lásd lent), elmenti az eredményt. Nincs
   queue: a napi hirdetésmennyiség (becsülve tucat-száz db) simán elfér
   szinkron, egymás utáni AI-hívásokban egy háttérfolyamatban.
+
+### Kézi hozzáadás link alapján (`manual_fetch.go`)
+
+A nofluffjobs.com, a LinkedIn, és bármely más, automatikusan nem
+scrapelt oldal hirdetései egy generikus, URL-alapú kézi hozzáadási
+flow-n keresztül kerülnek be — ez nem crawl, hanem a felhasználó által
+kifejezetten kért, egyszeri lekérés egyetlen oldalra, ami etikailag
+közelebb áll a normál böngészéshez, mint az automatizált scrapeléshez.
+
+```go
+type ManualFetchResult struct {
+    Job       ScrapedJob
+    Extracted bool // false: sem JSON-LD, sem OG-tag nem adott elég adatot
+}
+
+func FetchJobFromURL(ctx context.Context, rawURL string) (ManualFetchResult, error)
+```
+
+- `backend/internal/services/jobscraper/manual_fetch.go`, ugyanabban a
+  csomagban, mint a `ProfessionHuScraper`, mert ugyanazt a
+  robots.txt-ellenőrző és HTTP-segédkódot használja újra.
+- Menet: (1) a `rawURL`-ből `net/url`-lel kinyeri a domain-t, ellenőrzi a
+  domain `robots.txt`-jét a meglévő `robots.go` segédfüggvénnyel — ha az
+  adott útvonal tiltott, `FetchJobFromURL` hibát ad vissza, és a
+  frontend rögtön a kézi mezőkitöltést kéri; (2) egyetlen `GET` a
+  `rawURL`-re; (3) `goquery`-vel megkeresi a
+  `<script type="application/ld+json">` blokkokat, és megpróbálja
+  `schema.org` `JobPosting` típusként JSON-dekódolni (mezők: `title`,
+  `hiringOrganization.name`, `jobLocation...`, `description`); (4) ha
+  egyik JSON-LD blokk sem `JobPosting`, vagy a dekódolás hibázik,
+  visszaesik az Open Graph meta-tagekre (`og:title`, `og:description`,
+  `og:site_name` a céghez); (5) ha sem a JSON-LD, sem az OG-tagek nem
+  adnak legalább címet és leírást, `ManualFetchResult.Extracted = false`
+  (nem hiba — a hívó fél ilyenkor a felhasználótól kéri be kézzel a
+  mezőket, amiket aztán ugyanúgy `ScrapedJob`-ként ment el a handler).
+- Nincs lapozás, nincs kategória-bejárás, nincs ismétlődő ütemezés — ez
+  mindig egy explicit, egyedi admin-akcióra fut le.
 
 ## AI-matching (`ai/app/job_match.py`)
 
@@ -315,6 +378,16 @@ pontosan a `profile_routes.go` mintáját követi: `/admin` csoport,
   futást — ha ez a gyakorlatban túl lassúnak bizonyul a HTTP-timeouthoz
   képest, ez egy implementációs döntés, amit a plan végrehajtásakor kell
   finomítani, pl. `context.WithTimeout`-tal)
+- `POST /admin/job-search/listings/manual` — body: `{ url string,
+  title?, company?, location?, description? }`. Meghívja a
+  `jobscraper.FetchJobFromURL`-t; ha `Extracted == true`, a kinyert
+  adatokat használja, egyébként a request-ben kapott kézi mezőket várja
+  el (ha azok is hiányoznak, `400`-at ad vissza, jelezve, hogy a
+  frontendnek a kézi kitöltő formot kell megjelenítenie). Sikeres
+  esetben `INSERT ... ON CONFLICT (site, external_url) DO NOTHING`-gal
+  menti a `job_listings`-be, majd **szinkron** meghívja a
+  `JobMatchService`-t erre az egy hirdetésre (nincs queue, egyetlen
+  AI-hívásról van szó), és visszaadja a létrejött `JobMatch`-et.
 - `GET /admin/job-search/matches?status=` — rangsorolt lista (`ORDER BY
   score DESC`), opcionális `status` szűréssel, `Preload("JobListing")`
 - `PATCH /admin/job-search/matches/:id/status` — `reviewed`/`dismissed`
@@ -349,6 +422,13 @@ tudjon Gmailt küldeni — ez a meglévő email-küldés flow tiszta
     ugyanaz a state/hívás-minta, mint a `ProfileModal`-ban)
   - "Keresés most" gomb (`scan-now` hívás, loading állapot, majd a lista
     frissítése)
+  - "Hirdetés hozzáadása linkkel" szekció: egy URL-input + "Hozzáadás"
+    gomb, ami a `POST /admin/job-search/listings/manual`-t hívja. Ha a
+    válasz jelzi, hogy a kinyerés sikertelen volt (`400`), a felület
+    inline megjelenít egy kiegészítő formot (cím/cég/helyszín/leírás
+    mezők), amivel a felhasználó kézzel újraküldheti a kérést a
+    kitöltött mezőkkel; sikeres hozzáadás után a lista frissül az új,
+    azonnal pontozott hirdetéssel.
   - Rangsorolt lista: cím, cég, helyszín, score-badge (színkódolt: pl.
     zöld ≥70, sárga 40-69, szürke <40), rövid `reasoning`, státusz-badge,
     "Hirdetés megnyitása" link, "Jelentkezés" gomb, "Elutasítás" gomb
@@ -369,11 +449,19 @@ sem vezetjük be. Tiszta függvények kapnak unit tesztet, DB-t érintő
 handlerek nem (ugyanaz a konvenció, mint a `draft_reply_test.go` és
 `email_handler_test.go` esetén).
 
-- **`parseListingPage`** mindkét scraper-nél: mentett HTML-fixture
-  fájlokkal (`testdata/professionhu_sample.html`,
-  `testdata/nofluffjobs_sample.html`) — assert a kinyert `ScrapedJob`
-  mezőkre. Ha egy site megváltoztatja a struktúráját, csak ez a teszt
-  bukik, azonnal látszik melyik scraper romlott el.
+- **`parseListingPage`** (`ProfessionHuScraper`): mentett HTML-fixture
+  fájllal (`testdata/professionhu_sample.html`) — assert a kinyert
+  `ScrapedJob` mezőkre. Ha a site megváltoztatja a struktúráját, csak ez
+  a teszt bukik, azonnal látszik, hogy a scraper elromlott.
+- **`FetchJobFromURL` kinyerő logikája**: szintetikus, szabvány-hű
+  fixture-ökkel (nem élő site-fetch-csel, mert a JSON-LD/OG formátum
+  stabil, publikus szabvány, könnyen pontosan lekövethető) —
+  `testdata/manual_jobposting_ldjson.html` (érvényes schema.org
+  `JobPosting` JSON-LD-vel) → assert a helyesen kinyert mezőkre;
+  `testdata/manual_og_only.html` (csak Open Graph meta-tagek, JSON-LD
+  nélkül) → assert a fallback-kinyerésre; `testdata/manual_no_data.html`
+  (se JSON-LD, se OG-tag) → assert, hogy `Extracted == false` és nincs
+  hiba (ez egy várt, kezelt eset, nem hibaág).
 - **robots.txt parser**: unit teszt (tiltott/engedélyezett útvonalak,
   hiányzó `robots.txt`).
 - **`job_match.py`/`job_application_draft.py`**: `pytest` +
