@@ -18,9 +18,11 @@ type ScrapedJob struct {
 	PostedAt    *time.Time
 }
 
-// Scraper is implemented once per auto-scraped site. Only profession.hu
-// implements it today (see the design doc's Scope section for why
-// nofluffjobs.com/LinkedIn are manual-add only).
+// Scraper is implemented once per auto-scraped site: profession.hu and
+// nofluffjobs.com today (see NoFluffJobsScraper's doc comment for how it
+// works around that site having no sitemap and a robots.txt-disallowed
+// search API). LinkedIn remains manual-add only per the design doc's Scope
+// section (ToS prohibits scraping).
 type Scraper interface {
 	Site() string
 	Scrape(ctx context.Context) ([]ScrapedJob, error)

@@ -18,9 +18,9 @@ import (
 // listing that doesn't have a match yet. Mirrors RunGmailSync's per-item
 // error tolerance: one scraper (or one match) failing is logged and
 // skipped, the rest of the run continues.
-func RunScrape(ctx context.Context, matcher JobMatcher, maxPages int) (newListings int, newMatches int) {
+func RunScrape(ctx context.Context, matcher JobMatcher, maxPages int, nfjMaxJobs int) (newListings int, newMatches int) {
 	db := database.GetDB()
-	scrapers := registeredScrapers(maxPages)
+	scrapers := registeredScrapers(maxPages, nfjMaxJobs)
 
 	for _, scraper := range scrapers {
 		jobs, err := scraper.Scrape(ctx)
@@ -48,10 +48,17 @@ func RunScrape(ctx context.Context, matcher JobMatcher, maxPages int) (newListin
 	return newListings, newMatches
 }
 
-// registeredScrapers builds the one scraper this feature currently
-// supports.
-func registeredScrapers(maxPages int) []jobscraper.Scraper {
-	return []jobscraper.Scraper{jobscraper.NewProfessionHuScraper(maxPages)}
+// registeredScrapers builds every scraper this feature supports.
+// nfjMaxJobs is 0 for the manual "Scan Now" path (see ScanNow's comment) -
+// NoFluffJobsScraper needs one HTTP fetch per candidate job on top of its
+// per-category fetches, which comfortably fits the scheduler's unbounded
+// background run but not ScanNow's 40s request timeout.
+func registeredScrapers(maxPages int, nfjMaxJobs int) []jobscraper.Scraper {
+	scrapers := []jobscraper.Scraper{jobscraper.NewProfessionHuScraper(maxPages)}
+	if nfjMaxJobs > 0 {
+		scrapers = append(scrapers, jobscraper.NewNoFluffJobsScraper(nfjMaxJobs))
+	}
+	return scrapers
 }
 
 func scoreUnmatchedListings(ctx context.Context, db *gorm.DB, matcher JobMatcher) int {

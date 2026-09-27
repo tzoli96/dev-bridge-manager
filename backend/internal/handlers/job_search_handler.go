@@ -77,7 +77,9 @@ const scanNowMaxPages = 10
 // Runs RunScrape synchronously and reports how many new listings/matches
 // were created - no queue, matching the design doc's stated low volume.
 func (h *JobSearchHandler) ScanNow(c *fiber.Ctx) error {
-	newListings, newMatches := services.RunScrape(c.Context(), h.matcher, scanNowMaxPages)
+	// nfjMaxJobs is 0 here - NoFluffJobsScraper only runs on the scheduled
+	// background scrape (see registeredScrapers), not this synchronous path.
+	newListings, newMatches := services.RunScrape(c.Context(), h.matcher, scanNowMaxPages, 0)
 	return c.JSON(fiber.Map{"success": true, "new_listings": newListings, "new_matches": newMatches})
 }
 
