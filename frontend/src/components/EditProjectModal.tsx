@@ -17,6 +17,7 @@ export default function EditProjectModal({ isOpen, project, onClose, onSuccess }
         pricing_type: '',
         hourly_rate: null,
         fixed_price: null,
+        contract_end_date: null,
     })
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -32,7 +33,8 @@ export default function EditProjectModal({ isOpen, project, onClose, onSuccess }
                 status: project.status,
                 pricing_type: project.pricing_type || '',
                 hourly_rate: project.hourly_rate ?? null,
-                fixed_price: project.fixed_price ?? null
+                fixed_price: project.fixed_price ?? null,
+                contract_end_date: project.contract_end_date ? project.contract_end_date.slice(0, 10) : null
             })
             setSelectedClientIds((project.clients || []).map(c => c.client_id))
             setError(null)
@@ -92,7 +94,8 @@ export default function EditProjectModal({ isOpen, project, onClose, onSuccess }
                 status: formData.status,
                 pricing_type: formData.pricing_type || undefined,
                 hourly_rate: formData.pricing_type === 'hourly' ? formData.hourly_rate : undefined,
-                fixed_price: formData.pricing_type === 'fixed' ? formData.fixed_price : undefined
+                fixed_price: formData.pricing_type === 'fixed' ? formData.fixed_price : undefined,
+                contract_end_date: formData.contract_end_date ?? ''
             })
 
             onSuccess()
@@ -258,6 +261,23 @@ export default function EditProjectModal({ isOpen, project, onClose, onSuccess }
                                 Hobbi projektre nem lehet órát logolni és nem lehet számlázni.
                             </p>
                         )}
+                    </div>
+
+                    <div>
+                        <label htmlFor="contract_end_date" className="block text-sm font-medium text-foreground mb-1">
+                            Szerződés lejárata
+                        </label>
+                        <input
+                            type="date"
+                            id="contract_end_date"
+                            value={formData.contract_end_date || ''}
+                            onChange={(e) => setFormData(prev => ({ ...prev, contract_end_date: e.target.value || null }))}
+                            className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+                            disabled={loading}
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Ha meg van adva, 30 nappal előtte emlékeztetőt kap a super-admin a dashboardon.
+                        </p>
                     </div>
 
                     {clients.length > 0 && (

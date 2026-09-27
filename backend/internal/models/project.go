@@ -21,13 +21,17 @@ type Project struct {
 	// resulting notice via services.ApproveInvoiceNotice) — unless
 	// AutoInvoiceAutoApprove is also set, in which case the scheduler
 	// approves the notice itself right after sending it.
-	AutoInvoiceEnabled     bool      `json:"auto_invoice_enabled" gorm:"default:false"`
-	AutoInvoiceClientID    *uint     `json:"auto_invoice_client_id"`
-	AutoInvoiceAutoApprove bool      `json:"auto_invoice_auto_approve" gorm:"default:false"`
-	CreatedBy              uint      `json:"created_by" gorm:"not null"`
-	CreatedByName          string    `json:"created_by_name" gorm:"-"`
-	CreatedAt              time.Time `json:"created_at"`
-	UpdatedAt              time.Time `json:"updated_at"`
+	AutoInvoiceEnabled     bool  `json:"auto_invoice_enabled" gorm:"default:false"`
+	AutoInvoiceClientID    *uint `json:"auto_invoice_client_id"`
+	AutoInvoiceAutoApprove bool  `json:"auto_invoice_auto_approve" gorm:"default:false"`
+	// ContractEndDate optionally marks when the project's contract/SOW is
+	// due for renewal. Checked daily by services.RunProjectRenewalCheck,
+	// which flags projects coming up on it - see ProjectRenewalFlag.
+	ContractEndDate *time.Time `json:"contract_end_date"`
+	CreatedBy       uint       `json:"created_by" gorm:"not null"`
+	CreatedByName   string     `json:"created_by_name" gorm:"-"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
 
 	// Kapcsolat a User modellel
 	Creator User `json:"creator,omitempty" gorm:"foreignKey:CreatedBy"`
@@ -53,9 +57,13 @@ type ProjectUpdateRequest struct {
 	FixedPrice  *float64 `json:"fixed_price"`
 	// AutoInvoiceEnabled is a pointer so "not present in the request" (leave
 	// as-is) can be distinguished from an explicit false (turn off).
-	AutoInvoiceEnabled     *bool `json:"auto_invoice_enabled"`
-	AutoInvoiceClientID    *uint `json:"auto_invoice_client_id"`
-	AutoInvoiceAutoApprove *bool `json:"auto_invoice_auto_approve"`
+	AutoInvoiceEnabled     *bool   `json:"auto_invoice_enabled"`
+	AutoInvoiceClientID    *uint   `json:"auto_invoice_client_id"`
+	AutoInvoiceAutoApprove *bool   `json:"auto_invoice_auto_approve"`
+	// ContractEndDate is a YYYY-MM-DD date string (see models.ParseDate),
+	// not a raw time.Time - a nil pointer means "leave unchanged", while an
+	// empty string clears it.
+	ContractEndDate *string `json:"contract_end_date"`
 }
 
 type ProjectResponse struct {
@@ -69,6 +77,7 @@ type ProjectResponse struct {
 	AutoInvoiceEnabled     bool                    `json:"auto_invoice_enabled"`
 	AutoInvoiceClientID    *uint                   `json:"auto_invoice_client_id"`
 	AutoInvoiceAutoApprove bool                    `json:"auto_invoice_auto_approve"`
+	ContractEndDate        *time.Time              `json:"contract_end_date"`
 	CreatedBy              uint                    `json:"created_by"`
 	CreatedByName          string                  `json:"created_by_name"`
 	CreatedAt              time.Time               `json:"created_at"`

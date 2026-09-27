@@ -101,6 +101,7 @@ func (h *ProjectHandler) GetAllProjects(c *fiber.Ctx) error {
 			AutoInvoiceEnabled:     project.AutoInvoiceEnabled,
 			AutoInvoiceClientID:    project.AutoInvoiceClientID,
 			AutoInvoiceAutoApprove: project.AutoInvoiceAutoApprove,
+			ContractEndDate:        project.ContractEndDate,
 			CreatedBy:              project.CreatedBy,
 			CreatedByName:          project.CreatedByName,
 			CreatedAt:              project.CreatedAt,
@@ -152,6 +153,7 @@ func (h *ProjectHandler) GetProject(c *fiber.Ctx) error {
 		AutoInvoiceEnabled:     project.AutoInvoiceEnabled,
 		AutoInvoiceClientID:    project.AutoInvoiceClientID,
 		AutoInvoiceAutoApprove: project.AutoInvoiceAutoApprove,
+		ContractEndDate:        project.ContractEndDate,
 		CreatedBy:              project.CreatedBy,
 		CreatedByName:          project.CreatedByName,
 		CreatedAt:              project.CreatedAt,
@@ -260,6 +262,7 @@ func (h *ProjectHandler) CreateProject(c *fiber.Ctx) error {
 		AutoInvoiceEnabled:     createdProject.AutoInvoiceEnabled,
 		AutoInvoiceClientID:    createdProject.AutoInvoiceClientID,
 		AutoInvoiceAutoApprove: createdProject.AutoInvoiceAutoApprove,
+		ContractEndDate:        createdProject.ContractEndDate,
 		CreatedBy:              createdProject.CreatedBy,
 		CreatedByName:          createdProject.CreatedByName,
 		CreatedAt:              createdProject.CreatedAt,
@@ -398,6 +401,17 @@ func (h *ProjectHandler) UpdateProject(c *fiber.Ctx) error {
 		updates["auto_invoice_auto_approve"] = effectiveAutoApprove
 	}
 
+	if req.ContractEndDate != nil {
+		parsed, err := models.ParseDate(*req.ContractEndDate)
+		if err != nil {
+			return c.Status(400).JSON(models.ProjectListResponse{
+				Success: false,
+				Message: "Invalid contract_end_date",
+			})
+		}
+		updates["contract_end_date"] = parsed
+	}
+
 	if len(updates) > 0 {
 		if err := database.GetDB().Model(&project).Updates(updates).Error; err != nil {
 			return c.Status(500).JSON(models.ProjectListResponse{
@@ -433,6 +447,7 @@ func (h *ProjectHandler) UpdateProject(c *fiber.Ctx) error {
 		AutoInvoiceEnabled:     updatedProject.AutoInvoiceEnabled,
 		AutoInvoiceClientID:    updatedProject.AutoInvoiceClientID,
 		AutoInvoiceAutoApprove: updatedProject.AutoInvoiceAutoApprove,
+		ContractEndDate:        updatedProject.ContractEndDate,
 		CreatedBy:              updatedProject.CreatedBy,
 		CreatedByName:          updatedProject.CreatedByName,
 		CreatedAt:              updatedProject.CreatedAt,

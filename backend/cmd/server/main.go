@@ -73,6 +73,10 @@ func main() {
 	// services.RunKanbanStallCheck)
 	go services.StartKanbanStallScheduler()
 
+	// Contract/project renewal reminders, once at startup then every 24h
+	// (see services.RunProjectRenewalCheck)
+	go services.StartProjectRenewalScheduler()
+
 	// Start server
 	port := getPort()
 	log.Printf("🚀 Server starting on port %s", port)

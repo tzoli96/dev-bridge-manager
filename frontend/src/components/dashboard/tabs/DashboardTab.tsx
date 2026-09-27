@@ -9,6 +9,7 @@ import QuickActionsGrid from '@/components/dashboard/QuickActionsGrid'
 import StatsCards from '@/components/dashboard/StatsCards'
 import StalledTasksWidget from '@/components/dashboard/StalledTasksWidget'
 import ActivityDigestWidget from '@/components/dashboard/ActivityDigestWidget'
+import ProjectRenewalWidget from '@/components/dashboard/ProjectRenewalWidget'
 
 interface DashboardTabProps {
     user: User | null
@@ -32,6 +33,7 @@ export default function DashboardTab({ user }: DashboardTabProps) {
             <QuickActionsGrid user={user} users={users} projects={projects} />
             <ActivityDigestWidget />
             {isSuperAdmin(user) && <StalledTasksWidget />}
+            {isSuperAdmin(user) && <ProjectRenewalWidget />}
         </div>
     )
 }
