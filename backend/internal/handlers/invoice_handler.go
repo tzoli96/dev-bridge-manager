@@ -128,19 +128,26 @@ func (h *InvoiceHandler) CreateInvoice(c *fiber.Ctx) error {
 	})
 }
 
-// getRevenueAnalytics aggregates 'created' invoice amounts filtered by a
-// single column (either "project_id" or "client_id", always a fixed literal
-// supplied by the caller below, never user input) into the last 12 calendar
-// months, all calendar years, and an all-time total. Shared by the project-
-// and client-scoped analytics endpoints so the aggregation logic exists once.
-func getRevenueAnalytics(filterColumn string, filterValue uint) (models.RevenueAnalyticsResponse, error) {
+// getRevenueAnalytics aggregates 'created' invoice amounts, optionally
+// filtered by a single column (either "project_id" or "client_id", always a
+// fixed literal supplied by the caller below, never user input), into the
+// last 12 calendar months, all calendar years, and an all-time total. A nil
+// filterValue means no project/client filter at all - i.e. the company-wide
+// report. Shared by the project-, client-, and company-scoped analytics
+// endpoints so the aggregation logic exists once.
+func getRevenueAnalytics(filterColumn string, filterValue *uint) (models.RevenueAnalyticsResponse, error) {
 	db := database.GetDB()
-	whereClause := filterColumn + " = ? AND status = 'created'"
+	whereClause := "status = 'created'"
+	args := []interface{}{}
+	if filterValue != nil {
+		whereClause = filterColumn + " = ? AND " + whereClause
+		args = append(args, *filterValue)
+	}
 
 	var monthly []models.MonthlyRevenue
 	if err := db.Table("invoices").
 		Select("to_char(created_at, 'YYYY-MM') as month, COALESCE(SUM(amount), 0) as amount").
-		Where(whereClause+" AND created_at >= ?", filterValue, time.Now().AddDate(0, -11, 0)).
+		Where(whereClause+" AND created_at >= ?", append(append([]interface{}{}, args...), time.Now().AddDate(0, -11, 0))...).
 		Group("month").
 		Order("month ASC").
 		Scan(&monthly).Error; err != nil {
@@ -150,7 +157,7 @@ func getRevenueAnalytics(filterColumn string, filterValue uint) (models.RevenueA
 	var yearly []models.YearlyRevenue
 	if err := db.Table("invoices").
 		Select("to_char(created_at, 'YYYY') as year, COALESCE(SUM(amount), 0) as amount").
-		Where(whereClause, filterValue).
+		Where(whereClause, args...).
 		Group("year").
 		Order("year ASC").
 		Scan(&yearly).Error; err != nil {
@@ -160,7 +167,7 @@ func getRevenueAnalytics(filterColumn string, filterValue uint) (models.RevenueA
 	var total float64
 	if err := db.Table("invoices").
 		Select("COALESCE(SUM(amount), 0)").
-		Where(whereClause, filterValue).
+		Where(whereClause, args...).
 		Scan(&total).Error; err != nil {
 		return models.RevenueAnalyticsResponse{}, err
 	}
@@ -180,7 +187,8 @@ func (h *InvoiceHandler) GetProjectRevenueAnalytics(c *fiber.Ctx) error {
 		return c.Status(400).JSON(models.RevenueAnalyticsResponse{Success: false, Message: "Invalid project ID"})
 	}
 
-	resp, err := getRevenueAnalytics("project_id", uint(projectID))
+	pID := uint(projectID)
+	resp, err := getRevenueAnalytics("project_id", &pID)
 	if err != nil {
 		return c.Status(500).JSON(models.RevenueAnalyticsResponse{Success: false, Message: "Error computing revenue analytics"})
 	}
@@ -199,7 +207,24 @@ func (h *InvoiceHandler) GetClientRevenueAnalytics(c *fiber.Ctx) error {
 		return c.Status(400).JSON(models.RevenueAnalyticsResponse{Success: false, Message: "Invalid client ID"})
 	}
 
-	resp, err := getRevenueAnalytics("client_id", uint(clientID))
+	cID := uint(clientID)
+	resp, err := getRevenueAnalytics("client_id", &cID)
+	if err != nil {
+		return c.Status(500).JSON(models.RevenueAnalyticsResponse{Success: false, Message: "Error computing revenue analytics"})
+	}
+	return c.JSON(resp)
+}
+
+// GetCompanyRevenueAnalytics - GET /api/v1/invoices/analytics - same
+// aggregation as the project/client-scoped endpoints, but across every
+// client and project, for a company-wide monthly revenue report.
+func (h *InvoiceHandler) GetCompanyRevenueAnalytics(c *fiber.Ctx) error {
+	currentUserID := c.Locals("userID").(uint)
+	if err := checkInvoiceAccess(h.permissionService, currentUserID, "invoices.read"); err != nil {
+		return err
+	}
+
+	resp, err := getRevenueAnalytics("", nil)
 	if err != nil {
 		return c.Status(500).JSON(models.RevenueAnalyticsResponse{Success: false, Message: "Error computing revenue analytics"})
 	}

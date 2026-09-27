@@ -7,6 +7,7 @@ import { InvoicesService, Invoice, InvoiceLineItem, InvoiceNoticesService, Invoi
 import { Button } from '@/components/ui/button';
 import { Eye, ChevronDown, ChevronUp, ArrowUpRight, Receipt, Mail, Check, Pencil } from 'lucide-react';
 import EmailTemplatesModal from '@/components/EmailTemplatesModal';
+import RevenueAnalytics from '@/components/RevenueAnalytics';
 
 const paymentStatusInfo: Record<string, { label: string; className: string }> = {
     paid: { label: 'Kifizetve', className: 'bg-success/10 text-success' },
@@ -357,6 +358,8 @@ export default function BillingPage() {
                 <h1 className="text-2xl font-bold text-foreground mb-1">Számlázás</h1>
                 <p className="text-sm text-muted-foreground">Minden projekt számlái egy helyen, projektenkénti szűréssel.</p>
             </div>
+
+            <RevenueAnalytics title="Havi bevétel jelentés" />
 
             <div>
                 <div className="flex items-center justify-between mb-1">

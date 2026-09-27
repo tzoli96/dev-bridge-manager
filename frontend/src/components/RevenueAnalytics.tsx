@@ -32,7 +32,7 @@ export default function RevenueAnalytics({ projectId, clientId, title = 'Bevéte
             ? InvoicesService.getProjectRevenueAnalytics(projectId)
             : clientId
                 ? InvoicesService.getClientRevenueAnalytics(clientId)
-                : Promise.resolve(null)
+                : InvoicesService.getCompanyRevenueAnalytics()
 
         request
             .then((result) => { if (!cancelled) setData(result) })

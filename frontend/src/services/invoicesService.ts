@@ -343,6 +343,21 @@ export class InvoicesService {
         }
     }
 
+    static async getCompanyRevenueAnalytics(): Promise<RevenueAnalytics> {
+        try {
+            const response = await apiClient.get<RevenueAnalyticsResponse>('/invoices/analytics')
+
+            if (response.success) {
+                return { monthly: response.monthly || [], yearly: response.yearly || [], total: response.total || 0 }
+            }
+
+            throw new Error(response.message || 'Failed to fetch revenue analytics')
+        } catch (error: any) {
+            console.error('Error fetching company revenue analytics:', error)
+            throw new Error(error.response?.data?.message || error.message || 'Failed to fetch revenue analytics')
+        }
+    }
+
     static async sendInvoiceEmail(projectId: number, invoiceId: number): Promise<void> {
         try {
             const response = await apiClient.post<{ success: boolean; message: string }>(
