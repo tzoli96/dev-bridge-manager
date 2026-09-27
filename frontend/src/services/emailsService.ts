@@ -20,6 +20,10 @@ export interface EmailListItem {
     is_read: boolean
     category: string | null
     received_at: string
+    client_id: number | null
+    client_name: string | null
+    project_id: number | null
+    project_name: string | null
 }
 
 export interface EmailListResponse {
@@ -41,6 +45,7 @@ export interface EmailDetail {
     body_html?: string
     attachments?: EmailAttachment[]
     received_at?: string
+    project_id?: number | null
 }
 
 export interface SendEmailRequest {

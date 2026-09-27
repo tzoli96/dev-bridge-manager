@@ -10,6 +10,7 @@ from app.categorize_email import CategorizeEmailRequest, CategorizeEmailResult, 
 from app.draft_reply import DraftReplyRequest, DraftReplyResult, draft_reply
 from app.job_application_draft import JobApplicationDraftRequest, JobApplicationDraftResult, job_application_draft
 from app.job_match import JobMatchRequest, JobMatchResult, job_match
+from app.match_email_client import MatchEmailClientRequest, MatchEmailClientResult, match_email_client
 
 logger = logging.getLogger("devbridge_ai")
 # No observability existed before this: not one call logged its latency, and
@@ -69,6 +70,12 @@ async def categorize_email_endpoint(payload: CategorizeEmailRequest) -> Categori
 async def draft_reply_endpoint(payload: DraftReplyRequest) -> DraftReplyResult:
     draft = await draft_reply(payload)
     return DraftReplyResult(draft=draft)
+
+
+@app.post("/match-email-client", response_model=MatchEmailClientResult)
+async def match_email_client_endpoint(payload: MatchEmailClientRequest) -> MatchEmailClientResult:
+    client_id = await match_email_client(payload)
+    return MatchEmailClientResult(client_id=client_id)
 
 
 @app.post("/job-match", response_model=JobMatchResult)

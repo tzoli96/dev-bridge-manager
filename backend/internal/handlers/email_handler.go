@@ -93,11 +93,12 @@ func (h *EmailHandler) ListEmails(c *fiber.Ctx) error {
 	db.Count(&total)
 
 	var rows []models.Email
-	db.Order("received_at desc").Limit(pageSize).Offset((page - 1) * pageSize).Find(&rows)
+	db.Preload("Client").Preload("Project").
+		Order("received_at desc").Limit(pageSize).Offset((page - 1) * pageSize).Find(&rows)
 
 	items := make([]models.EmailListItem, 0, len(rows))
 	for _, e := range rows {
-		items = append(items, models.EmailListItem{
+		item := models.EmailListItem{
 			ID:             e.ID,
 			Folder:         e.Folder,
 			FromAddress:    e.FromAddress,
@@ -110,7 +111,16 @@ func (h *EmailHandler) ListEmails(c *fiber.Ctx) error {
 			IsRead:         e.IsRead,
 			ReceivedAt:     e.ReceivedAt,
 			Category:       e.Category,
-		})
+			ClientID:       e.ClientID,
+			ProjectID:      e.ProjectID,
+		}
+		if e.Client != nil {
+			item.ClientName = &e.Client.Name
+		}
+		if e.Project != nil {
+			item.ProjectName = &e.Project.Name
+		}
+		items = append(items, item)
 	}
 
 	return c.JSON(models.EmailListResponse{Success: true, Emails: items, Total: total})
@@ -172,6 +182,7 @@ func (h *EmailHandler) GetEmail(c *fiber.Ctx) error {
 		BodyHTML:    full.BodyHTML,
 		Attachments: full.Attachments,
 		ReceivedAt:  full.ReceivedAt,
+		ProjectID:   email.ProjectID,
 	})
 }
 

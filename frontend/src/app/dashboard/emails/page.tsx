@@ -491,6 +491,14 @@ export default function EmailsPage() {
                                                         {CATEGORY_STYLES[item.category].label}
                                                     </span>
                                                 )}
+                                                {item.client_name && (
+                                                    <span
+                                                        className="shrink-0 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/10 text-indigo-600 truncate max-w-[100px]"
+                                                        title={item.project_name ? `${item.client_name} · ${item.project_name}` : item.client_name}
+                                                    >
+                                                        {item.client_name}
+                                                    </span>
+                                                )}
                                             </div>
                                             <div className="text-xs text-muted-foreground truncate">{item.snippet}</div>
                                         </div>

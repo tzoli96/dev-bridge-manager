@@ -48,6 +48,14 @@ type Email struct {
 	ReceivedAt     time.Time `json:"received_at"`
 	SyncedAt       time.Time `json:"synced_at"`
 	Category       *string   `json:"category" gorm:"size:20"`
+	// ClientID/ProjectID are a best-effort AI match, computed once at sync
+	// time for "ugyfel"-categorized inbox mail (see
+	// services.matchClientAndProject) - never re-computed afterward, and
+	// always overridable by hand when creating a task from the email.
+	ClientID  *uint    `json:"client_id" gorm:"index"`
+	Client    *Client  `json:"-" gorm:"foreignKey:ClientID"`
+	ProjectID *uint    `json:"project_id" gorm:"index"`
+	Project   *Project `json:"-" gorm:"foreignKey:ProjectID"`
 }
 
 func (Email) TableName() string { return "emails" }
@@ -85,6 +93,10 @@ type EmailListItem struct {
 	IsRead         bool                  `json:"is_read"`
 	ReceivedAt     time.Time             `json:"received_at"`
 	Category       *string               `json:"category"`
+	ClientID       *uint                 `json:"client_id"`
+	ClientName     *string               `json:"client_name"`
+	ProjectID      *uint                 `json:"project_id"`
+	ProjectName    *string               `json:"project_name"`
 }
 
 type EmailListResponse struct {
@@ -106,6 +118,7 @@ type EmailDetailResponse struct {
 	BodyHTML    string                `json:"body_html,omitempty"`
 	Attachments []EmailAttachmentMeta `json:"attachments,omitempty"`
 	ReceivedAt  time.Time             `json:"received_at,omitempty"`
+	ProjectID   *uint                 `json:"project_id,omitempty"`
 }
 
 type EmailSendRequest struct {
