@@ -32,6 +32,7 @@ func SetupRoutes(app *fiber.App) {
 	SetupSearchRoutes(v1)            // Global search across clients/projects/tasks
 	SetupActivityDigestRoutes(v1)    // Daily activity digest (dashboard card)
 	SetupProjectRenewalRoutes(v1)    // Contract/project renewal reminders - super_admin only
+	SetupClientHealthRoutes(v1)      // Per-client risk status (stalled tasks + overdue invoices) - super_admin only
 }
 
 func SetupAPIRoutes(api fiber.Router) {

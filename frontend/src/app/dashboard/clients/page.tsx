@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useClients } from '@/hooks/useClients'
 import { ClientsService, Client } from '@/services/clientsService'
-import { hasAnyPermission, hasPermission } from '@/utils/permissions'
+import { ClientHealthService, ClientHealth } from '@/services/clientHealthService'
+import { hasAnyPermission, hasPermission, isSuperAdmin } from '@/utils/permissions'
 import { useAuth } from '@/contexts/AuthContext'
 import CreateClientModal from '@/components/CreateClientModal'
 import EditClientModal from '@/components/EditClientModal'
@@ -20,10 +21,19 @@ export default function ClientsPage() {
     const [showEdit, setShowEdit] = useState(false)
     const [selectedClient, setSelectedClient] = useState<Client | null>(null)
     const [deleting, setDeleting] = useState<number | null>(null)
+    const [health, setHealth] = useState<Record<number, ClientHealth>>({})
 
     const canCreate = hasAnyPermission(user, ['clients.create']) || hasPermission(user, 'clients.create')
     const canUpdate = hasAnyPermission(user, ['clients.update'])
     const canDelete = hasAnyPermission(user, ['clients.delete'])
+    const showHealth = isSuperAdmin(user)
+
+    useEffect(() => {
+        if (!showHealth) return
+        ClientHealthService.list()
+            .then(list => setHealth(Object.fromEntries(list.map(c => [c.client_id, c]))))
+            .catch(() => setHealth({}))
+    }, [showHealth])
 
     const handleEdit = (client: Client) => {
         setSelectedClient(client)
@@ -88,6 +98,9 @@ export default function ClientsPage() {
                                     <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Tax Number</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Contact</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
+                                    {showHealth && (
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Health</th>
+                                    )}
                                     {(canUpdate || canDelete) && (
                                         <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
                                     )}
@@ -119,6 +132,27 @@ export default function ClientsPage() {
                                                 {client.is_active ? 'Active' : 'Inactive'}
                                             </span>
                                         </td>
+                                        {showHealth && (
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span
+                                                    className={`inline-block h-2.5 w-2.5 rounded-full ${
+                                                        health[client.id]?.status === 'red'
+                                                            ? 'bg-destructive'
+                                                            : health[client.id]?.status === 'yellow'
+                                                                ? 'bg-warning'
+                                                                : 'bg-success'
+                                                    }`}
+                                                    title={
+                                                        health[client.id]
+                                                            ? [
+                                                                health[client.id].has_stalled_task && 'elakadt task',
+                                                                health[client.id].has_overdue_invoice && 'lejárt számla',
+                                                            ].filter(Boolean).join(', ') || 'rendben'
+                                                            : ''
+                                                    }
+                                                />
+                                            </td>
+                                        )}
                                         {(canUpdate || canDelete) && (
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm space-x-3">
                                                 {canUpdate && (

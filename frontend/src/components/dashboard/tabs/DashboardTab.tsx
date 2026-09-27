@@ -10,6 +10,7 @@ import StatsCards from '@/components/dashboard/StatsCards'
 import StalledTasksWidget from '@/components/dashboard/StalledTasksWidget'
 import ActivityDigestWidget from '@/components/dashboard/ActivityDigestWidget'
 import ProjectRenewalWidget from '@/components/dashboard/ProjectRenewalWidget'
+import ClientHealthWidget from '@/components/dashboard/ClientHealthWidget'
 
 interface DashboardTabProps {
     user: User | null
@@ -34,6 +35,7 @@ export default function DashboardTab({ user }: DashboardTabProps) {
             <ActivityDigestWidget />
             {isSuperAdmin(user) && <StalledTasksWidget />}
             {isSuperAdmin(user) && <ProjectRenewalWidget />}
+            {isSuperAdmin(user) && <ClientHealthWidget />}
         </div>
     )
 }
