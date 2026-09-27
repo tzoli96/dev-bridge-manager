@@ -8,6 +8,7 @@ import { hasPermission, hasAnyPermission, isAdmin, isSuperAdmin } from '@/utils/
 import QuickActionsGrid from '@/components/dashboard/QuickActionsGrid'
 import StatsCards from '@/components/dashboard/StatsCards'
 import StalledTasksWidget from '@/components/dashboard/StalledTasksWidget'
+import ActivityDigestWidget from '@/components/dashboard/ActivityDigestWidget'
 
 interface DashboardTabProps {
     user: User | null
@@ -29,6 +30,7 @@ export default function DashboardTab({ user }: DashboardTabProps) {
                 <StatsCards user={user} users={users} projects={projects} />
             </div>
             <QuickActionsGrid user={user} users={users} projects={projects} />
+            <ActivityDigestWidget />
             {isSuperAdmin(user) && <StalledTasksWidget />}
         </div>
     )
