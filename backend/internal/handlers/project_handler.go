@@ -367,10 +367,10 @@ func (h *ProjectHandler) UpdateProject(c *fiber.Ctx) error {
 		}
 
 		if effectiveEnabled {
-			if effectivePricingType != "hourly" {
+			if effectivePricingType != "hourly" && effectivePricingType != "fixed" {
 				return c.Status(400).JSON(models.ProjectListResponse{
 					Success: false,
-					Message: "Automatic invoicing requires hourly pricing",
+					Message: "Automatic invoicing requires hourly or fixed pricing",
 				})
 			}
 			if effectiveClientID == nil {
@@ -414,6 +414,13 @@ func (h *ProjectHandler) UpdateProject(c *fiber.Ctx) error {
 		Joins("LEFT JOIN users ON projects.created_by = users.id").
 		Where("projects.id = ?", id).
 		First(&updatedProject)
+
+	// Fix áras projekt lezárásakor automatikus számla-értesítő - lásd
+	// services.MaybeSendFixedPriceCompletionNotice. Háttérben fut, hogy egy
+	// lassú Gmail/Billingo hívás se lassítsa a projekt lezárását.
+	if req.Status == "completed" && project.Status != "completed" {
+		go services.MaybeSendFixedPriceCompletionNotice(updatedProject)
+	}
 
 	response := models.ProjectResponse{
 		ID:                     updatedProject.ID,

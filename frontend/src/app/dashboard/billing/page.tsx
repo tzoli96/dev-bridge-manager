@@ -96,7 +96,7 @@ function AutomationRow({ project, clients }: AutomationRowProps) {
                         onChange={(e) => handleToggle(e.target.checked)}
                         disabled={saving || clients.length === 0}
                     />
-                    Automatikus havi értesítő
+                    {project.pricing_type === 'hourly' ? 'Automatikus havi értesítő' : 'Automatikus értesítő lezáráskor'}
                     {saving && <span className="text-xs text-muted-foreground font-normal">(mentés...)</span>}
                 </label>
             </div>

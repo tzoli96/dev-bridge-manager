@@ -102,3 +102,66 @@ func autoNotifyProject(project models.Project, periodStart, periodEnd time.Time)
 
 	log.Printf("✅ Auto-invoicing: auto-approved notice %d for project %d", notice.ID, project.ID)
 }
+
+// shouldSendFixedPriceCompletionNotice reports whether a fixed-price project
+// that just transitioned to "completed" has auto-invoicing configured. Pure
+// function so it can be unit-tested without a database.
+func shouldSendFixedPriceCompletionNotice(project models.Project) bool {
+	return project.PricingType == "fixed" && project.AutoInvoiceEnabled && project.AutoInvoiceClientID != nil
+}
+
+// MaybeSendFixedPriceCompletionNotice is the event-driven counterpart to
+// RunAutoInvoiceNotices' monthly schedule: instead of a period-based hourly
+// check, a fixed-price project sends its (one-off) pre-invoice notice the
+// moment it's marked "completed", if auto-invoicing is enabled for it.
+// Skipped if a notice or invoice already exists for this project, so
+// completing it again later (e.g. after reopening it) never sends a
+// duplicate. Called from ProjectHandler.UpdateProject in a background
+// goroutine, so a slow Gmail/Billingo call never blocks the status update.
+func MaybeSendFixedPriceCompletionNotice(project models.Project) {
+	if !shouldSendFixedPriceCompletionNotice(project) {
+		return
+	}
+	db := database.GetDB()
+
+	var existingNotice models.InvoiceNotice
+	if err := db.Where("project_id = ?", project.ID).First(&existingNotice).Error; err == nil {
+		return // notice already sent for this project
+	}
+	var existingInvoice models.Invoice
+	if err := db.Where("project_id = ? AND status IN ('created','pending')", project.ID).First(&existingInvoice).Error; err == nil {
+		return // already invoiced (e.g. via the manual button) for this project
+	}
+
+	var client models.Client
+	if err := db.First(&client, *project.AutoInvoiceClientID).Error; err != nil {
+		log.Printf("⚠️ Fixed-price completion: project %d's configured client %d not found, skipping", project.ID, *project.AutoInvoiceClientID)
+		return
+	}
+
+	var account models.GmailAccount
+	if err := db.Where("user_id = ?", project.CreatedBy).First(&account).Error; err != nil {
+		log.Printf("⚠️ Fixed-price completion: project %d's creator (user %d) has no connected Gmail account, skipping notice", project.ID, project.CreatedBy)
+		return
+	}
+
+	notice, err := SendInvoiceNoticeEmail(project, client, account, nil, nil, project.CreatedBy)
+	if err != nil {
+		log.Printf("⚠️ Fixed-price completion: failed to send notice for project %d: %v", project.ID, err)
+		return
+	}
+
+	log.Printf("✅ Fixed-price completion: sent notice for project %d", project.ID)
+
+	if !project.AutoInvoiceAutoApprove {
+		return
+	}
+
+	billingoService := NewBillingoService()
+	if _, httpStatus, message := ApproveInvoiceNotice(*notice, project, client, project.CreatedBy, billingoService); httpStatus != 0 {
+		log.Printf("⚠️ Fixed-price completion: auto-approve failed for project %d notice %d: %s", project.ID, notice.ID, message)
+		return
+	}
+
+	log.Printf("✅ Fixed-price completion: auto-approved notice %d for project %d", notice.ID, project.ID)
+}
