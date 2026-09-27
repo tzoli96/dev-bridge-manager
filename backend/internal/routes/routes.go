@@ -12,27 +12,28 @@ func SetupRoutes(app *fiber.App) {
 	SetupHealthRoutes(v1)
 
 	// Setup route groups
-	SetupAPIRoutes(v1)               // API endpoints under /api/v1
-	SetupAuthRoutes(v1)              // Auth endpoints
-	SetupUsersRoutes(v1)             // Users endpoints
-	SetupRoleRoutes(v1)              // Role endpoints
-	SetupPermissionRoutes(v1)        // Permission endpoints
-	SetupProjectRoutes(v1)           // Project endpoints - ÚJ!
-	SetupProjectAssignmentRoutes(v1) // Project endpoints - ÚJ!
-	SetupKanbanRoutes(v1)            // Kanban board/task/comment/time-entry endpoints - ÚJ!
-	SetupClientRoutes(v1)            // Client endpoints
-	SetupProjectClientRoutes(v1)     // Project-client assignment endpoints
-	SetupInvoiceRoutes(v1)           // Invoice endpoints
-	SetupBillingoSettingsRoutes(v1)  // Billingo settings endpoints
-	SetupGmailRoutes(v1)             // Gmail OAuth connect/status endpoints
-	SetupEmailRoutes(v1)             // Synced email list/detail/attachment/send endpoints
-	SetupProfileRoutes(v1)           // Global "who am I" profile - admin CRUD + internal context endpoint
-	SetupJobSearchRoutes(v1)         // Job search: profile, scan-now, manual add, matches - super_admin only
-	SetupKanbanStallRoutes(v1)       // Stalled kanban task flags - super_admin only
-	SetupSearchRoutes(v1)            // Global search across clients/projects/tasks
-	SetupActivityDigestRoutes(v1)    // Daily activity digest (dashboard card)
-	SetupProjectRenewalRoutes(v1)    // Contract/project renewal reminders - super_admin only
-	SetupClientHealthRoutes(v1)      // Per-client risk status (stalled tasks + overdue invoices) - super_admin only
+	SetupAPIRoutes(v1)                   // API endpoints under /api/v1
+	SetupAuthRoutes(v1)                  // Auth endpoints
+	SetupUsersRoutes(v1)                 // Users endpoints
+	SetupRoleRoutes(v1)                  // Role endpoints
+	SetupPermissionRoutes(v1)            // Permission endpoints
+	SetupProjectRoutes(v1)               // Project endpoints - ÚJ!
+	SetupProjectAssignmentRoutes(v1)     // Project endpoints - ÚJ!
+	SetupKanbanRoutes(v1)                // Kanban board/task/comment/time-entry endpoints - ÚJ!
+	SetupClientRoutes(v1)                // Client endpoints
+	SetupProjectClientRoutes(v1)         // Project-client assignment endpoints
+	SetupInvoiceRoutes(v1)               // Invoice endpoints
+	SetupBillingoSettingsRoutes(v1)      // Billingo settings endpoints
+	SetupGmailRoutes(v1)                 // Gmail OAuth connect/status endpoints
+	SetupEmailRoutes(v1)                 // Synced email list/detail/attachment/send endpoints
+	SetupProfileRoutes(v1)               // Global "who am I" profile - admin CRUD + internal context endpoint
+	SetupJobSearchRoutes(v1)             // Job search: profile, scan-now, manual add, matches - super_admin only
+	SetupKanbanStallRoutes(v1)           // Stalled kanban task flags - super_admin only
+	SetupSearchRoutes(v1)                // Global search across clients/projects/tasks
+	SetupActivityDigestRoutes(v1)        // Daily activity digest (dashboard card)
+	SetupProjectRenewalRoutes(v1)        // Contract/project renewal reminders - super_admin only
+	SetupClientHealthRoutes(v1)          // Per-client risk status (stalled tasks + overdue invoices) - super_admin only
+	SetupInvoiceReconciliationRoutes(v1) // Time-tracking vs. invoicing mismatches - super_admin only
 }
 
 func SetupAPIRoutes(api fiber.Router) {

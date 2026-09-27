@@ -22,9 +22,18 @@ type Invoice struct {
 	// Billingo, since no webhook is configured.
 	PaymentStatus string     `json:"payment_status" gorm:"size:20"`
 	PaidDate      *time.Time `json:"paid_date"`
-	ErrorMessage  string     `json:"error_message" gorm:"type:text"`
-	CreatedBy     uint       `json:"created_by" gorm:"not null"`
-	CreatedAt     time.Time  `json:"created_at"`
+	// InvoicedHours snapshots the logged hours actually billed at creation
+	// time for hourly invoices (nil for fixed-price). Time entries can still
+	// be edited/deleted afterwards with no restriction (see
+	// TaskTimeEntryHandler), so comparing this snapshot against the
+	// currently-logged hours for the same period is how
+	// services.RunInvoiceReconciliationCheck detects billing drift -
+	// comparing against Amount directly would be thrown off by later
+	// hourly-rate changes.
+	InvoicedHours *float64  `json:"invoiced_hours"`
+	ErrorMessage  string    `json:"error_message" gorm:"type:text"`
+	CreatedBy     uint      `json:"created_by" gorm:"not null"`
+	CreatedAt     time.Time `json:"created_at"`
 
 	Client  Client `json:"client,omitempty" gorm:"foreignKey:ClientID"`
 	Creator User   `json:"creator,omitempty" gorm:"foreignKey:CreatedBy"`

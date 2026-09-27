@@ -77,6 +77,10 @@ func main() {
 	// (see services.RunProjectRenewalCheck)
 	go services.StartProjectRenewalScheduler()
 
+	// Time-tracking vs. invoicing reconciliation flags, once at startup then
+	// every 24h (see services.RunInvoiceReconciliationCheck)
+	go services.StartInvoiceReconciliationScheduler()
+
 	// Start server
 	port := getPort()
 	log.Printf("🚀 Server starting on port %s", port)

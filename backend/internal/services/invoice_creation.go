@@ -96,6 +96,7 @@ func CreateInvoiceForProject(billingoService *BillingoService, project models.Pr
 
 	var amount float64
 	var periodStart, periodEnd *time.Time
+	var invoicedHours *float64
 	var description string
 	baseQuantity := 1.0
 	var baseUnit string
@@ -166,6 +167,7 @@ func CreateInvoiceForProject(billingoService *BillingoService, project models.Pr
 		baseUnit = "óra"
 		baseUnitPrice = hourlyRate
 		periodStart, periodEnd = &start, &end
+		invoicedHours = &totalHours
 		description = fmt.Sprintf("%s - %s to %s", project.Name, req.PeriodStart, req.PeriodEnd)
 
 	default:
@@ -263,6 +265,7 @@ func CreateInvoiceForProject(billingoService *BillingoService, project models.Pr
 			ItemName:              description,
 			DueDate:               dueDate,
 			Amount:                amount,
+			InvoicedHours:         invoicedHours,
 			Status:                "created",
 			CreatedBy:             createdBy,
 		}
