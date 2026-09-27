@@ -122,6 +122,25 @@ export interface InvoiceNoticeWithNames extends InvoiceNotice {
     billingo_invoice_number?: string
 }
 
+export interface InvoiceReminder {
+    id: number
+    invoice_id: number
+    project_id: number
+    client_id: number
+    days_overdue: number
+    status: 'pending' | 'sent' | 'dismissed'
+    created_at: string
+    sent_by: number | null
+    sent_at: string | null
+    gmail_message_id: string
+}
+
+export interface InvoiceReminderWithNames extends InvoiceReminder {
+    project_name: string
+    client_name: string
+    billingo_invoice_number: string
+}
+
 export interface EmailTemplate {
     email_type: 'notice' | 'ready'
     subject: string
@@ -200,6 +219,29 @@ export const InvoiceNoticesService = {
         return apiClient.get<{ success: boolean; notices?: InvoiceNoticeWithNames[] }>(
             '/invoice-notices',
             status ? { status } : undefined
+        )
+    },
+}
+
+export const InvoiceRemindersService = {
+    async listAll(status?: 'pending' | 'sent' | 'dismissed') {
+        return apiClient.get<{ success: boolean; reminders?: InvoiceReminderWithNames[] }>(
+            '/invoice-reminders',
+            status ? { status } : undefined
+        )
+    },
+
+    async approve(reminderId: number) {
+        return apiClient.post<{ success: boolean; message?: string; reminder?: InvoiceReminder }>(
+            `/invoice-reminders/${reminderId}/approve`,
+            {}
+        )
+    },
+
+    async dismiss(reminderId: number) {
+        return apiClient.post<{ success: boolean; message?: string; reminder?: InvoiceReminder }>(
+            `/invoice-reminders/${reminderId}/dismiss`,
+            {}
         )
     },
 }

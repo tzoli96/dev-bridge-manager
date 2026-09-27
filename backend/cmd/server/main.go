@@ -65,6 +65,10 @@ func main() {
 	// services.RunScrape)
 	go services.StartJobScrapingScheduler()
 
+	// Overdue invoice reminder proposals, once at startup then every 24h
+	// (see services.RunInvoiceReminderCheck)
+	go services.StartInvoiceReminderScheduler()
+
 	// Start server
 	port := getPort()
 	log.Printf("🚀 Server starting on port %s", port)

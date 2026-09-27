@@ -3,7 +3,7 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { ProjectsService, Project, ProjectClient } from '@/services/projectsService';
-import { InvoicesService, Invoice, InvoiceLineItem, InvoiceNoticesService, InvoiceNoticeWithNames, InvoiceReadyEmail } from '@/services/invoicesService';
+import { InvoicesService, Invoice, InvoiceLineItem, InvoiceNoticesService, InvoiceNoticeWithNames, InvoiceReadyEmail, InvoiceRemindersService, InvoiceReminderWithNames } from '@/services/invoicesService';
 import { Button } from '@/components/ui/button';
 import { Eye, ChevronDown, ChevronUp, ArrowUpRight, Receipt, Mail, Check, Pencil } from 'lucide-react';
 import EmailTemplatesModal from '@/components/EmailTemplatesModal';
@@ -194,6 +194,58 @@ export default function BillingPage() {
         fetchNotices();
     }, [fetchNotices]);
 
+    const [reminders, setReminders] = React.useState<InvoiceReminderWithNames[]>([]);
+    const [reminderFilter, setReminderFilter] = React.useState<'pending' | 'sent' | 'all'>('pending');
+    const [loadingReminders, setLoadingReminders] = React.useState(true);
+    const [actingReminderId, setActingReminderId] = React.useState<number | null>(null);
+    const [reminderActionError, setReminderActionError] = React.useState<string | null>(null);
+
+    const fetchReminders = React.useCallback(() => {
+        setLoadingReminders(true);
+        InvoiceRemindersService.listAll(reminderFilter === 'all' ? undefined : reminderFilter)
+            .then((res) => setReminders(res.reminders || []))
+            .catch(() => setReminders([]))
+            .finally(() => setLoadingReminders(false));
+    }, [reminderFilter]);
+
+    React.useEffect(() => {
+        fetchReminders();
+    }, [fetchReminders]);
+
+    const handleApproveReminder = async (reminder: InvoiceReminderWithNames) => {
+        setReminderActionError(null);
+        try {
+            setActingReminderId(reminder.id);
+            const res = await InvoiceRemindersService.approve(reminder.id);
+            if (!res.success) {
+                setReminderActionError(res.message || 'A jóváhagyás sikertelen');
+                return;
+            }
+            fetchReminders();
+        } catch (err: any) {
+            setReminderActionError(err.message);
+        } finally {
+            setActingReminderId(null);
+        }
+    };
+
+    const handleDismissReminder = async (reminder: InvoiceReminderWithNames) => {
+        setReminderActionError(null);
+        try {
+            setActingReminderId(reminder.id);
+            const res = await InvoiceRemindersService.dismiss(reminder.id);
+            if (!res.success) {
+                setReminderActionError(res.message || 'A kihagyás sikertelen');
+                return;
+            }
+            fetchReminders();
+        } catch (err: any) {
+            setReminderActionError(err.message);
+        } finally {
+            setActingReminderId(null);
+        }
+    };
+
     const handleApproveNotice = async (notice: InvoiceNoticeWithNames) => {
         setNoticeApprovalError(null);
         try {
@@ -361,6 +413,82 @@ export default function BillingPage() {
                                     >
                                         Jóváhagyás
                                     </Button>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            <div>
+                <div className="flex items-center justify-between mb-1">
+                    <h2 className="text-lg font-semibold text-foreground">Fizetési emlékeztetők</h2>
+                    <select
+                        value={reminderFilter}
+                        onChange={(e) => setReminderFilter(e.target.value as 'pending' | 'sent' | 'all')}
+                        className="px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                        <option value="pending">Jóváhagyásra vár</option>
+                        <option value="sent">Elküldve</option>
+                        <option value="all">Összes</option>
+                    </select>
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">
+                    Lejárt, kifizetetlen számlákhoz automatikusan javasolt emlékeztető e-mailek, 7 naponta ismétlődve, amíg a számla ki nem fizetve marad.
+                </p>
+                {reminderActionError && (
+                    <div className="bg-destructive/10 border border-destructive/20 text-destructive px-3 py-2 rounded text-sm mb-3">
+                        {reminderActionError}
+                    </div>
+                )}
+                {loadingReminders ? (
+                    <div className="flex items-center justify-center h-20">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                    </div>
+                ) : reminders.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Nincs megjeleníthető emlékeztető.</p>
+                ) : (
+                    <div className="bg-card border border-border rounded-lg divide-y divide-border">
+                        {reminders.map((reminder) => (
+                            <div key={reminder.id} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 px-4 py-3">
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-foreground">
+                                        {reminder.project_name}
+                                        {' · '}
+                                        {reminder.client_name}
+                                        {reminder.billingo_invoice_number ? ` · ${reminder.billingo_invoice_number}` : ''}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {`${reminder.days_overdue} napja lejárt`}
+                                        {reminder.status === 'sent' && reminder.sent_at ? ` · elküldve: ${new Date(reminder.sent_at).toLocaleString('hu-HU')}` : ''}
+                                    </p>
+                                </div>
+                                {reminder.status === 'sent' ? (
+                                    <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-success/10 text-success flex-shrink-0">
+                                        Elküldve
+                                    </span>
+                                ) : reminder.status === 'dismissed' ? (
+                                    <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-muted text-muted-foreground flex-shrink-0">
+                                        Kihagyva
+                                    </span>
+                                ) : (
+                                    <div className="flex gap-2 flex-shrink-0">
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            loading={actingReminderId === reminder.id}
+                                            onClick={() => handleDismissReminder(reminder)}
+                                        >
+                                            Kihagyás
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            loading={actingReminderId === reminder.id}
+                                            onClick={() => handleApproveReminder(reminder)}
+                                        >
+                                            Küldés
+                                        </Button>
+                                    </div>
                                 )}
                             </div>
                         ))}

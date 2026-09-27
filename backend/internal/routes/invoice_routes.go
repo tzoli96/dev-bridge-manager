@@ -12,6 +12,7 @@ func SetupInvoiceRoutes(api fiber.Router) {
 	invoiceHandler := handlers.NewInvoiceHandler()
 	noticeHandler := handlers.NewInvoiceNoticeHandler()
 	emailTemplateHandler := handlers.NewEmailTemplateHandler()
+	reminderHandler := handlers.NewInvoiceReminderHandler()
 
 	projects := api.Group("/projects")
 	projects.Use(middleware.JWTMiddleware())
@@ -65,4 +66,11 @@ func SetupInvoiceRoutes(api fiber.Router) {
 
 	// GET /api/v1/invoice-notices - Minden értesítő listázása, opcionális ?status= szűréssel (Számlázás menüpont)
 	api.Get("/invoice-notices", middleware.JWTMiddleware(), noticeHandler.ListAllInvoiceNotices)
+
+	// GET /api/v1/invoice-reminders - Lejárt számla emlékeztetők listázása, opcionális ?status= szűréssel (Számlázás menüpont)
+	api.Get("/invoice-reminders", middleware.JWTMiddleware(), reminderHandler.ListInvoiceReminders)
+	// POST /api/v1/invoice-reminders/:id/approve - Emlékeztető jóváhagyása, e-mail kiküldése
+	api.Post("/invoice-reminders/:id/approve", middleware.JWTMiddleware(), reminderHandler.Approve)
+	// POST /api/v1/invoice-reminders/:id/dismiss - Emlékeztető kihagyása ebben a körben
+	api.Post("/invoice-reminders/:id/dismiss", middleware.JWTMiddleware(), reminderHandler.Dismiss)
 }
