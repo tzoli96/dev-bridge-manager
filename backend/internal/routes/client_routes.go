@@ -22,6 +22,9 @@ func SetupClientRoutes(api fiber.Router) {
 	// GET /api/v1/clients/:id - Egy ügyfél megtekintése
 	clients.Get("/:id", clientHandler.GetClient)
 
+	// GET /api/v1/clients/:id/projects - Ügyfélhez rendelt projektek listázása
+	clients.Get("/:id/projects", clientHandler.GetClientProjects)
+
 	// ADMIN ONLY ENDPOINTS
 	// POST /api/v1/clients - Ügyfél létrehozása (csak admin)
 	clients.Post("/", clientHandler.CreateClient)

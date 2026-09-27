@@ -99,6 +99,21 @@ export class ClientsService {
         }
     }
 
+    static async getClientProjects(id: number): Promise<{ id: number; name: string }[]> {
+        try {
+            const response = await apiClient.get<{ success: boolean; message: string; projects?: { id: number; name: string }[] }>(`${this.baseUrl}/${id}/projects`)
+
+            if (response.success) {
+                return response.projects || []
+            }
+
+            throw new Error(response.message || 'Failed to fetch client projects')
+        } catch (error: any) {
+            console.error('Error fetching client projects:', error)
+            throw new Error(error.response?.data?.message || error.message || 'Failed to fetch client projects')
+        }
+    }
+
     static async createClient(clientData: ClientCreateRequest): Promise<Client> {
         try {
             const response = await apiClient.post<ClientsResponse>(this.baseUrl, clientData)

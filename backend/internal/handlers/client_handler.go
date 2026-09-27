@@ -160,6 +160,69 @@ func ptrClientResponse(r models.ClientResponse) *models.ClientResponse {
 	return &r
 }
 
+// GetClientProjects - GET /api/v1/clients/:id/projects
+// Reverse of GetProjectClients: which projects is this client assigned to.
+func (h *ClientHandler) GetClientProjects(c *fiber.Ctx) error {
+	id, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return c.Status(400).JSON(models.ProjectListResponse{
+			Success: false,
+			Message: "Invalid client ID",
+		})
+	}
+
+	var client models.Client
+	if err := database.GetDB().First(&client, id).Error; err != nil {
+		return c.Status(404).JSON(models.ProjectListResponse{
+			Success: false,
+			Message: "Client not found",
+		})
+	}
+
+	var projects []models.Project
+	err = database.GetDB().Table("projects").
+		Select("projects.*, users.name as created_by_name").
+		Joins("JOIN project_clients ON project_clients.project_id = projects.id").
+		Joins("LEFT JOIN users ON projects.created_by = users.id").
+		Where("project_clients.client_id = ?", id).
+		Order("projects.created_at DESC").
+		Scan(&projects).Error
+
+	if err != nil {
+		return c.Status(500).JSON(models.ProjectListResponse{
+			Success: false,
+			Message: "Error fetching client projects",
+		})
+	}
+
+	response := make([]models.ProjectResponse, 0, len(projects))
+	for _, project := range projects {
+		response = append(response, models.ProjectResponse{
+			ID:                     project.ID,
+			Name:                   project.Name,
+			Description:            project.Description,
+			Status:                 project.Status,
+			PricingType:            project.PricingType,
+			HourlyRate:             project.HourlyRate,
+			FixedPrice:             project.FixedPrice,
+			AutoInvoiceEnabled:     project.AutoInvoiceEnabled,
+			AutoInvoiceClientID:    project.AutoInvoiceClientID,
+			AutoInvoiceAutoApprove: project.AutoInvoiceAutoApprove,
+			CreatedBy:              project.CreatedBy,
+			CreatedByName:          project.CreatedByName,
+			CreatedAt:              project.CreatedAt,
+			UpdatedAt:              project.UpdatedAt,
+		})
+	}
+
+	return c.JSON(models.ProjectListResponse{
+		Success:  true,
+		Message:  "Client projects retrieved successfully",
+		Projects: response,
+		Count:    len(response),
+	})
+}
+
 // CreateClient - POST /api/v1/clients
 // Csak admin hozhat létre ügyfelet
 func (h *ClientHandler) CreateClient(c *fiber.Ctx) error {
