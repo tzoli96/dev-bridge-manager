@@ -19,14 +19,16 @@ import (
 )
 
 type EmailHandler struct {
-	gmailAPI     services.GmailAPI
-	draftReplier services.DraftReplier
+	gmailAPI        services.GmailAPI
+	draftReplier    services.DraftReplier
+	taskBreakdowner services.TaskBreakdowner
 }
 
 func NewEmailHandler() *EmailHandler {
 	return &EmailHandler{
-		gmailAPI:     services.NewRealGmailAPI(),
-		draftReplier: services.NewDraftReplyService(),
+		gmailAPI:        services.NewRealGmailAPI(),
+		draftReplier:    services.NewDraftReplyService(),
+		taskBreakdowner: services.NewTaskBreakdownService(),
 	}
 }
 
@@ -284,6 +286,50 @@ func (h *EmailHandler) DraftComposeEmail(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{"success": true, "draft": draft})
+}
+
+// BreakdownEmailIntoTasks - POST /api/v1/emails/:id/task-breakdown - fetches
+// the email body and asks the AI service to propose one or more tasks
+// (related items nested as subtasks of a primary task). Returns the proposed
+// groups only - nothing is created until the user confirms via the regular
+// task-creation endpoints.
+func (h *EmailHandler) BreakdownEmailIntoTasks(c *fiber.Ctx) error {
+	userID := c.Locals("userID").(uint)
+	account, err := currentGmailAccount(userID)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"success": false, "message": "Connect your Gmail account first"})
+	}
+
+	id, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"success": false, "message": "Invalid email id"})
+	}
+
+	var email models.Email
+	if err := database.GetDB().Where("id = ? AND gmail_account_id = ?", id, account.ID).First(&email).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{"success": false, "message": "Email not found"})
+	}
+
+	full, err := h.gmailAPI.GetFullMessage(c.Context(), account, email.GmailMessageID)
+	if err != nil {
+		return c.Status(502).JSON(fiber.Map{"success": false, "message": "Failed to fetch email body from Gmail: " + err.Error()})
+	}
+
+	content := full.BodyText
+	if strings.TrimSpace(content) == "" {
+		content = full.Subject
+	}
+	const maxContentLen = 4000
+	if len(content) > maxContentLen {
+		content = content[:maxContentLen]
+	}
+
+	groups, err := h.taskBreakdowner.BreakdownIntoTasks(c.Context(), full.Subject, content)
+	if err != nil {
+		return c.Status(502).JSON(fiber.Map{"success": false, "message": "Failed to generate task breakdown: " + err.Error()})
+	}
+
+	return c.JSON(fiber.Map{"success": true, "groups": groups})
 }
 
 // GetAttachment - GET /api/v1/emails/:id/attachments/:attachmentId - proxyzott

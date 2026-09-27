@@ -3,11 +3,12 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Mail, Send, Paperclip, RefreshCw, LogOut, X, Plus, Sparkles } from 'lucide-react'
+import { Mail, Send, Paperclip, RefreshCw, LogOut, X, Plus, Sparkles, KanbanSquare } from 'lucide-react'
 import { GmailService, GmailStatus } from '@/services/gmailService'
 import { EmailsService, EmailListItem, EmailDetail } from '@/services/emailsService'
 import LoadingState from '@/components/ui/LoadingState'
 import ComposeEditor, { ComposeEditorHandle } from '@/components/emails/ComposeEditor'
+import { CreateTaskFromEmailModal } from '@/components/emails/CreateTaskFromEmailModal'
 
 type Folder = 'inbox' | 'sent'
 
@@ -114,6 +115,7 @@ export default function EmailsPage() {
     const [draftInstruction, setDraftInstruction] = useState('')
     const [syncing, setSyncing] = useState(false)
     const [syncError, setSyncError] = useState<string | null>(null)
+    const [createTaskModalOpen, setCreateTaskModalOpen] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const composeEditorRef = useRef<ComposeEditorHandle>(null)
     // Async draft requests read these refs after an `await`, when state
@@ -574,11 +576,24 @@ export default function EmailsPage() {
                                 >
                                     <RefreshCw size={14} /> Válasz
                                 </button>
+                                <button
+                                    onClick={() => setCreateTaskModalOpen(true)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-muted text-foreground rounded-lg text-sm font-medium hover:bg-muted/70 transition-colors"
+                                >
+                                    <KanbanSquare size={14} /> Feladat létrehozása
+                                </button>
                             </div>
                         </div>
                     )}
                 </div>
             </div>
+            {selected && (
+                <CreateTaskFromEmailModal
+                    isOpen={createTaskModalOpen}
+                    onClose={() => setCreateTaskModalOpen(false)}
+                    email={selected}
+                />
+            )}
 
             {composeOpen && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">

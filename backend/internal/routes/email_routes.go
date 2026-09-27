@@ -21,4 +21,5 @@ func SetupEmailRoutes(api fiber.Router) {
 	emails.Get("/:id/attachments/:attachmentId", h.GetAttachment)
 	emails.Post("/send", h.SendEmail)
 	emails.Post("/draft-compose", h.DraftComposeEmail)
+	emails.Post("/:id/task-breakdown", h.BreakdownEmailIntoTasks)
 }

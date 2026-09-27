@@ -11,6 +11,7 @@ from app.draft_reply import DraftReplyRequest, DraftReplyResult, draft_reply
 from app.job_application_draft import JobApplicationDraftRequest, JobApplicationDraftResult, job_application_draft
 from app.job_match import JobMatchRequest, JobMatchResult, job_match
 from app.match_email_client import MatchEmailClientRequest, MatchEmailClientResult, match_email_client
+from app.task_breakdown import TaskBreakdownRequest, TaskBreakdownResult, task_breakdown
 
 logger = logging.getLogger("devbridge_ai")
 # No observability existed before this: not one call logged its latency, and
@@ -76,6 +77,12 @@ async def draft_reply_endpoint(payload: DraftReplyRequest) -> DraftReplyResult:
 async def match_email_client_endpoint(payload: MatchEmailClientRequest) -> MatchEmailClientResult:
     client_id = await match_email_client(payload)
     return MatchEmailClientResult(client_id=client_id)
+
+
+@app.post("/task-breakdown", response_model=TaskBreakdownResult)
+async def task_breakdown_endpoint(payload: TaskBreakdownRequest) -> TaskBreakdownResult:
+    groups = await task_breakdown(payload)
+    return TaskBreakdownResult(groups=groups)
 
 
 @app.post("/job-match", response_model=JobMatchResult)

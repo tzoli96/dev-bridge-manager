@@ -48,6 +48,17 @@ export interface EmailDetail {
     project_id?: number | null
 }
 
+export interface TaskBreakdownItem {
+    title: string
+    description: string
+}
+
+export interface TaskBreakdownGroup {
+    title: string
+    description: string
+    subtasks: TaskBreakdownItem[]
+}
+
 export interface SendEmailRequest {
     to: string
     subject: string
@@ -112,6 +123,12 @@ export const EmailsService = {
         // browser a longer timeout so it doesn't give up before the backend
         // itself would (same reasoning as GmailService.sync's longer timeout).
         return apiClient.post(`/emails/${id}/draft-reply`, { instruction }, 40000)
+    },
+
+    async breakdownIntoTasks(id: number): Promise<{ success: boolean; message?: string; groups?: TaskBreakdownGroup[] }> {
+        // Same reasoning as draftReply's longer timeout - this is a
+        // similarly heavy AI generation call.
+        return apiClient.post(`/emails/${id}/task-breakdown`, {}, 40000)
     },
 
     async draftCompose(instruction: string): Promise<{ success: boolean; message?: string; draft?: string }> {
