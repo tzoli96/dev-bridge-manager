@@ -81,6 +81,10 @@ func main() {
 	// every 24h (see services.RunInvoiceReconciliationCheck)
 	go services.StartInvoiceReconciliationScheduler()
 
+	// AI-drafted weekly client status emails, once at startup then hourly,
+	// gated to only do work on Mondays (see services.RunClientStatusEmailDrafts)
+	go services.StartClientStatusEmailScheduler()
+
 	// Start server
 	port := getPort()
 	log.Printf("🚀 Server starting on port %s", port)

@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request
 import logfire
 
 from app.categorize_email import CategorizeEmailRequest, CategorizeEmailResult, categorize_email
+from app.client_status_email import ClientStatusEmailRequest, ClientStatusEmailResult, client_status_email
 from app.draft_reply import DraftReplyRequest, DraftReplyResult, draft_reply
 from app.job_application_draft import JobApplicationDraftRequest, JobApplicationDraftResult, job_application_draft
 from app.job_match import JobMatchRequest, JobMatchResult, job_match
@@ -94,3 +95,8 @@ async def job_match_endpoint(payload: JobMatchRequest) -> JobMatchResult:
 async def job_application_draft_endpoint(payload: JobApplicationDraftRequest) -> JobApplicationDraftResult:
     draft = await job_application_draft(payload)
     return JobApplicationDraftResult(draft=draft)
+
+
+@app.post("/client-status-email", response_model=ClientStatusEmailResult)
+async def client_status_email_endpoint(payload: ClientStatusEmailRequest) -> ClientStatusEmailResult:
+    return await client_status_email(payload)

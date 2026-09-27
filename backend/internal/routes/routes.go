@@ -34,6 +34,7 @@ func SetupRoutes(app *fiber.App) {
 	SetupProjectRenewalRoutes(v1)        // Contract/project renewal reminders - super_admin only
 	SetupClientHealthRoutes(v1)          // Per-client risk status (stalled tasks + overdue invoices) - super_admin only
 	SetupInvoiceReconciliationRoutes(v1) // Time-tracking vs. invoicing mismatches - super_admin only
+	SetupClientStatusEmailRoutes(v1)     // AI-drafted weekly client status emails - super_admin only
 }
 
 func SetupAPIRoutes(api fiber.Router) {
