@@ -28,6 +28,7 @@ func SetupRoutes(app *fiber.App) {
 	SetupEmailRoutes(v1)             // Synced email list/detail/attachment/send endpoints
 	SetupProfileRoutes(v1)           // Global "who am I" profile - admin CRUD + internal context endpoint
 	SetupJobSearchRoutes(v1)         // Job search: profile, scan-now, manual add, matches - super_admin only
+	SetupKanbanStallRoutes(v1)       // Stalled kanban task flags - super_admin only
 }
 
 func SetupAPIRoutes(api fiber.Router) {

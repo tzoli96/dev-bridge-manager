@@ -69,6 +69,10 @@ func main() {
 	// (see services.RunInvoiceReminderCheck)
 	go services.StartInvoiceReminderScheduler()
 
+	// Stalled kanban task flags, once at startup then every 24h (see
+	// services.RunKanbanStallCheck)
+	go services.StartKanbanStallScheduler()
+
 	// Start server
 	port := getPort()
 	log.Printf("🚀 Server starting on port %s", port)

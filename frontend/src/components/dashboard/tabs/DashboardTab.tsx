@@ -4,9 +4,10 @@ import { User } from '@/types/user'
 import { useUsers } from '@/hooks/useUser'
 import { useProjects } from '@/hooks/useProjects'
 import { useModals } from '@/components/dashboard/DashboardModals'
-import { hasPermission, hasAnyPermission, isAdmin } from '@/utils/permissions'
+import { hasPermission, hasAnyPermission, isAdmin, isSuperAdmin } from '@/utils/permissions'
 import QuickActionsGrid from '@/components/dashboard/QuickActionsGrid'
 import StatsCards from '@/components/dashboard/StatsCards'
+import StalledTasksWidget from '@/components/dashboard/StalledTasksWidget'
 
 interface DashboardTabProps {
     user: User | null
@@ -28,6 +29,7 @@ export default function DashboardTab({ user }: DashboardTabProps) {
                 <StatsCards user={user} users={users} projects={projects} />
             </div>
             <QuickActionsGrid user={user} users={users} projects={projects} />
+            {isSuperAdmin(user) && <StalledTasksWidget />}
         </div>
     )
 }
