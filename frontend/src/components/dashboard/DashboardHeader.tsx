@@ -3,6 +3,7 @@
 import { LogOut, Boxes } from 'lucide-react'
 import { User } from '@/types/user'
 import { ThemeToggle } from '@/components/theme-toggle'
+import GlobalSearch from '@/components/dashboard/GlobalSearch'
 
 interface DashboardHeaderProps {
     user: User | null
@@ -15,18 +16,22 @@ export default function DashboardHeader({ user, onLogout }: DashboardHeaderProps
     return (
         <div className="bg-card border-b border-border">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex justify-between items-center py-4">
-                    <div className="flex items-center gap-3">
+                <div className="flex justify-between items-center py-4 gap-4">
+                    <div className="flex items-center gap-3 shrink-0">
                         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-white shadow-sm shadow-primary/20">
                             <Boxes size={18} />
                         </div>
-                        <div>
+                        <div className="hidden md:block">
                             <h1 className="text-base font-semibold text-foreground leading-tight">Dev Bridge Manager</h1>
                             <p className="text-xs text-muted-foreground">Project management</p>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex-1 max-w-md">
+                        <GlobalSearch />
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0">
                         <div className="hidden sm:flex items-center gap-2.5 pr-3 border-r border-border">
                             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-semibold">
                                 {initial}
