@@ -15,7 +15,7 @@ import (
 // DraftReplier is the seam email_handler.go calls through, so tests can
 // inject a fake instead of hitting the real AI service.
 type DraftReplier interface {
-	DraftReply(ctx context.Context, emailContent, profileContext string, similarReplies []string) (string, error)
+	DraftReply(ctx context.Context, emailContent, profileContext string, similarReplies []string, editExamples []DraftEditExample, instruction string) (string, error)
 }
 
 var _ DraftReplier = (*DraftReplyService)(nil)
@@ -41,23 +41,36 @@ func NewDraftReplyService() *DraftReplyService {
 }
 
 type draftReplyRequest struct {
-	EmailContent   string   `json:"email_content"`
-	ProfileContext string   `json:"profile_context"`
-	SimilarReplies []string `json:"similar_replies"`
+	EmailContent   string                    `json:"email_content"`
+	ProfileContext string                    `json:"profile_context"`
+	SimilarReplies []string                  `json:"similar_replies"`
+	EditExamples   []draftEditExamplePayload `json:"edit_examples"`
+	Instruction    string                    `json:"instruction"`
+}
+
+type draftEditExamplePayload struct {
+	AIDraft string `json:"ai_draft"`
+	Sent    string `json:"sent"`
 }
 
 type draftReplyResponse struct {
 	Draft string `json:"draft"`
 }
 
-func (s *DraftReplyService) DraftReply(ctx context.Context, emailContent, profileContext string, similarReplies []string) (string, error) {
+func (s *DraftReplyService) DraftReply(ctx context.Context, emailContent, profileContext string, similarReplies []string, editExamples []DraftEditExample, instruction string) (string, error) {
 	if similarReplies == nil {
 		similarReplies = []string{}
+	}
+	editExamplePayloads := make([]draftEditExamplePayload, 0, len(editExamples))
+	for _, e := range editExamples {
+		editExamplePayloads = append(editExamplePayloads, draftEditExamplePayload{AIDraft: e.AIDraft, Sent: e.Sent})
 	}
 	payload, err := json.Marshal(draftReplyRequest{
 		EmailContent:   emailContent,
 		ProfileContext: profileContext,
 		SimilarReplies: similarReplies,
+		EditExamples:   editExamplePayloads,
+		Instruction:    instruction,
 	})
 	if err != nil {
 		return "", fmt.Errorf("encoding draft-reply request: %w", err)

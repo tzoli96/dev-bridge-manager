@@ -186,6 +186,10 @@ func (h *EmailHandler) GetEmail(c *fiber.Ctx) error {
 	})
 }
 
+type draftReplyRequestBody struct {
+	Instruction string `json:"instruction"`
+}
+
 // DraftReply - POST /api/v1/emails/:id/draft-reply - fetches the email body,
 // combines it with the global profile context, and asks the AI service for
 // a draft. Returns text only - never saves or sends anything.
@@ -220,6 +224,16 @@ func (h *EmailHandler) DraftReply(c *fiber.Ctx) error {
 		content = content[:maxContentLen]
 	}
 
+	// A missing or malformed body just means "no instruction given" - the
+	// endpoint still works exactly as before in that case.
+	var reqBody draftReplyRequestBody
+	_ = c.BodyParser(&reqBody)
+	instruction := strings.TrimSpace(reqBody.Instruction)
+	const maxInstructionLen = 2000
+	if len(instruction) > maxInstructionLen {
+		instruction = instruction[:maxInstructionLen]
+	}
+
 	var profile models.Profile
 	profileContext := ""
 	if err := database.GetDB().Preload("Samples").First(&profile, 1).Error; err == nil {
@@ -229,8 +243,42 @@ func (h *EmailHandler) DraftReply(c *fiber.Ctx) error {
 	// failing the whole request - drafting a plain reply is still useful.
 
 	similarReplies := services.FindSimilarReplies(c.Context(), database.GetDB(), account, &email, content, h.gmailAPI)
+	editExamples := services.FindDraftEditExamples(c.Context(), database.GetDB(), account)
 
-	draft, err := h.draftReplier.DraftReply(c.Context(), content, profileContext, similarReplies)
+	draft, err := h.draftReplier.DraftReply(c.Context(), content, profileContext, similarReplies, editExamples, instruction)
+	if err != nil {
+		return c.Status(502).JSON(fiber.Map{"success": false, "message": "Failed to generate draft: " + err.Error()})
+	}
+
+	return c.JSON(fiber.Map{"success": true, "draft": draft})
+}
+
+// DraftComposeEmail - POST /api/v1/emails/draft-compose - asks the AI
+// service to turn the user's own instruction into a polished draft for a
+// brand-new (non-reply) email. Unlike DraftReply there is no incoming email
+// to fall back on, so the instruction is required. Returns text only -
+// never saves or sends anything.
+func (h *EmailHandler) DraftComposeEmail(c *fiber.Ctx) error {
+	var reqBody draftReplyRequestBody
+	if err := c.BodyParser(&reqBody); err != nil {
+		return c.Status(400).JSON(fiber.Map{"success": false, "message": "Invalid request body"})
+	}
+	instruction := strings.TrimSpace(reqBody.Instruction)
+	if instruction == "" {
+		return c.Status(400).JSON(fiber.Map{"success": false, "message": "Instruction is required"})
+	}
+	const maxInstructionLen = 2000
+	if len(instruction) > maxInstructionLen {
+		instruction = instruction[:maxInstructionLen]
+	}
+
+	var profile models.Profile
+	profileContext := ""
+	if err := database.GetDB().Preload("Samples").First(&profile, 1).Error; err == nil {
+		profileContext = services.BuildProfileContext(&profile)
+	}
+
+	draft, err := h.draftReplier.DraftReply(c.Context(), "", profileContext, nil, nil, instruction)
 	if err != nil {
 		return c.Status(502).JSON(fiber.Map{"success": false, "message": "Failed to generate draft: " + err.Error()})
 	}

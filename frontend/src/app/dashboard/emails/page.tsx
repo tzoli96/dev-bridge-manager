@@ -111,6 +111,7 @@ export default function EmailsPage() {
     const [draftError, setDraftError] = useState<string | null>(null)
     const [pendingDraftText, setPendingDraftText] = useState<string | null>(null)
     const [aiDraftOriginalText, setAiDraftOriginalText] = useState<string | null>(null)
+    const [draftInstruction, setDraftInstruction] = useState('')
     const [syncing, setSyncing] = useState(false)
     const [syncError, setSyncError] = useState<string | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
@@ -224,6 +225,7 @@ export default function EmailsPage() {
         setDraftError(null)
         setComposeFiles([])
         setAiDraftOriginalText(null)
+        setDraftInstruction('')
         if (reply) {
             setComposeTo(reply.from || '')
             setComposeSubject(reply.subject?.startsWith('Re:') ? reply.subject : `Re: ${reply.subject || ''}`)
@@ -237,13 +239,21 @@ export default function EmailsPage() {
     }
 
     const handleDraftReply = async () => {
-        if (!selected?.id) return
-        const targetEmailId = selected.id
+        // Reads replyToId, not selected?.id: the compose modal (and the
+        // instruction field it's called from) already targets a specific
+        // reply, independent of whichever email is selected in the list
+        // behind it. When there's no replyToId, this is a brand-new
+        // (non-reply) email - draftCompose is used instead, which requires
+        // the instruction since there's no incoming email to fall back on.
+        const targetEmailId = replyToId
+        const instruction = draftInstruction.trim()
+        if (!targetEmailId && !instruction) return
         setDraftError(null)
-        openCompose(selected)
         try {
             setDraftingReply(true)
-            const res = await EmailsService.draftReply(targetEmailId)
+            const res = targetEmailId
+                ? await EmailsService.draftReply(targetEmailId, instruction || undefined)
+                : await EmailsService.draftCompose(instruction)
             // The compose modal may have been closed, or switched to a
             // different email, while this request was in flight - discard
             // the result rather than injecting a stale draft.
@@ -564,13 +574,6 @@ export default function EmailsPage() {
                                 >
                                     <RefreshCw size={14} /> Válasz
                                 </button>
-                                <button
-                                    onClick={handleDraftReply}
-                                    disabled={draftingReply}
-                                    className="flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-lg text-sm font-medium hover:bg-primary/20 disabled:opacity-50 transition-colors"
-                                >
-                                    <Sparkles size={14} /> {draftingReply ? 'Javaslat készül...' : 'AI válasz-javaslat'}
-                                </button>
                             </div>
                         </div>
                     )}
@@ -598,6 +601,28 @@ export default function EmailsPage() {
                                     {draftError}
                                 </div>
                             )}
+                            <div className="space-y-2 bg-muted/40 border border-border rounded-lg p-3">
+                                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                                    <Sparkles size={13} /> {replyToId ? 'AI válasz-javaslat' : 'AI-fogalmazás'}
+                                </label>
+                                <textarea
+                                    placeholder={replyToId
+                                        ? 'Mit szeretnél írni? (nem kötelező - üresen hagyva az AI a bejövő email alapján javasol választ)'
+                                        : 'Mit szeretnél írni? (kötelező - az AI ez alapján fogalmaz kész levelet)'}
+                                    value={draftInstruction}
+                                    onChange={e => setDraftInstruction(e.target.value)}
+                                    rows={2}
+                                    className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={handleDraftReply}
+                                    disabled={draftingReply || (!replyToId && !draftInstruction.trim())}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-sm font-medium hover:bg-primary/20 disabled:opacity-50 transition-colors"
+                                >
+                                    <Sparkles size={13} /> {draftingReply ? 'Javaslat készül...' : 'AI-javaslat kérése'}
+                                </button>
+                            </div>
                             <div className="space-y-1.5">
                                 <label className="text-xs font-medium text-muted-foreground">Címzett</label>
                                 <input

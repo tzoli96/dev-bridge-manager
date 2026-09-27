@@ -25,7 +25,8 @@ func TestDraftReplySendsFieldsAndReturnsDraft(t *testing.T) {
 	defer server.Close()
 
 	svc := &DraftReplyService{httpClient: &http.Client{Timeout: 5 * time.Second}, baseURL: server.URL}
-	got, err := svc.DraftReply(context.Background(), "email body", "profile context", []string{"prior reply one", "prior reply two"})
+	editExamples := []DraftEditExample{{AIDraft: "AI draft one", Sent: "edited one"}}
+	got, err := svc.DraftReply(context.Background(), "email body", "profile context", []string{"prior reply one", "prior reply two"}, editExamples, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -39,6 +40,32 @@ func TestDraftReplySendsFieldsAndReturnsDraft(t *testing.T) {
 	if !ok || len(gotSimilar) != 2 || gotSimilar[0] != "prior reply one" || gotSimilar[1] != "prior reply two" {
 		t.Fatalf("request body missing expected similar_replies: %+v", gotBody)
 	}
+	gotEditExamples, ok := gotBody["edit_examples"].([]interface{})
+	if !ok || len(gotEditExamples) != 1 {
+		t.Fatalf("request body missing expected edit_examples: %+v", gotBody)
+	}
+	firstExample, ok := gotEditExamples[0].(map[string]interface{})
+	if !ok || firstExample["ai_draft"] != "AI draft one" || firstExample["sent"] != "edited one" {
+		t.Fatalf("edit_examples entry missing expected fields: %+v", gotEditExamples[0])
+	}
+}
+
+func TestDraftReplySendsInstruction(t *testing.T) {
+	var gotBody map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewDecoder(r.Body).Decode(&gotBody)
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"draft": "d"})
+	}))
+	defer server.Close()
+
+	svc := &DraftReplyService{httpClient: &http.Client{Timeout: 5 * time.Second}, baseURL: server.URL}
+	if _, err := svc.DraftReply(context.Background(), "s", "p", nil, nil, "mondd meg neki hogy holnapra kész"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotBody["instruction"] != "mondd meg neki hogy holnapra kész" {
+		t.Fatalf("expected instruction to be sent, got: %+v", gotBody)
+	}
 }
 
 func TestDraftReplyMarshalsNilSimilarRepliesAsEmptyArray(t *testing.T) {
@@ -51,11 +78,14 @@ func TestDraftReplyMarshalsNilSimilarRepliesAsEmptyArray(t *testing.T) {
 	defer server.Close()
 
 	svc := &DraftReplyService{httpClient: &http.Client{Timeout: 5 * time.Second}, baseURL: server.URL}
-	if _, err := svc.DraftReply(context.Background(), "s", "p", nil); err != nil {
+	if _, err := svc.DraftReply(context.Background(), "s", "p", nil, nil, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(string(rawBody), `"similar_replies":[]`) {
 		t.Fatalf("expected similar_replies to marshal as [], got raw body: %s", rawBody)
+	}
+	if !strings.Contains(string(rawBody), `"edit_examples":[]`) {
+		t.Fatalf("expected edit_examples to marshal as [], got raw body: %s", rawBody)
 	}
 }
 
@@ -67,7 +97,7 @@ func TestDraftReplyReturnsErrorOnNon2xx(t *testing.T) {
 	defer server.Close()
 
 	svc := &DraftReplyService{httpClient: &http.Client{Timeout: 5 * time.Second}, baseURL: server.URL}
-	_, err := svc.DraftReply(context.Background(), "s", "p", nil)
+	_, err := svc.DraftReply(context.Background(), "s", "p", nil, nil, "")
 	if err == nil {
 		t.Fatal("expected an error for a 500 response, got nil")
 	}
@@ -82,7 +112,7 @@ func TestDraftReplyReturnsErrorOnTimeout(t *testing.T) {
 	defer server.Close()
 
 	svc := &DraftReplyService{httpClient: &http.Client{Timeout: 5 * time.Millisecond}, baseURL: server.URL}
-	_, err := svc.DraftReply(context.Background(), "s", "p", nil)
+	_, err := svc.DraftReply(context.Background(), "s", "p", nil, nil, "")
 	if err == nil {
 		t.Fatal("expected a timeout error, got nil")
 	}
