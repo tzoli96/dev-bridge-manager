@@ -10,9 +10,10 @@ interface RichTextEditorProps {
     onBlur?: () => void;
     placeholder?: string;
     minHeight?: string;
+    readOnly?: boolean;
 }
 
-export const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, onBlur, placeholder, minHeight = '100px' }) => {
+export const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange, onBlur, placeholder, minHeight = '100px', readOnly = false }) => {
     const editorRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -39,32 +40,34 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChang
 
     return (
         <div className="border border-input rounded-lg overflow-hidden">
-            <div className="flex items-center gap-1 border-b border-border bg-muted px-2 py-1">
-                <button
-                    type="button"
-                    onClick={() => exec('bold')}
-                    className="p-1.5 rounded hover:bg-muted text-muted-foreground"
-                >
-                    <Bold size={14} />
-                </button>
-                <button
-                    type="button"
-                    onClick={() => exec('italic')}
-                    className="p-1.5 rounded hover:bg-muted text-muted-foreground"
-                >
-                    <Italic size={14} />
-                </button>
-                <button
-                    type="button"
-                    onClick={() => exec('insertUnorderedList')}
-                    className="p-1.5 rounded hover:bg-muted text-muted-foreground"
-                >
-                    <List size={14} />
-                </button>
-            </div>
+            {!readOnly && (
+                <div className="flex items-center gap-1 border-b border-border bg-muted px-2 py-1">
+                    <button
+                        type="button"
+                        onClick={() => exec('bold')}
+                        className="p-1.5 rounded hover:bg-muted text-muted-foreground"
+                    >
+                        <Bold size={14} />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => exec('italic')}
+                        className="p-1.5 rounded hover:bg-muted text-muted-foreground"
+                    >
+                        <Italic size={14} />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => exec('insertUnorderedList')}
+                        className="p-1.5 rounded hover:bg-muted text-muted-foreground"
+                    >
+                        <List size={14} />
+                    </button>
+                </div>
+            )}
             <div
                 ref={editorRef}
-                contentEditable
+                contentEditable={!readOnly}
                 onInput={emitChange}
                 onBlur={onBlur}
                 data-placeholder={placeholder}
