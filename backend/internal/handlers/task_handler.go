@@ -201,6 +201,9 @@ func (h *TaskHandler) UpdateTask(c *fiber.Ctx) error {
 	if err := database.GetDB().First(&task, taskID).Error; err != nil {
 		return c.Status(404).JSON(fiber.Map{"success": false, "message": "Task not found"})
 	}
+	if isJiraSourced(task) {
+		return c.Status(403).JSON(fiber.Map{"success": false, "message": "This task is mirrored from Jira and can't be edited locally"})
+	}
 	original := task
 
 	var req models.UpdateTaskRequest
@@ -257,6 +260,14 @@ func (h *TaskHandler) DeleteTask(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"success": false, "message": "Invalid task ID"})
 	}
 
+	var task models.Task
+	if err := database.GetDB().First(&task, taskID).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{"success": false, "message": "Task not found"})
+	}
+	if isJiraSourced(task) {
+		return c.Status(403).JSON(fiber.Map{"success": false, "message": "This task is mirrored from Jira and can't be deleted locally"})
+	}
+
 	if err := database.GetDB().Delete(&models.Task{}, taskID).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"success": false, "message": "Error deleting task"})
 	}
@@ -278,6 +289,9 @@ func (h *TaskHandler) MoveTask(c *fiber.Ctx) error {
 	var task models.Task
 	if err := database.GetDB().First(&task, taskID).Error; err != nil {
 		return c.Status(404).JSON(fiber.Map{"success": false, "message": "Task not found"})
+	}
+	if isJiraSourced(task) {
+		return c.Status(403).JSON(fiber.Map{"success": false, "message": "This task is mirrored from Jira and can't be moved locally"})
 	}
 
 	var placement models.TaskPlacement
@@ -356,6 +370,9 @@ func (h *TaskHandler) PlaceTask(c *fiber.Ctx) error {
 	if err := database.GetDB().First(&task, taskID).Error; err != nil {
 		return c.Status(404).JSON(fiber.Map{"success": false, "message": "Task not found"})
 	}
+	if isJiraSourced(task) {
+		return c.Status(403).JSON(fiber.Map{"success": false, "message": "This task is mirrored from Jira and can't be placed locally"})
+	}
 
 	var req models.PlaceTaskRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -406,6 +423,14 @@ func (h *TaskHandler) RemovePlacement(c *fiber.Ctx) error {
 	}
 
 	db := database.GetDB()
+
+	var task models.Task
+	if err := db.First(&task, taskID).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{"success": false, "message": "Task not found"})
+	}
+	if isJiraSourced(task) {
+		return c.Status(403).JSON(fiber.Map{"success": false, "message": "This task is mirrored from Jira and can't be removed locally"})
+	}
 
 	var placement models.TaskPlacement
 	if err := db.Where("task_id = ? AND board_id = ?", taskID, boardID).First(&placement).Error; err != nil {

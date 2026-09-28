@@ -166,6 +166,9 @@ func (h *KanbanHandler) UpdateColumn(c *fiber.Ctx) error {
 	if err := database.GetDB().First(&column, columnID).Error; err != nil {
 		return c.Status(404).JSON(fiber.Map{"success": false, "message": "Column not found"})
 	}
+	if isJiraColumn(column) {
+		return c.Status(403).JSON(fiber.Map{"success": false, "message": "This column mirrors a Jira status and can't be edited locally"})
+	}
 
 	var req models.UpdateColumnRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -220,6 +223,9 @@ func (h *KanbanHandler) DeleteColumn(c *fiber.Ctx) error {
 	if err := database.GetDB().First(&column, columnID).Error; err != nil {
 		return c.Status(404).JSON(fiber.Map{"success": false, "message": "Column not found"})
 	}
+	if isJiraColumn(column) {
+		return c.Status(403).JSON(fiber.Map{"success": false, "message": "This column mirrors a Jira status and can't be deleted locally"})
+	}
 
 	db := database.GetDB()
 
@@ -264,6 +270,13 @@ func (h *KanbanHandler) ReorderColumns(c *fiber.Ctx) error {
 	for _, order := range req.Orders {
 		columnID, err := models.StrToID(order.ColumnID)
 		if err != nil {
+			continue
+		}
+		var column models.KanbanColumn
+		if err := db.First(&column, columnID).Error; err != nil {
+			continue
+		}
+		if isJiraColumn(column) {
 			continue
 		}
 		db.Model(&models.KanbanColumn{}).Where("id = ?", columnID).Update("position", order.Position)
