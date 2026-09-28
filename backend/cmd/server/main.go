@@ -85,6 +85,10 @@ func main() {
 	// gated to only do work on Mondays (see services.RunClientStatusEmailDrafts)
 	go services.StartClientStatusEmailScheduler()
 
+	// Jira board sync, once at startup then every 15 minutes (see
+	// services.RunJiraSync)
+	go services.StartJiraSyncScheduler()
+
 	// Start server
 	port := getPort()
 	log.Printf("🚀 Server starting on port %s", port)
