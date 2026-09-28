@@ -19,6 +19,7 @@ export interface Task {
     htmlDescription?: string;
     priority: TaskPriority;
     status: TaskStatus;
+    source: 'local' | 'jira';
     columnId: string;
     boardId?: string;
     projectId: string;

@@ -7,6 +7,7 @@ export interface KanbanColumn {
     position: number;
     maxTasks?: number;
     isDone?: boolean;
+    jiraStatusName?: string;
     tasks: Task[];
     createdAt: string;
     updatedAt: string;
@@ -70,4 +71,20 @@ export interface DragDropResult {
     fromColumnId: string;
     toColumnId: string;
     newPosition?: number;
+}
+
+export interface JiraIntegrationStatus {
+    connected: boolean;
+    baseUrl?: string;
+    email?: string;
+    projectKey?: string;
+    lastSyncAt?: string;
+    lastSyncError?: string;
+}
+
+export interface JiraIntegrationConnectData {
+    baseUrl: string;
+    email: string;
+    apiToken: string;
+    projectKey: string;
 }
