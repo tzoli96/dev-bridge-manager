@@ -65,15 +65,16 @@ func columnDTO(c models.KanbanColumn, tasks []models.TaskDTO) models.KanbanColum
 		}
 	}
 	return models.KanbanColumnDTO{
-		ID:        models.IDToStr(c.ID),
-		Title:     c.Title,
-		Color:     c.Color,
-		Position:  c.Position,
-		MaxTasks:  c.MaxTasks,
-		IsDone:    c.IsDone,
-		Tasks:     colTasks,
-		CreatedAt: c.CreatedAt,
-		UpdatedAt: c.UpdatedAt,
+		ID:             models.IDToStr(c.ID),
+		Title:          c.Title,
+		Color:          c.Color,
+		Position:       c.Position,
+		MaxTasks:       c.MaxTasks,
+		IsDone:         c.IsDone,
+		JiraStatusName: c.JiraStatusName,
+		Tasks:          colTasks,
+		CreatedAt:      c.CreatedAt,
+		UpdatedAt:      c.UpdatedAt,
 	}
 }
 

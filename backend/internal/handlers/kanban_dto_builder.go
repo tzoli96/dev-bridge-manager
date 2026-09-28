@@ -265,6 +265,7 @@ func buildTaskDTO(t models.Task, placement *models.TaskPlacement, comments []mod
 		HTMLDescription: t.HTMLDescription,
 		Priority:        t.Priority,
 		Status:          t.Status,
+		Source:          t.Source,
 		ColumnID:        columnID,
 		ProjectID:       models.IDToStr(t.ProjectID),
 		AssigneeID: func() string {
