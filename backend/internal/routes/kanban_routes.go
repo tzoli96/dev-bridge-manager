@@ -15,6 +15,7 @@ func SetupKanbanRoutes(api fiber.Router) {
 	timeEntryHandler := handlers.NewTaskTimeEntryHandler()
 	attachmentHandler := handlers.NewAttachmentHandler()
 	activityLogHandler := handlers.NewActivityLogHandler()
+	jiraIntegrationHandler := handlers.NewJiraIntegrationHandler()
 
 	projects := api.Group("/projects")
 	projects.Use(middleware.JWTMiddleware())
@@ -24,6 +25,13 @@ func SetupKanbanRoutes(api fiber.Router) {
 	projects.Post("/:id/boards", middleware.RequirePermission("kanban.manage_columns"), boardHandler.CreateBoard)
 	projects.Put("/:id/boards/:boardId", middleware.RequirePermission("kanban.manage_columns"), boardHandler.UpdateBoard)
 	projects.Delete("/:id/boards/:boardId", middleware.RequirePermission("kanban.manage_columns"), boardHandler.DeleteBoard)
+
+	// Jira board integration (super_admin-only, same reasoning as
+	// client_status_email_routes.go - passed per-route so it never leaks
+	// onto other board routes).
+	projects.Post("/:id/boards/:boardId/jira-integration", middleware.RequireRole("super_admin"), jiraIntegrationHandler.Connect)
+	projects.Get("/:id/boards/:boardId/jira-integration", middleware.RequireRole("super_admin"), jiraIntegrationHandler.Status)
+	projects.Delete("/:id/boards/:boardId/jira-integration", middleware.RequireRole("super_admin"), jiraIntegrationHandler.Disconnect)
 
 	// Board content (columns)
 	projects.Get("/:id/boards/:boardId/kanban", kanbanHandler.GetBoard)
