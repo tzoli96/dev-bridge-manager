@@ -10,15 +10,16 @@ import (
 // ---------- DB models ----------
 
 type KanbanColumn struct {
-	ID        uint `gorm:"primaryKey"`
-	BoardID   uint `gorm:"not null;index" json:"boardId"`
-	Title     string
-	Color     string
-	Position  int
-	MaxTasks  *int
-	IsDone    bool
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID             uint `gorm:"primaryKey"`
+	BoardID        uint `gorm:"not null;index" json:"boardId"`
+	Title          string
+	Color          string
+	Position       int
+	MaxTasks       *int
+	IsDone         bool
+	JiraStatusName *string `gorm:"column:jira_status_name"`
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 func (KanbanColumn) TableName() string { return "kanban_columns" }
@@ -60,6 +61,9 @@ type Task struct {
 	Tags            string     `gorm:"type:jsonb"`
 	DueDate         *time.Time `gorm:"type:date"`
 	IsArchived      bool
+	Source          string     `gorm:"column:source;default:local"`
+	JiraIssueKey    *string    `gorm:"column:jira_issue_key"`
+	JiraSyncedAt    *time.Time `gorm:"column:jira_synced_at"`
 	CreatedBy       uint
 	UpdatedBy       uint
 	CreatedAt       time.Time
@@ -162,6 +166,7 @@ type TaskDTO struct {
 	HTMLDescription string           `json:"htmlDescription,omitempty"`
 	Priority        string           `json:"priority"`
 	Status          string           `json:"status"`
+	Source          string           `json:"source"`
 	ColumnID        string           `json:"columnId"`
 	IsDoneColumn    bool             `json:"isDoneColumn,omitempty"`
 	BoardID         string           `json:"boardId,omitempty"`
@@ -190,15 +195,16 @@ type TaskDTO struct {
 }
 
 type KanbanColumnDTO struct {
-	ID        string    `json:"id"`
-	Title     string    `json:"title"`
-	Color     string    `json:"color"`
-	Position  int       `json:"position"`
-	MaxTasks  *int      `json:"maxTasks,omitempty"`
-	IsDone    bool      `json:"isDone"`
-	Tasks     []TaskDTO `json:"tasks"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	ID             string    `json:"id"`
+	Title          string    `json:"title"`
+	Color          string    `json:"color"`
+	Position       int       `json:"position"`
+	MaxTasks       *int      `json:"maxTasks,omitempty"`
+	IsDone         bool      `json:"isDone"`
+	JiraStatusName *string   `json:"jiraStatusName,omitempty"`
+	Tasks          []TaskDTO `json:"tasks"`
+	CreatedAt      time.Time `json:"createdAt"`
+	UpdatedAt      time.Time `json:"updatedAt"`
 }
 
 type KanbanSettingsDTO struct {
