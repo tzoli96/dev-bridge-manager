@@ -27,6 +27,7 @@ export const DescriptionTab: React.FC<DescriptionTabProps> = ({ taskId, onDelete
     const { getTask, updateTask } = useTasks(projectId);
     const { assignees, loadAssignees } = useTaskAssignees(projectId);
     const task = getTask(taskId);
+    const isJira = task?.source === 'jira';
 
     const [title, setTitle] = useState(task?.title ?? '');
     const [description, setDescription] = useState(task?.description ?? '');
@@ -68,6 +69,7 @@ export const DescriptionTab: React.FC<DescriptionTabProps> = ({ taskId, onDelete
     };
 
     const commitTags = (next: typeof tags) => {
+        if (isJira) return;
         setTags(next);
         save('tags', { tags: next.map((t) => ({ name: t.name, level: t.level })) });
     };
@@ -84,6 +86,7 @@ export const DescriptionTab: React.FC<DescriptionTabProps> = ({ taskId, onDelete
     if (!task) return null;
 
     const handleTitleBlur = () => {
+        if (isJira) return;
         if (!title.trim()) {
             setTitle(task.title);
             setStatus((s) => ({ ...s, title: 'error' }));
@@ -94,6 +97,12 @@ export const DescriptionTab: React.FC<DescriptionTabProps> = ({ taskId, onDelete
 
     return (
         <div className="space-y-8">
+            {isJira && (
+                <div className="text-sm text-muted-foreground bg-muted border border-border rounded-lg px-3 py-2">
+                    This task is mirrored from Jira and is read-only here. Time tracking and comments are still fully usable.
+                </div>
+            )}
+
             <section className="space-y-4">
                 <div className="flex items-center gap-2">
                     <div className="flex-1">
@@ -102,6 +111,7 @@ export const DescriptionTab: React.FC<DescriptionTabProps> = ({ taskId, onDelete
                             value={title}
                             onChange={setTitle}
                             onBlur={handleTitleBlur}
+                            disabled={isJira}
                             required
                         />
                     </div>
@@ -115,8 +125,9 @@ export const DescriptionTab: React.FC<DescriptionTabProps> = ({ taskId, onDelete
                             <RichTextEditor
                                 content={htmlDescription}
                                 onChange={(html, text) => { setHtmlDescription(html); setDescription(text); }}
-                                onBlur={() => save('description', { description, htmlDescription })}
+                                onBlur={() => !isJira && save('description', { description, htmlDescription })}
                                 minHeight="120px"
+                                readOnly={isJira}
                             />
                         </div>
                         <Indicator field="description" />
@@ -133,7 +144,9 @@ export const DescriptionTab: React.FC<DescriptionTabProps> = ({ taskId, onDelete
                             <Select
                                 label="Priority"
                                 value={priority}
+                                disabled={isJira}
                                 onChange={(value) => {
+                                    if (isJira) return;
                                     const next = value as TaskPriority;
                                     setPriority(next);
                                     save('priority', { priority: next });
@@ -156,8 +169,9 @@ export const DescriptionTab: React.FC<DescriptionTabProps> = ({ taskId, onDelete
                                 min="0"
                                 step="0.5"
                                 value={String(estimatedHours)}
+                                disabled={isJira}
                                 onChange={(v) => setEstimatedHours(Number(v))}
-                                onBlur={() => save('estimatedHours', { estimatedHours })}
+                                onBlur={() => !isJira && save('estimatedHours', { estimatedHours })}
                             />
                         </div>
                         <Indicator field="estimatedHours" />
@@ -171,7 +185,8 @@ export const DescriptionTab: React.FC<DescriptionTabProps> = ({ taskId, onDelete
                                 label="Due Date"
                                 type="date"
                                 value={dueDate}
-                                onChange={(v) => { setDueDate(v); save('dueDate', { dueDate: v }); }}
+                                disabled={isJira}
+                                onChange={(v) => { if (isJira) return; setDueDate(v); save('dueDate', { dueDate: v }); }}
                             />
                         </div>
                         <Indicator field="dueDate" />
@@ -181,7 +196,8 @@ export const DescriptionTab: React.FC<DescriptionTabProps> = ({ taskId, onDelete
                             <Select
                                 label="Assignee"
                                 value={assigneeId}
-                                onChange={(value) => { setAssigneeId(value); save('assignee', { assigneeId: value }); }}
+                                disabled={isJira}
+                                onChange={(value) => { if (isJira) return; setAssigneeId(value); save('assignee', { assigneeId: value }); }}
                                 options={[
                                     { value: '', label: 'Unassigned' },
                                     ...assignees.map((a) => ({ value: String(a.user_id), label: a.user_name })),
@@ -198,24 +214,28 @@ export const DescriptionTab: React.FC<DescriptionTabProps> = ({ taskId, onDelete
                 <div className="flex flex-wrap items-center gap-2 p-2 border rounded-lg border-border focus-within:ring-ring focus-within:border-ring">
                     {tags.map((tag) => (
                         <Badge key={tag.name} variant="secondary" className="gap-1">
-                            <button type="button" onClick={() => handleCycleTagLevel(tag.name)}>{tag.level}</button>
+                            <button type="button" disabled={isJira} onClick={() => handleCycleTagLevel(tag.name)}>{tag.level}</button>
                             {tag.name}
-                            <button type="button" onClick={() => handleRemoveTag(tag.name)} className="ml-1 hover:text-destructive">
-                                <X size={12} />
-                            </button>
+                            {!isJira && (
+                                <button type="button" onClick={() => handleRemoveTag(tag.name)} className="ml-1 hover:text-destructive">
+                                    <X size={12} />
+                                </button>
+                            )}
                         </Badge>
                     ))}
-                    <input
-                        className="flex-1 min-w-[120px] outline-none py-1"
-                        value={tagInput}
-                        onChange={(e) => setTagInput(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(); } }}
-                        placeholder="Add tag…"
-                    />
+                    {!isJira && (
+                        <input
+                            className="flex-1 min-w-[120px] outline-none py-1"
+                            value={tagInput}
+                            onChange={(e) => setTagInput(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(); } }}
+                            placeholder="Add tag…"
+                        />
+                    )}
                 </div>
             </section>
 
-            {onDeletePermanently && (
+            {onDeletePermanently && !isJira && (
                 <div className="pt-4 border-t">
                     <Button
                         type="button"
