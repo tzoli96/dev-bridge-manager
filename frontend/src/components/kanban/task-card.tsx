@@ -13,7 +13,8 @@ import {
     Calendar,
     AlertCircle,
     ListTree,
-    Receipt
+    Receipt,
+    Braces
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ProgressBar } from '@/components/ui/progress-bar';
@@ -72,7 +73,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     const isOverdue = task.dueDate && new Date(task.dueDate) < new Date();
 
     const handleDragStart = (e: React.DragEvent) => {
-        if (!permissions.canMoveTasks) {
+        if (!permissions.canMoveTasks || task.source === 'jira') {
             e.preventDefault();
             return;
         }
@@ -105,12 +106,12 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 
     return (
         <div
-            draggable={permissions.canMoveTasks}
+            draggable={permissions.canMoveTasks && task.source !== 'jira'}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
             className={cn(
                 "group bg-card rounded-lg border border-border hover:border-primary/30 hover:shadow-sm transition-all duration-150 p-3.5",
-                permissions.canMoveTasks ? "cursor-move" : "cursor-default"
+                permissions.canMoveTasks && task.source !== 'jira' ? "cursor-move" : "cursor-default"
             )}
         >
             {/* Header */}
@@ -123,9 +124,17 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                     <h4 className="font-medium text-foreground line-clamp-2 text-sm leading-snug">
                         {task.title}
                     </h4>
+                    {task.source === 'jira' && (
+                        <span
+                            title="Mirrored from Jira"
+                            className="flex items-center gap-0.5 text-[10px] font-medium text-primary bg-primary/10 rounded px-1 py-0.5 flex-shrink-0"
+                        >
+                            <Braces size={10} />
+                        </span>
+                    )}
                 </div>
 
-                {permissions.canMoveTasks && (
+                {permissions.canMoveTasks && task.source !== 'jira' && (
                     <GripVertical
                         size={14}
                         className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
