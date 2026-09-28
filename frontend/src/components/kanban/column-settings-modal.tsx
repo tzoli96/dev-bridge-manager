@@ -1,12 +1,13 @@
 'use client';
 
 import React from 'react';
-import { ArrowUp, ArrowDown, Trash2, Plus } from 'lucide-react';
+import { ArrowUp, ArrowDown, Trash2, Plus, Braces } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useKanbanStore } from '@/stores/kanban';
 import { kanbanService } from '@/services/kanban';
+import { JiraIntegrationPanel } from '@/components/kanban/jira-integration-panel';
 import type { KanbanColumn } from '@/types/kanban';
 
 interface ColumnSettingsModalProps {
@@ -158,6 +159,8 @@ export const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ projec
 
     return (
         <div className="space-y-4">
+            <JiraIntegrationPanel projectId={projectId} boardId={boardId} />
+
             {error && (
                 <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">
                     {error}
@@ -166,95 +169,103 @@ export const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ projec
 
             <div className="space-y-3">
                 {sortedColumns.map((column, index) => (
-                    <div key={column.id} className="border border-border rounded-lg p-3 space-y-3">
-                        <div className="flex items-center gap-2">
-                            <div className="flex flex-col">
+                    column.jiraStatusName ? (
+                        <div key={column.id} className="border border-border rounded-lg p-3 flex items-center gap-2">
+                            <Braces size={14} className="text-muted-foreground flex-shrink-0" />
+                            <span className="flex-1 text-sm text-foreground">{column.title}</span>
+                            <span className="text-xs text-muted-foreground">Mirrored from Jira</span>
+                        </div>
+                    ) : (
+                        <div key={column.id} className="border border-border rounded-lg p-3 space-y-3">
+                            <div className="flex items-center gap-2">
+                                <div className="flex flex-col">
+                                    <button
+                                        type="button"
+                                        disabled={index === 0}
+                                        onClick={() => handleMove(index, -1)}
+                                        className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                                    >
+                                        <ArrowUp size={14} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={index === sortedColumns.length - 1}
+                                        onClick={() => handleMove(index, 1)}
+                                        className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                                    >
+                                        <ArrowDown size={14} />
+                                    </button>
+                                </div>
+
+                                <ColumnTitleInput
+                                    title={column.title}
+                                    onCommit={(title) => persistColumn(column.id, { title })}
+                                    className="flex-1"
+                                />
+
                                 <button
                                     type="button"
-                                    disabled={index === 0}
-                                    onClick={() => handleMove(index, -1)}
-                                    className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                                    disabled={savingId === column.id}
+                                    onClick={() => handleDelete(column)}
+                                    className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                                 >
-                                    <ArrowUp size={14} />
-                                </button>
-                                <button
-                                    type="button"
-                                    disabled={index === sortedColumns.length - 1}
-                                    onClick={() => handleMove(index, 1)}
-                                    className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                                >
-                                    <ArrowDown size={14} />
+                                    <Trash2 size={16} />
                                 </button>
                             </div>
 
-                            <ColumnTitleInput
-                                title={column.title}
-                                onCommit={(title) => persistColumn(column.id, { title })}
-                                className="flex-1"
-                            />
+                            <div className="flex items-center gap-6 pl-8">
+                                <div className="flex items-center gap-2">
+                                    <label className="text-xs font-medium text-muted-foreground">WIP limit</label>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        placeholder="—"
+                                        value={column.maxTasks ?? ''}
+                                        onChange={(e) => updateColumnInStore(column.id, {
+                                            maxTasks: e.target.value === '' ? undefined : Number(e.target.value),
+                                        })}
+                                        onBlur={(e) => persistColumn(column.id, {
+                                            maxTasks: e.target.value === '' ? undefined : Number(e.target.value),
+                                        })}
+                                        className="w-16 rounded-lg border border-input px-2 py-1.5 text-sm shadow-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                                    />
+                                </div>
 
-                            <button
-                                type="button"
-                                disabled={savingId === column.id}
-                                onClick={() => handleDelete(column)}
-                                className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                            >
-                                <Trash2 size={16} />
-                            </button>
-                        </div>
+                                <div className="flex items-center gap-2">
+                                    <label className="text-xs font-medium text-muted-foreground">Color</label>
+                                    <ColorPicker
+                                        value={column.color}
+                                        onChange={(color) => persistColumn(column.id, { color })}
+                                    />
+                                </div>
 
-                        <div className="flex items-center gap-6 pl-8">
-                            <div className="flex items-center gap-2">
-                                <label className="text-xs font-medium text-muted-foreground">WIP limit</label>
-                                <input
-                                    type="number"
-                                    min={0}
-                                    placeholder="—"
-                                    value={column.maxTasks ?? ''}
-                                    onChange={(e) => updateColumnInStore(column.id, {
-                                        maxTasks: e.target.value === '' ? undefined : Number(e.target.value),
-                                    })}
-                                    onBlur={(e) => persistColumn(column.id, {
-                                        maxTasks: e.target.value === '' ? undefined : Number(e.target.value),
-                                    })}
-                                    className="w-16 rounded-lg border border-input px-2 py-1.5 text-sm shadow-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
-                                />
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                                <label className="text-xs font-medium text-muted-foreground">Color</label>
-                                <ColorPicker
-                                    value={column.color}
-                                    onChange={(color) => persistColumn(column.id, { color })}
-                                />
-                            </div>
-
-                            <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                                <input
-                                    type="checkbox"
-                                    checked={column.isDone ?? false}
-                                    onChange={(e) => {
-                                        const isDone = e.target.checked;
-                                        if (isDone) {
-                                            const other = sortedColumns.find((c) => c.id !== column.id && c.isDone);
-                                            if (other && !window.confirm(`"${other.title}" is currently the Done column. Mark "${column.title}" as Done instead?`)) {
-                                                return;
+                                <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                                    <input
+                                        type="checkbox"
+                                        checked={column.isDone ?? false}
+                                        onChange={(e) => {
+                                            const isDone = e.target.checked;
+                                            if (isDone) {
+                                                const other = sortedColumns.find((c) => c.id !== column.id && c.isDone);
+                                                if (other && !window.confirm(`"${other.title}" is currently the Done column. Mark "${column.title}" as Done instead?`)) {
+                                                    return;
+                                                }
                                             }
-                                        }
-                                        persistColumn(column.id, { isDone }).then((ok) => {
-                                            if (ok && isDone) {
-                                                sortedColumns.forEach((c) => {
-                                                    if (c.id !== column.id && c.isDone) updateColumnInStore(c.id, { isDone: false });
-                                                });
-                                            }
-                                        });
-                                    }}
-                                    className="rounded border-input"
-                                />
-                                Done column
-                            </label>
+                                            persistColumn(column.id, { isDone }).then((ok) => {
+                                                if (ok && isDone) {
+                                                    sortedColumns.forEach((c) => {
+                                                        if (c.id !== column.id && c.isDone) updateColumnInStore(c.id, { isDone: false });
+                                                    });
+                                                }
+                                            });
+                                        }}
+                                        className="rounded border-input"
+                                    />
+                                    Done column
+                                </label>
+                            </div>
                         </div>
-                    </div>
+                    )
                 ))}
             </div>
 
