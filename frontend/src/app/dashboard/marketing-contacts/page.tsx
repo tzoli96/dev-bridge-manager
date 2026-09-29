@@ -15,7 +15,8 @@ import { Modal } from '@/components/ui/modal';
 import EmptyState from '@/components/ui/EmptyState';
 import LoadingState from '@/components/ui/LoadingState';
 import ErrorState from '@/components/ui/ErrorState';
-import { Plus, Pencil, Trash2, Contact } from 'lucide-react';
+import { Plus, Pencil, Trash2, Contact, Upload, Download } from 'lucide-react';
+import type { ImportResult } from '@/services/marketingContactsService';
 
 const emptyForm: MarketingContactInput = {
     email: '',
@@ -47,6 +48,13 @@ export default function MarketingContactsPage() {
     const [editingId, setEditingId] = React.useState<number | null>(null);
     const [form, setForm] = React.useState<MarketingContactInput>(emptyForm);
     const [isSaving, setIsSaving] = React.useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = React.useState(false);
+    const [importFile, setImportFile] = React.useState<File | null>(null);
+    const [importOverwrite, setImportOverwrite] = React.useState(false);
+    const [isImporting, setIsImporting] = React.useState(false);
+    const [importResult, setImportResult] = React.useState<ImportResult | null>(null);
+    const [importError, setImportError] = React.useState<string | null>(null);
+    const [isExporting, setIsExporting] = React.useState(false);
 
     const currentFilters = React.useCallback((): MarketingContactFilters => ({
         search: search.trim() || undefined,
@@ -124,15 +132,63 @@ export default function MarketingContactsPage() {
         }
     };
 
+    const openImportModal = () => {
+        setImportFile(null);
+        setImportOverwrite(false);
+        setImportResult(null);
+        setImportError(null);
+        setIsImportModalOpen(true);
+    };
+
+    const handleImport = async () => {
+        if (!importFile) return;
+        setIsImporting(true);
+        setImportError(null);
+        try {
+            const result = await marketingContactsService.importCsv(importFile, importOverwrite);
+            setImportResult(result);
+            await loadContacts();
+        } catch (err: any) {
+            setImportError(err.message);
+        } finally {
+            setIsImporting(false);
+        }
+    };
+
+    const handleExport = async () => {
+        setIsExporting(true);
+        try {
+            const blob = await marketingContactsService.exportCsv(currentFilters());
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'marketing-contacts.csv';
+            link.click();
+            URL.revokeObjectURL(url);
+        } catch (err: any) {
+            setActionError(err.message);
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     return (
         <div className="p-6 max-w-6xl mx-auto space-y-6">
             <div className="flex items-center justify-between">
                 <h1 className="text-2xl font-semibold text-foreground flex items-center gap-2">
                     <Contact size={22} /> Marketing lista
                 </h1>
-                <Button icon={Plus} onClick={openCreateModal}>
-                    Új kontakt
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button variant="secondary" icon={Upload} onClick={openImportModal}>
+                        Importálás
+                    </Button>
+                    <Button variant="secondary" icon={Download} loading={isExporting} onClick={handleExport}>
+                        Exportálás
+                    </Button>
+                    <Button icon={Plus} onClick={openCreateModal}>
+                        Új kontakt
+                    </Button>
+                </div>
             </div>
 
             <div className="flex flex-wrap items-end gap-3">
@@ -166,7 +222,7 @@ export default function MarketingContactsPage() {
                     icon="files"
                     title="Még nincs marketing kontakt"
                     description="Adj hozzá egy kontaktot, vagy importálj egy CSV listát."
-                    action={{ label: 'Új kontakt', onClick: openCreateModal }}
+                    action={{ label: 'Importálás', onClick: openImportModal }}
                 />
             )}
 
@@ -261,6 +317,57 @@ export default function MarketingContactsPage() {
                         </Button>
                         <Button onClick={handleSave} loading={isSaving} disabled={!form.email.trim()}>
                             Mentés
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
+
+            <Modal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                title="Kontaktok importálása"
+                size="sm"
+            >
+                <div className="space-y-3 mt-2">
+                    {importError && (
+                        <div className="bg-destructive/10 border border-destructive/20 text-destructive px-3 py-2 rounded text-sm">
+                            {importError}
+                        </div>
+                    )}
+                    {importResult && (
+                        <div className="bg-success/10 border border-success/20 text-success px-3 py-2 rounded text-sm space-y-1">
+                            <p>
+                                {importResult.created} új, {importResult.updated} felülírva, {importResult.skipped} kihagyva.
+                            </p>
+                            {importResult.errors.length > 0 && (
+                                <ul className="list-disc list-inside text-xs text-muted-foreground max-h-32 overflow-y-auto">
+                                    {importResult.errors.map((message, i) => (
+                                        <li key={i}>{message}</li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    )}
+                    <input
+                        type="file"
+                        accept=".csv"
+                        onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
+                        className="block w-full text-sm text-foreground"
+                    />
+                    <label className="flex items-center gap-2 text-sm text-foreground">
+                        <input
+                            type="checkbox"
+                            checked={importOverwrite}
+                            onChange={(e) => setImportOverwrite(e.target.checked)}
+                        />
+                        Meglévők felülírása
+                    </label>
+                    <div className="flex justify-end gap-2 pt-2">
+                        <Button variant="secondary" onClick={() => setIsImportModalOpen(false)}>
+                            Bezárás
+                        </Button>
+                        <Button onClick={handleImport} loading={isImporting} disabled={!importFile}>
+                            Importálás
                         </Button>
                     </div>
                 </div>
