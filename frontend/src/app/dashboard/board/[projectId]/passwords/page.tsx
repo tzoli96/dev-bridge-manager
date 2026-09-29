@@ -23,6 +23,7 @@ export default function ProjectPasswordsPage() {
     const [passwords, setPasswords] = React.useState<ProjectPassword[]>([]);
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState<string | null>(null);
+    const [actionError, setActionError] = React.useState<string | null>(null);
     const [revealed, setRevealed] = React.useState<Record<number, boolean>>({});
 
     const [isModalOpen, setIsModalOpen] = React.useState(false);
@@ -50,6 +51,7 @@ export default function ProjectPasswordsPage() {
     const openCreateModal = () => {
         setEditingId(null);
         setForm(emptyForm);
+        setActionError(null);
         setIsModalOpen(true);
     };
 
@@ -62,6 +64,7 @@ export default function ProjectPasswordsPage() {
             url: entry.url,
             notes: entry.notes,
         });
+        setActionError(null);
         setIsModalOpen(true);
     };
 
@@ -76,9 +79,10 @@ export default function ProjectPasswordsPage() {
                 const created = await passwordsService.create(projectId, form);
                 setPasswords((prev) => [created, ...prev]);
             }
+            setActionError(null);
             setIsModalOpen(false);
         } catch (err: any) {
-            setError(err.message);
+            setActionError(err.message);
         } finally {
             setIsSaving(false);
         }
@@ -89,8 +93,9 @@ export default function ProjectPasswordsPage() {
         try {
             await passwordsService.remove(projectId, entry.id);
             setPasswords((prev) => prev.filter((p) => p.id !== entry.id));
+            setActionError(null);
         } catch (err: any) {
-            setError(err.message);
+            setActionError(err.message);
         }
     };
 
@@ -122,6 +127,12 @@ export default function ProjectPasswordsPage() {
                     Új jelszó
                 </Button>
             </div>
+
+            {actionError && (
+                <div className="bg-destructive/10 border border-destructive/20 text-destructive px-3 py-2 rounded text-sm mb-4">
+                    {actionError}
+                </div>
+            )}
 
             {loading && <LoadingState message="Jelszavak betöltése..." />}
             {!loading && error && <ErrorState error={error} onRetry={loadPasswords} />}
@@ -215,6 +226,7 @@ export default function ProjectPasswordsPage() {
                     />
                     <Input
                         label="Jelszó"
+                        type="password"
                         value={form.password}
                         onChange={(v) => setForm((f) => ({ ...f, password: v }))}
                     />
