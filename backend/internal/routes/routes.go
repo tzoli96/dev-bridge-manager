@@ -35,6 +35,7 @@ func SetupRoutes(app *fiber.App) {
 	SetupClientHealthRoutes(v1)          // Per-client risk status (stalled tasks + overdue invoices) - super_admin only
 	SetupInvoiceReconciliationRoutes(v1) // Time-tracking vs. invoicing mismatches - super_admin only
 	SetupClientStatusEmailRoutes(v1)     // AI-drafted weekly client status emails - super_admin only
+	SetupProjectPasswordRoutes(v1)       // Project-scoped shared credentials - active project members only
 }
 
 func SetupAPIRoutes(api fiber.Router) {
