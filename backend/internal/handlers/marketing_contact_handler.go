@@ -50,7 +50,7 @@ func (h *MarketingContactHandler) CreateMarketingContact(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"success": false, "message": "Invalid request body"})
 	}
-	email := strings.TrimSpace(req.Email)
+	email := strings.ToLower(strings.TrimSpace(req.Email))
 	if email == "" || !services.IsValidEmail(email) {
 		return c.Status(400).JSON(fiber.Map{"success": false, "message": "Valid email is required"})
 	}
@@ -98,7 +98,7 @@ func (h *MarketingContactHandler) UpdateMarketingContact(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"success": false, "message": "Invalid request body"})
 	}
-	email := strings.TrimSpace(req.Email)
+	email := strings.ToLower(strings.TrimSpace(req.Email))
 	if email == "" || !services.IsValidEmail(email) {
 		return c.Status(400).JSON(fiber.Map{"success": false, "message": "Valid email is required"})
 	}

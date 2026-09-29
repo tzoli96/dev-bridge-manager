@@ -97,6 +97,34 @@ func TestParseContactsCSVRejectsTooManyRows(t *testing.T) {
 	}
 }
 
+func TestParseContactsCSVStripsHeaderBOM(t *testing.T) {
+	csv := "\ufeffemail,first_name\nfoo@example.com,Foo\n"
+	parsed, err := ParseContactsCSV(strings.NewReader(csv))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(parsed.Rows) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(parsed.Rows))
+	}
+	if parsed.Rows[0].Email != "foo@example.com" {
+		t.Fatalf("unexpected email: %q", parsed.Rows[0].Email)
+	}
+}
+
+func TestParseContactsCSVLowercasesEmail(t *testing.T) {
+	csv := "email\nFoo@Example.COM\n"
+	parsed, err := ParseContactsCSV(strings.NewReader(csv))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(parsed.Rows) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(parsed.Rows))
+	}
+	if parsed.Rows[0].Email != "foo@example.com" {
+		t.Fatalf("expected lowercased email, got %q", parsed.Rows[0].Email)
+	}
+}
+
 func TestIsValidEmail(t *testing.T) {
 	valid := []string{"a@example.com", "first.last@sub.example.co.uk"}
 	invalid := []string{"", "not-an-email", "a@", "@example.com", "a b@example.com"}

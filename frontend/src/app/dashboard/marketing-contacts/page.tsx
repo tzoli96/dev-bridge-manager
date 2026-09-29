@@ -62,21 +62,33 @@ export default function MarketingContactsPage() {
         tag: tagFilter.trim() || undefined,
     }), [search, subscribedFilter, tagFilter]);
 
+    const requestIdRef = React.useRef(0);
+    const hasLoadedRef = React.useRef(false);
+
     const loadContacts = React.useCallback(async () => {
+        const requestId = ++requestIdRef.current;
         try {
-            setLoading(true);
+            if (!hasLoadedRef.current) setLoading(true);
             setError(null);
             const data = await marketingContactsService.list(currentFilters());
+            if (requestId !== requestIdRef.current) return;
             setContacts(data);
         } catch (err: any) {
+            if (requestId !== requestIdRef.current) return;
             setError(err.message);
         } finally {
-            setLoading(false);
+            if (requestId === requestIdRef.current) {
+                setLoading(false);
+                hasLoadedRef.current = true;
+            }
         }
     }, [currentFilters]);
 
     React.useEffect(() => {
-        loadContacts();
+        const handle = setTimeout(() => {
+            loadContacts();
+        }, 300);
+        return () => clearTimeout(handle);
     }, [loadContacts]);
 
     const openCreateModal = () => {

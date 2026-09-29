@@ -70,6 +70,9 @@ func ParseContactsCSV(r io.Reader) (ParsedContacts, error) {
 	if err != nil {
 		return ParsedContacts{}, fmt.Errorf("could not read CSV header: %w", err)
 	}
+	if len(header) > 0 {
+		header[0] = strings.TrimPrefix(header[0], "\ufeff")
+	}
 
 	colIndex := make(map[string]int, len(header))
 	for i, name := range header {
@@ -103,7 +106,7 @@ func ParseContactsCSV(r io.Reader) (ParsedContacts, error) {
 			return ParsedContacts{}, fmt.Errorf("CSV has more than %d data rows", maxImportRows)
 		}
 
-		email := cell(record, "email")
+		email := strings.ToLower(cell(record, "email"))
 		if email == "" || !IsValidEmail(email) {
 			result.Errors = append(result.Errors, fmt.Sprintf("row %d: invalid or missing email", rowNumber))
 			continue
