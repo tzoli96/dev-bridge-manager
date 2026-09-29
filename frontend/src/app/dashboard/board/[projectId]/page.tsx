@@ -12,7 +12,7 @@ import { computeDueTasks } from '@/utils/taskStats';
 import { hasPermission } from '@/utils/permissions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, ArrowLeft, KanbanSquare, FileText, Eye, ChevronDown, ChevronUp, Receipt, ArrowUpRight, Wallet, CalendarClock, AlertOctagon, Repeat } from 'lucide-react';
+import { Plus, ArrowLeft, KanbanSquare, FileText, Eye, ChevronDown, ChevronUp, Receipt, ArrowUpRight, Wallet, CalendarClock, AlertOctagon, Repeat, KeyRound } from 'lucide-react';
 import type { Board } from '@/types/kanban';
 import type { Invoice } from '@/services/invoicesService';
 import type { DueTask } from '@/utils/taskStats';
@@ -180,6 +180,13 @@ export default function BoardsListPage() {
                             Áttekintés
                         </Button>
                     )}
+                    <Button
+                        variant="secondary"
+                        icon={KeyRound}
+                        onClick={() => router.push(`/dashboard/board/${projectId}/passwords`)}
+                    >
+                        Jelszavak
+                    </Button>
                     {(project?.pricing_type === 'hourly' || project?.pricing_type === 'fixed') && hasPermission(user, 'invoices.create') && (
                         <Button icon={FileText} onClick={() => router.push(`/dashboard/board/${projectId}/invoice`)}>
                             Számla kiállítása
