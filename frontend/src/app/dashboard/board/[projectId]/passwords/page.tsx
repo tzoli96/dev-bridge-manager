@@ -218,6 +218,11 @@ export default function ProjectPasswordsPage() {
                 size="sm"
             >
                 <div className="space-y-3 mt-2">
+                    {actionError && (
+                        <div className="bg-destructive/10 border border-destructive/20 text-destructive px-3 py-2 rounded text-sm">
+                            {actionError}
+                        </div>
+                    )}
                     <Input label="Cím" value={form.title} onChange={(v) => setForm((f) => ({ ...f, title: v }))} />
                     <Input
                         label="Felhasználónév"
