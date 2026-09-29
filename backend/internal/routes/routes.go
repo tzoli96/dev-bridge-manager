@@ -31,6 +31,7 @@ func SetupRoutes(app *fiber.App) {
 	SetupKanbanStallRoutes(v1)           // Stalled kanban task flags - super_admin only
 	SetupSearchRoutes(v1)                // Global search across clients/projects/tasks
 	SetupActivityDigestRoutes(v1)        // Daily activity digest (dashboard card)
+	SetupMarketingContactRoutes(v1)      // Email marketing contact list - CSV import/export, anyone logged in
 	SetupProjectRenewalRoutes(v1)        // Contract/project renewal reminders - super_admin only
 	SetupClientHealthRoutes(v1)          // Per-client risk status (stalled tasks + overdue invoices) - super_admin only
 	SetupInvoiceReconciliationRoutes(v1) // Time-tracking vs. invoicing mismatches - super_admin only
