@@ -6,10 +6,17 @@ export interface DueTask {
     isOverdue: boolean
 }
 
+// A task counts as finished when its status is 'done' or it currently sits in
+// a column flagged is_done (the backend sets isDoneColumn). tasks.status alone
+// is not enough: moving a card between columns only changes its placement.
+export function isTaskDone(t: Task): boolean {
+    return t.status === 'done' || t.isDoneColumn === true
+}
+
 export function computeDueTasks(tasks: Task[], limit = 5): { overdue: DueTask[]; upcoming: DueTask[] } {
     const todayKey = new Date().toISOString().slice(0, 10)
     const dueTasks = tasks
-        .filter((t) => t.dueDate && t.status !== 'done')
+        .filter((t) => t.dueDate && !isTaskDone(t))
         .map((t) => ({
             task: t,
             dueDateKey: t.dueDate!.slice(0, 10),
@@ -29,8 +36,8 @@ export function computeTaskStats(tasks: Task[]) {
     in7Days.setDate(in7Days.getDate() + 7)
     const in7DaysKey = in7Days.toISOString().slice(0, 10)
 
-    const openTasks = tasks.filter((t) => t.status !== 'done')
-    const doneTasks = tasks.filter((t) => t.status === 'done')
+    const openTasks = tasks.filter((t) => !isTaskDone(t))
+    const doneTasks = tasks.filter((t) => isTaskDone(t))
     const overdueTasks = openTasks.filter((t) => t.dueDate && t.dueDate.slice(0, 10) < todayKey)
     const dueSoonTasks = openTasks.filter(
         (t) => t.dueDate && t.dueDate.slice(0, 10) >= todayKey && t.dueDate.slice(0, 10) <= in7DaysKey
@@ -41,7 +48,7 @@ export function computeTaskStats(tasks: Task[]) {
         if (!t.boardId) continue
         const entry = byBoard.get(t.boardId) || { total: 0, open: 0 }
         entry.total += 1
-        if (t.status !== 'done') entry.open += 1
+        if (!isTaskDone(t)) entry.open += 1
         byBoard.set(t.boardId, entry)
     }
 

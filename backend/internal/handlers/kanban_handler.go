@@ -16,14 +16,17 @@ func NewKanbanHandler() *KanbanHandler {
 	return &KanbanHandler{}
 }
 
+// IsDone flags the column whose tasks count as finished (overdue/stat
+// calculations rely on it, not on tasks.status); exactly one per board.
 var defaultColumnSeed = []struct {
-	Title string
-	Color string
+	Title  string
+	Color  string
+	IsDone bool
 }{
-	{"To Do", "bg-blue-500"},
-	{"In Progress", "bg-yellow-500"},
-	{"Review", "bg-purple-500"},
-	{"Done", "bg-green-500"},
+	{"To Do", "bg-blue-500", false},
+	{"In Progress", "bg-yellow-500", false},
+	{"Review", "bg-purple-500", false},
+	{"Done", "bg-green-500", true},
 }
 
 func intPtr(v int) *int { return &v }
@@ -45,6 +48,7 @@ func ensureColumns(boardID uint) ([]models.KanbanColumn, error) {
 			Title:    c.Title,
 			Color:    c.Color,
 			Position: i,
+			IsDone:   c.IsDone,
 		}
 		if i == 1 {
 			col.MaxTasks = intPtr(5)

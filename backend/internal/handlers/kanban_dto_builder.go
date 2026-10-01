@@ -365,6 +365,7 @@ func loadTaskDTOs(projectID uint) ([]models.TaskDTO, error) {
 
 	invoicedPeriods := invoicedPeriodsForProject(projectID)
 	boardIDs := taskBoardIDs(taskIDs)
+	doneSet := tasksInDoneColumn(taskIDs)
 
 	dtos := make([]models.TaskDTO, 0, len(tasks))
 	for _, t := range tasks {
@@ -382,6 +383,7 @@ func loadTaskDTOs(projectID uint) ([]models.TaskDTO, error) {
 		if boardID, ok := boardIDs[t.ID]; ok {
 			dto.BoardID = models.IDToStr(boardID)
 		}
+		dto.IsDoneColumn = doneSet[t.ID]
 		dtos = append(dtos, dto)
 	}
 	return dtos, nil
