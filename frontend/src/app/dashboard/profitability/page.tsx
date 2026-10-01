@@ -95,6 +95,20 @@ export default function ProfitabilityPage() {
         }
     };
 
+    // Cancelling must drop abandoned edits, so the form is re-seeded from the
+    // last loaded settings before the modal closes.
+    const closeSettings = () => {
+        if (data) {
+            setSettingsForm({
+                minutes_per_inbound_email: data.settings.minutes_per_inbound_email,
+                minutes_per_outbound_email: data.settings.minutes_per_outbound_email,
+                default_capacity_hours_per_month: data.settings.default_capacity_hours_per_month,
+                underpriced_ratio_threshold: data.settings.underpriced_ratio_threshold,
+            });
+        }
+        setShowSettings(false);
+    };
+
     const setField = (key: keyof ProfitSettingsInput) => (v: string) =>
         setSettingsForm((f) => (f ? { ...f, [key]: Number(v) } : f));
 
@@ -194,7 +208,7 @@ export default function ProfitabilityPage() {
                 </div>
             </div>
 
-            {actionError && (
+            {actionError && !showSettings && meetingClient === null && (
                 <div className="bg-destructive/10 border border-destructive/20 text-destructive px-3 py-2 rounded text-sm mb-4">
                     {actionError}
                 </div>
@@ -241,7 +255,7 @@ export default function ProfitabilityPage() {
                 </>
             )}
 
-            <Modal isOpen={showSettings} onClose={() => setShowSettings(false)} title="Számítási beállítások" size="sm">
+            <Modal isOpen={showSettings} onClose={closeSettings} title="Számítási beállítások" size="sm">
                 {settingsForm && (
                     <div className="space-y-3 mt-2">
                         {actionError && (
@@ -268,13 +282,13 @@ export default function ProfitabilityPage() {
                             onChange={setField('default_capacity_hours_per_month')}
                         />
                         <Input
-                            label="Áremelés-jelölt küszöb (0–1.5, pl. 0.6 = 60%)"
+                            label="Áremelés-jelölt küszöb (0.01–1.5, pl. 0.6 = 60%)"
                             type="number"
                             value={settingsForm.underpriced_ratio_threshold}
                             onChange={setField('underpriced_ratio_threshold')}
                         />
                         <div className="flex justify-end gap-2 pt-2">
-                            <Button variant="secondary" onClick={() => setShowSettings(false)}>
+                            <Button variant="secondary" onClick={closeSettings}>
                                 Mégse
                             </Button>
                             <Button onClick={saveSettings} loading={isSaving}>
