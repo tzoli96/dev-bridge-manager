@@ -18,6 +18,7 @@ import LoadingState from '@/components/ui/LoadingState';
 import ErrorState from '@/components/ui/ErrorState';
 import { Tabs } from '@/components/ui/tabs';
 import ForecastTab from '@/components/profitability/ForecastTab';
+import ScenariosTab from '@/components/profitability/ScenariosTab';
 import { formatHuf } from '@/utils/formatHuf';
 import { TrendingUp, Settings2, Pencil } from 'lucide-react';
 
@@ -30,7 +31,7 @@ export default function ProfitabilityPage() {
     const { user } = useAuth();
     const canManage = hasPermission(user, 'profitability.manage');
 
-    const [activeTab, setActiveTab] = React.useState<'overview' | 'forecast'>('overview');
+    const [activeTab, setActiveTab] = React.useState<'overview' | 'forecast' | 'scenarios'>('overview');
     const [months, setMonths] = React.useState(3);
     const [data, setData] = React.useState<ProfitabilityOverview | null>(null);
     const [loading, setLoading] = React.useState(true);
@@ -217,9 +218,10 @@ export default function ProfitabilityPage() {
                 tabs={[
                     { id: 'overview', label: 'Áttekintés' },
                     { id: 'forecast', label: 'Előrejelzés' },
+                    { id: 'scenarios', label: 'Forgatókönyvek' },
                 ]}
                 activeTab={activeTab}
-                onChange={(id) => setActiveTab(id as 'overview' | 'forecast')}
+                onChange={(id) => setActiveTab(id as 'overview' | 'forecast' | 'scenarios')}
             />
 
             {activeTab === 'overview' && (
@@ -274,6 +276,7 @@ export default function ProfitabilityPage() {
             )}
 
             {activeTab === 'forecast' && <ForecastTab />}
+            {activeTab === 'scenarios' && <ScenariosTab canManage={canManage} />}
 
             <Modal isOpen={showSettings} onClose={closeSettings} title="Számítási beállítások" size="sm">
                 {settingsForm && (
