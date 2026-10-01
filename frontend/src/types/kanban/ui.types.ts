@@ -1,3 +1,20 @@
+import type {
+    DragDropResult,
+    KanbanColumn,
+    KanbanPermissions,
+} from './kanban.types';
+import type {
+    CreateCommentData,
+    CreateTimeEntryData,
+    Task,
+    TaskComment,
+    TaskFormData,
+    TimeEntry,
+    UpdateCommentData,
+    UpdateTaskData,
+    UpdateTimeEntryData,
+} from './task.types';
+
 export interface TaskCardProps {
     task: Task;
     isEditing: boolean;
