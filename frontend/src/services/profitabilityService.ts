@@ -35,9 +35,35 @@ export interface ProfitabilityOverview {
     settings: ProfitSettings;
 }
 
+export interface ForecastClient {
+    client_id: number;
+    name: string;
+    monthly_average: number;
+    contract_end_month: string | null;
+    months_with_data: number;
+    committed: number[];
+    dependent: number[];
+}
+
+export interface ProfitabilityForecast {
+    baseline_months: string[];
+    months: string[];
+    committed: number[];
+    dependent: number[];
+    clients: ForecastClient[];
+    history_months: number;
+    low_data: boolean;
+    excluded_fixed_revenue: number;
+    warnings: string[];
+}
+
 export const profitabilityService = {
     async overview(months: number): Promise<ProfitabilityOverview> {
         return apiClient.get(`/profitability/overview?months=${months}`);
+    },
+
+    async forecast(months: number): Promise<ProfitabilityForecast> {
+        return apiClient.get(`/profitability/forecast?months=${months}`);
     },
 
     async getSettings(): Promise<ProfitSettings> {

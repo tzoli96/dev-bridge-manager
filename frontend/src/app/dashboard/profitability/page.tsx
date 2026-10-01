@@ -16,12 +16,13 @@ import { Modal } from '@/components/ui/modal';
 import EmptyState from '@/components/ui/EmptyState';
 import LoadingState from '@/components/ui/LoadingState';
 import ErrorState from '@/components/ui/ErrorState';
+import { Tabs } from '@/components/ui/tabs';
+import ForecastTab from '@/components/profitability/ForecastTab';
+import { formatHuf } from '@/utils/formatHuf';
 import { TrendingUp, Settings2, Pencil } from 'lucide-react';
 
 const errorMessage = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
-const formatHuf = (value: number | null) =>
-    value === null ? '—' : `${Math.round(value).toLocaleString('hu-HU')} Ft`;
 const formatHours = (value: number) => `${value.toFixed(1)} ó`;
 const formatRatio = (value: number | null) => (value === null ? '—' : `${Math.round(value * 100)}%`);
 
@@ -29,6 +30,7 @@ export default function ProfitabilityPage() {
     const { user } = useAuth();
     const canManage = hasPermission(user, 'profitability.manage');
 
+    const [activeTab, setActiveTab] = React.useState<'overview' | 'forecast'>('overview');
     const [months, setMonths] = React.useState(3);
     const [data, setData] = React.useState<ProfitabilityOverview | null>(null);
     const [loading, setLoading] = React.useState(true);
@@ -185,75 +187,93 @@ export default function ProfitabilityPage() {
                 <h1 className="text-2xl font-semibold text-foreground flex items-center gap-2">
                     <TrendingUp size={22} /> Jövedelmezőség
                 </h1>
-                <div className="flex items-center gap-2">
-                    <select
-                        value={months}
-                        onChange={(e) => setMonths(Number(e.target.value))}
-                        className="border border-border rounded-md bg-background text-sm px-2 py-1.5"
-                    >
-                        {[3, 6, 12].map((m) => (
-                            <option key={m} value={m}>
-                                Utolsó {m} hónap
-                            </option>
-                        ))}
-                    </select>
-                    {canManage && (
-                        <Button variant="secondary" icon={Settings2} onClick={() => {
-                                setActionError(null);
-                                setShowSettings(true);
-                            }}>
-                            Beállítások
-                        </Button>
-                    )}
-                </div>
+                {activeTab === 'overview' && (
+                    <div className="flex items-center gap-2">
+                        <select
+                            value={months}
+                            onChange={(e) => setMonths(Number(e.target.value))}
+                            className="border border-border rounded-md bg-background text-sm px-2 py-1.5"
+                        >
+                            {[3, 6, 12].map((m) => (
+                                <option key={m} value={m}>
+                                    Utolsó {m} hónap
+                                </option>
+                            ))}
+                        </select>
+                        {canManage && (
+                            <Button variant="secondary" icon={Settings2} onClick={() => {
+                                    setActionError(null);
+                                    setShowSettings(true);
+                                }}>
+                                Beállítások
+                            </Button>
+                        )}
+                    </div>
+                )}
             </div>
 
-            {actionError && !showSettings && meetingClient === null && (
-                <div className="bg-destructive/10 border border-destructive/20 text-destructive px-3 py-2 rounded text-sm mb-4">
-                    {actionError}
-                </div>
-            )}
+            <Tabs
+                className="-mx-6 mb-6 w-auto"
+                tabs={[
+                    { id: 'overview', label: 'Áttekintés' },
+                    { id: 'forecast', label: 'Előrejelzés' },
+                ]}
+                activeTab={activeTab}
+                onChange={(id) => setActiveTab(id as 'overview' | 'forecast')}
+            />
 
-            {loading && <LoadingState message="Jövedelmezőség betöltése..." />}
-            {!loading && error && <ErrorState error={error} onRetry={load} />}
-
-            {!loading && !error && data && (
+            {activeTab === 'overview' && (
                 <>
-                    <p className="text-xs text-muted-foreground mb-4">
-                        A valódi óradíj a bevételt a naplózott órákkal, a megbeszélés-átalánnyal és a levelezés becsült
-                        idejével osztja. A levelezés ideje az ügyfélhez rendelt bejövő ügyfél-levelekből
-                        ({data.settings.minutes_per_inbound_email} perc/levél) és az ugyanabban a szálban küldött
-                        kimenő levelekből ({data.settings.minutes_per_outbound_email} perc/levél) becsült. Az
-                        ügyfélhez nem rendelt szálak levelei nem számítanak bele, így az érték alsó becslés.
-                        Az áremelés-jelölt küszöb: {Math.round(data.settings.underpriced_ratio_threshold * 100)}%.
-                    </p>
+                {actionError && !showSettings && meetingClient === null && (
+                    <div className="bg-destructive/10 border border-destructive/20 text-destructive px-3 py-2 rounded text-sm mb-4">
+                        {actionError}
+                    </div>
+                )}
 
-                    {data.warnings.map((w) => (
-                        <div
-                            key={w}
-                            className="bg-muted border border-border text-foreground px-3 py-2 rounded text-sm mb-4"
-                        >
-                            {w}
-                        </div>
-                    ))}
+                {loading && <LoadingState message="Jövedelmezőség betöltése..." />}
+                {!loading && error && <ErrorState error={error} onRetry={load} />}
 
-                    {data.clients.length === 0 && data.projects.length === 0 ? (
-                        <EmptyState
-                            icon="files"
-                            title="Nincs adat az időszakban"
-                            description="Nincs kiállított számla, naplózott óra vagy ügyfélhez rendelt levél az utolsó teljes hónapokban."
-                        />
-                    ) : (
-                        <>
-                            {renderTable('Ügyfelek', data.clients, true)}
-                            {renderTable('Projektek', data.projects, false)}
-                            <p className="text-xs text-muted-foreground">
-                                A projekt-sorok nem tartalmazzák a megbeszélés-átalányt, mert az ügyfélenként adható meg.
-                            </p>
-                        </>
-                    )}
+                {!loading && !error && data && (
+                    <>
+                        <p className="text-xs text-muted-foreground mb-4">
+                            A valódi óradíj a bevételt a naplózott órákkal, a megbeszélés-átalánnyal és a levelezés becsült
+                            idejével osztja. A levelezés ideje az ügyfélhez rendelt bejövő ügyfél-levelekből
+                            ({data.settings.minutes_per_inbound_email} perc/levél) és az ugyanabban a szálban küldött
+                            kimenő levelekből ({data.settings.minutes_per_outbound_email} perc/levél) becsült. Az
+                            ügyfélhez nem rendelt szálak levelei nem számítanak bele, így az érték alsó becslés.
+                            Az áremelés-jelölt küszöb: {Math.round(data.settings.underpriced_ratio_threshold * 100)}%.
+                        </p>
+
+                        {data.warnings.map((w) => (
+                            <div
+                                key={w}
+                                className="bg-muted border border-border text-foreground px-3 py-2 rounded text-sm mb-4"
+                            >
+                                {w}
+                            </div>
+                        ))}
+
+                        {data.clients.length === 0 && data.projects.length === 0 ? (
+                            <EmptyState
+                                icon="files"
+                                title="Nincs adat az időszakban"
+                                description="Nincs kiállított számla, naplózott óra vagy ügyfélhez rendelt levél az utolsó teljes hónapokban."
+                            />
+                        ) : (
+                            <>
+                                {renderTable('Ügyfelek', data.clients, true)}
+                                {renderTable('Projektek', data.projects, false)}
+                                <p className="text-xs text-muted-foreground">
+                                    A projekt-sorok nem tartalmazzák a megbeszélés-átalányt, mert az ügyfélenként adható meg.
+                                </p>
+                            </>
+                        )}
+                    </>
+                )}
                 </>
             )}
+
+            {activeTab === 'forecast' && <ForecastTab />}
 
             <Modal isOpen={showSettings} onClose={closeSettings} title="Számítási beállítások" size="sm">
                 {settingsForm && (
