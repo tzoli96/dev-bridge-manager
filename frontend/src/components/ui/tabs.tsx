@@ -32,7 +32,7 @@ export function Tabs({ tabs, activeTab, onChange, className }: TabsProps) {
             value={id}
             className={cn(
               "flex items-center gap-1.5 border-b-2 border-transparent px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground",
-              "data-active:border-primary data-active:text-foreground"
+              "data-[state=active]:border-primary data-[state=active]:text-foreground"
             )}
           >
             {Icon && <Icon className="size-4" />}
