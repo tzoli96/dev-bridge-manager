@@ -112,6 +112,8 @@ Merge a `main`-be és push csak kifejezett kérésre.
 - A rendszerben jelenleg egy projekt és kevés történet van, ezért az első számok tájékoztató jellegűek.
 - **2. szakasz döntései:** a fix áras számlák kimaradnak az előrejelzésből (egyszeri számla, figyelmeztetéssel); a horizont az aktuális hónappal kezdődik; a szerződés vége projektenként érvényesül (a lejárat hónapja még „biztos"); alapértelmezett horizont 6 hónap (3–6); az oldal két fülre oszlik, a Forgatókönyvek és a Beállítások fül a 3–4. szakaszban jön.
 - **Előrejelzés korlátja:** az átlag az utolsó 3 hónapra támaszkodik, ezért új vagy megszűnő ügyfelet lassan követ, és pipeline nincs (új bevétel csak forgatókönyvben szerepelhet).
+- **3. szakasz döntései:** a forgatókönyv alapja az előrejelzés ügyfélátlaga (nem fix áras számlák) és az áttekintés havi órái; a havi eredmény minden hónapra azonos, a szerződések lejárata nem hat rá; az óraváltozás a naplózott órákra vonatkozik, ár nélkül a bevétel arányosan skálázódik; az `after_costs` tételek nem halmozódnak és negatív eredményre 0-t adnak; a kapacitás kötelező és pozitív; nincs szerver-oldali cache (a felület 400 ms-ot vár); a paraméterkészletek kezelése a Forgatókönyvek fülről nyíló ablakban van, a Beállítások fül és a sablonok a 4. szakaszban jönnek.
+- **Forgatókönyv korlátai:** fix áras ügyfél csak új ügyfélként modellezhető; a levelezési és megbeszélési órák nem módosíthatók ügyfélenként; az eredmény nem adótanács, és a rendszer nem tartalmaz adószabályt.
 
 ## Kapcsolat az AI ügynökkel
 
