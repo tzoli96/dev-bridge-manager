@@ -28,11 +28,11 @@ help:
 # Development environment
 dev:
 	@echo "🏗️  Starting development environment..."
-	docker-compose -f $(COMPOSE_FILE) up -d
+	docker compose -f $(COMPOSE_FILE) up -d
 
 dev-build:
 	@echo "🏗️  Building development environment..."
-	docker-compose -f $(COMPOSE_FILE) build
+	docker compose -f $(COMPOSE_FILE) build
 
 # Build production backend image
 build-backend:
@@ -65,20 +65,20 @@ stop-prod:
 # Stop development containers
 down:
 	@echo "🛑 Stopping development containers..."
-	docker-compose -f $(COMPOSE_FILE) down
+	docker compose -f $(COMPOSE_FILE) down
 
 # Show logs
 logs:
-	docker-compose -f $(COMPOSE_FILE) logs -f
+	docker compose -f $(COMPOSE_FILE) logs -f
 
 # Enter backend container
 shell:
-	docker-compose -f $(COMPOSE_FILE) exec backend bash
+	docker compose -f $(COMPOSE_FILE) exec backend bash
 
 # Clean everything
 clean:
 	@echo "🧹 Cleaning up..."
-	docker-compose -f $(COMPOSE_FILE) down -v --rmi all --remove-orphans
+	docker compose -f $(COMPOSE_FILE) down -v --rmi all --remove-orphans
 	docker stop devbridge-backend-prod devbridge-frontend-prod || true
 	docker rm devbridge-backend-prod devbridge-frontend-prod || true
 	docker rmi devbridge-backend:latest devbridge-frontend:latest || true ".PHONY: help up down build restart logs shell clean status
