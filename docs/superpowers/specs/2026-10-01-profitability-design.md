@@ -110,6 +110,8 @@ Merge a `main`-be és push csak kifejezett kérésre.
 - A több ügyfeles projektek óraelosztása a számlázott összegek arányában történik. Ha ez félrevezető eredményt ad, az 1. szakasz után felülvizsgáljuk.
 - A küszöb alapértéke (`underpriced_ratio_threshold`) a beállításokban van; kezdőértéket az 1. szakasz során, valós adaton javaslunk.
 - A rendszerben jelenleg egy projekt és kevés történet van, ezért az első számok tájékoztató jellegűek.
+- **2. szakasz döntései:** a fix áras számlák kimaradnak az előrejelzésből (egyszeri számla, figyelmeztetéssel); a horizont az aktuális hónappal kezdődik; a szerződés vége projektenként érvényesül (a lejárat hónapja még „biztos"); alapértelmezett horizont 6 hónap (3–6); az oldal két fülre oszlik, a Forgatókönyvek és a Beállítások fül a 3–4. szakaszban jön.
+- **Előrejelzés korlátja:** az átlag az utolsó 3 hónapra támaszkodik, ezért új vagy megszűnő ügyfelet lassan követ, és pipeline nincs (új bevétel csak forgatókönyvben szerepelhet).
 
 ## Kapcsolat az AI ügynökkel
 
