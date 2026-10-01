@@ -95,13 +95,35 @@ func loadProjectHoursMonths(db *gorm.DB, from, to time.Time) ([]ProjectHoursMont
 	return rows, err
 }
 
+// loadEmailMonths counts client correspondence per month. Inbound mail counts
+// when it carries a client (set by the sync for "ugyfel"-categorised mail);
+// sent mail is never categorised nor matched to a client at sync time, so it
+// inherits the client/project of the latest client-matched inbound message in
+// the same Gmail thread (resolved at read time, nothing is written back).
 func loadEmailMonths(db *gorm.DB, from, to time.Time) ([]EmailMonth, error) {
 	var rows []EmailMonth
-	err := db.Table("emails").
-		Select("client_id, project_id, to_char(received_at, 'YYYY-MM') AS month, folder, COUNT(*) AS count").
-		Where("client_id IS NOT NULL AND category IN ? AND received_at >= ? AND received_at < ?",
-			[]string{models.EmailCategoryClient, models.EmailCategoryBilling}, from, to).
-		Group("client_id, project_id, to_char(received_at, 'YYYY-MM'), folder").
+	err := db.Raw(`
+		SELECT eff.client_id, eff.project_id, to_char(eff.received_at, 'YYYY-MM') AS month, eff.folder, COUNT(*) AS count
+		FROM (
+			SELECT e.folder, e.received_at,
+				COALESCE(e.client_id, t.client_id) AS client_id,
+				COALESCE(e.project_id, t.project_id) AS project_id
+			FROM emails e
+			LEFT JOIN LATERAL (
+				SELECT i.client_id, i.project_id
+				FROM emails i
+				WHERE e.folder = 'sent' AND e.client_id IS NULL
+					AND i.gmail_account_id = e.gmail_account_id AND i.thread_id = e.thread_id
+					AND i.thread_id <> '' AND i.folder = 'inbox' AND i.client_id IS NOT NULL
+				ORDER BY i.received_at DESC, i.id DESC
+				LIMIT 1
+			) t ON TRUE
+			WHERE e.received_at >= ? AND e.received_at < ?
+				AND ((e.folder = 'inbox' AND e.category IN ?) OR e.folder = 'sent')
+		) eff
+		WHERE eff.client_id IS NOT NULL
+		GROUP BY eff.client_id, eff.project_id, to_char(eff.received_at, 'YYYY-MM'), eff.folder`,
+		from, to, []string{models.EmailCategoryClient, models.EmailCategoryBilling}).
 		Scan(&rows).Error
 	return rows, err
 }

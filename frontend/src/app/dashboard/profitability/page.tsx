@@ -207,11 +207,11 @@ export default function ProfitabilityPage() {
                 <>
                     <p className="text-xs text-muted-foreground mb-4">
                         A valódi óradíj a bevételt a naplózott órákkal, a megbeszélés-átalánnyal és a levelezés becsült
-                        idejével osztja. A levelezés ideje csak az ügyfélhez rendelt bejövő ügyfél-levelekből
-                        becsült ({data.settings.minutes_per_inbound_email} perc/bejövő levél). A kimenő és számla
-                        kategóriájú levelek jelenleg nincsenek ügyfélhez rendelve, ezért a kimenő levél percei
-                        (beállított: {data.settings.minutes_per_outbound_email}) még nem érvényesülnek. Az
-                        áremelés-jelölt küszöb: {Math.round(data.settings.underpriced_ratio_threshold * 100)}%.
+                        idejével osztja. A levelezés ideje az ügyfélhez rendelt bejövő ügyfél-levelekből
+                        ({data.settings.minutes_per_inbound_email} perc/levél) és az ugyanabban a szálban küldött
+                        kimenő levelekből ({data.settings.minutes_per_outbound_email} perc/levél) becsült. Az
+                        ügyfélhez nem rendelt szálak levelei nem számítanak bele, így az érték alsó becslés.
+                        Az áremelés-jelölt küszöb: {Math.round(data.settings.underpriced_ratio_threshold * 100)}%.
                     </p>
 
                     {data.warnings.map((w) => (
