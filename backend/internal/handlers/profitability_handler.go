@@ -2,6 +2,7 @@
 package handlers
 
 import (
+	"math"
 	"strconv"
 	"time"
 
@@ -32,22 +33,27 @@ func parseOverviewMonths(raw string) (int, bool) {
 	return n, true
 }
 
+// finiteBetween reports lo <= v <= hi and is false for NaN and +-Inf.
+func finiteBetween(v, lo, hi float64) bool {
+	return !math.IsNaN(v) && !math.IsInf(v, 0) && v >= lo && v <= hi
+}
+
 func validateProfitSettings(req models.ProfitSettingsRequest) string {
-	if req.MinutesPerInboundEmail < 0 || req.MinutesPerInboundEmail > 240 ||
-		req.MinutesPerOutboundEmail < 0 || req.MinutesPerOutboundEmail > 240 {
+	if !finiteBetween(req.MinutesPerInboundEmail, 0, 240) ||
+		!finiteBetween(req.MinutesPerOutboundEmail, 0, 240) {
 		return "Email minutes must be between 0 and 240"
 	}
-	if req.DefaultCapacityHoursPerMonth < 0 || req.DefaultCapacityHoursPerMonth > 744 {
+	if !finiteBetween(req.DefaultCapacityHoursPerMonth, 0, 744) {
 		return "Capacity must be between 0 and 744 hours per month"
 	}
-	if req.UnderpricedRatioThreshold < 0.01 || req.UnderpricedRatioThreshold > 1.5 {
+	if !finiteBetween(req.UnderpricedRatioThreshold, 0.01, 1.5) {
 		return "Threshold must be between 0.01 and 1.5"
 	}
 	return ""
 }
 
 func validateMeetingAllowance(req models.MeetingAllowanceRequest) string {
-	if req.HoursPerMonth < 0 || req.HoursPerMonth > 744 {
+	if !finiteBetween(req.HoursPerMonth, 0, 744) {
 		return "Hours per month must be between 0 and 744"
 	}
 	return ""

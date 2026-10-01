@@ -2,6 +2,7 @@
 package handlers
 
 import (
+	"math"
 	"testing"
 
 	"dev-bridge-manager/internal/models"
@@ -90,5 +91,36 @@ func TestParseForecastMonths(t *testing.T) {
 		if ok != tc.wantOK || (ok && got != tc.want) {
 			t.Fatalf("parseForecastMonths(%q) = %d,%v want %d,%v", tc.in, got, ok, tc.want, tc.wantOK)
 		}
+	}
+}
+
+func TestValidateProfitSettingsRejectsNonFinite(t *testing.T) {
+	bad := map[string]float64{"NaN": math.NaN(), "+Inf": math.Inf(1), "-Inf": math.Inf(-1)}
+	fields := map[string]func(r *models.ProfitSettingsRequest, v float64){
+		"inbound minutes":  func(r *models.ProfitSettingsRequest, v float64) { r.MinutesPerInboundEmail = v },
+		"outbound minutes": func(r *models.ProfitSettingsRequest, v float64) { r.MinutesPerOutboundEmail = v },
+		"capacity":         func(r *models.ProfitSettingsRequest, v float64) { r.DefaultCapacityHoursPerMonth = v },
+		"threshold":        func(r *models.ProfitSettingsRequest, v float64) { r.UnderpricedRatioThreshold = v },
+	}
+	for fname, set := range fields {
+		for vname, v := range bad {
+			t.Run(fname+" "+vname, func(t *testing.T) {
+				req := models.ProfitSettingsRequest{MinutesPerInboundEmail: 5, MinutesPerOutboundEmail: 5, DefaultCapacityHoursPerMonth: 120, UnderpricedRatioThreshold: 0.8}
+				set(&req, v)
+				if msg := validateProfitSettings(req); msg == "" {
+					t.Fatalf("accepted %v: %+v", v, req)
+				}
+			})
+		}
+	}
+}
+
+func TestValidateMeetingAllowanceRejectsNonFinite(t *testing.T) {
+	for name, v := range map[string]float64{"NaN": math.NaN(), "+Inf": math.Inf(1), "-Inf": math.Inf(-1)} {
+		t.Run(name, func(t *testing.T) {
+			if msg := validateMeetingAllowance(models.MeetingAllowanceRequest{HoursPerMonth: v}); msg == "" {
+				t.Fatalf("accepted %v", v)
+			}
+		})
 	}
 }
