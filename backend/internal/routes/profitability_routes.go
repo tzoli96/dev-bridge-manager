@@ -17,6 +17,9 @@ func SetupProfitabilityRoutes(api fiber.Router) {
 	// GET /api/v1/profitability/overview - Ügyfél- és projekt-óradíjak (névleges és valódi)
 	g.Get("/overview", h.GetOverview)
 
+	// GET /api/v1/profitability/forecast - 3–6 hónapos bevétel-előrejelzés (biztos és megújítástól függő sáv)
+	g.Get("/forecast", h.GetForecast)
+
 	// GET /api/v1/profitability/settings - Levelezés-becslés beállításai
 	g.Get("/settings", h.GetSettings)
 

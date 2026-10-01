@@ -70,3 +70,25 @@ func TestValidateMeetingAllowance(t *testing.T) {
 		t.Fatal("745 accepted")
 	}
 }
+
+func TestParseForecastMonths(t *testing.T) {
+	cases := []struct {
+		in     string
+		want   int
+		wantOK bool
+	}{
+		{"", 6, true},
+		{"3", 3, true},
+		{"6", 6, true},
+		{"2", 0, false},
+		{"7", 0, false},
+		{"0", 0, false},
+		{"abc", 0, false},
+	}
+	for _, tc := range cases {
+		got, ok := parseForecastMonths(tc.in)
+		if ok != tc.wantOK || (ok && got != tc.want) {
+			t.Fatalf("parseForecastMonths(%q) = %d,%v want %d,%v", tc.in, got, ok, tc.want, tc.wantOK)
+		}
+	}
+}

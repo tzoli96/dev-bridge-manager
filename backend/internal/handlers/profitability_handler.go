@@ -133,3 +133,29 @@ func (h *ProfitabilityHandler) PutMeetingAllowance(c *fiber.Ctx) error {
 	}
 	return c.JSON(allowance)
 }
+
+// parseForecastMonths returns the requested horizon; empty means the default
+// of 6 months, anything outside 3..6 is rejected.
+func parseForecastMonths(raw string) (int, bool) {
+	if raw == "" {
+		return 6, true
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 3 || n > 6 {
+		return 0, false
+	}
+	return n, true
+}
+
+// GetForecast - GET /api/v1/profitability/forecast?months=
+func (h *ProfitabilityHandler) GetForecast(c *fiber.Ctx) error {
+	months, ok := parseForecastMonths(c.Query("months"))
+	if !ok {
+		return c.Status(400).JSON(fiber.Map{"success": false, "message": "months must be between 3 and 6"})
+	}
+	forecast, err := services.LoadForecast(months)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"success": false, "message": "Error loading profitability forecast"})
+	}
+	return c.JSON(forecast)
+}

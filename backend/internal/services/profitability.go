@@ -142,3 +142,67 @@ func loadNames(db *gorm.DB, table string) (map[uint]string, error) {
 	}
 	return names, nil
 }
+
+// LoadForecast builds the revenue forecast: the last forecastBaselineMonths
+// complete months of invoices are averaged and projected over `months`
+// months starting with the current one.
+func LoadForecast(months int) (Forecast, error) {
+	db := database.GetDB()
+	now := time.Now()
+	baseline, from, to := MonthWindow(now, forecastBaselineMonths)
+
+	invoices, err := loadForecastInvoices(db, from, to)
+	if err != nil {
+		return Forecast{}, err
+	}
+	endMonths, err := loadContractEndMonths(db)
+	if err != nil {
+		return Forecast{}, err
+	}
+	clientNames, err := loadNames(db, "clients")
+	if err != nil {
+		return Forecast{}, err
+	}
+
+	return BuildForecast(ForecastInput{
+		BaselineMonths:   baseline,
+		Months:           FutureMonths(now, months),
+		Invoices:         invoices,
+		ContractEndMonth: endMonths,
+		ClientNames:      clientNames,
+	}), nil
+}
+
+// Same "real invoice" definition and month bucketing as loadInvoiceMonths;
+// additionally flags fixed-price invoices (NULL pricing_type counts as not
+// fixed), which the forecast excludes from the run-rate.
+func loadForecastInvoices(db *gorm.DB, from, to time.Time) ([]ForecastInvoice, error) {
+	var rows []ForecastInvoice
+	err := db.Table("invoices").
+		Select("project_id, client_id, to_char(COALESCE(period_end, created_at), 'YYYY-MM') AS month, "+
+			"(COALESCE(pricing_type, '') = 'fixed') AS fixed, SUM(amount) AS amount").
+		Where("status = ? AND billingo_invoice_id <> ? AND COALESCE(period_end, created_at) >= ? AND COALESCE(period_end, created_at) < ?",
+			"created", "", from, to).
+		Group("project_id, client_id, to_char(COALESCE(period_end, created_at), 'YYYY-MM'), (COALESCE(pricing_type, '') = 'fixed')").
+		Scan(&rows).Error
+	return rows, err
+}
+
+func loadContractEndMonths(db *gorm.DB) (map[uint]string, error) {
+	var rows []struct {
+		ID    uint
+		Month string
+	}
+	err := db.Table("projects").
+		Select("id, to_char(contract_end_date, 'YYYY-MM') AS month").
+		Where("contract_end_date IS NOT NULL").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	months := make(map[uint]string, len(rows))
+	for _, r := range rows {
+		months[r.ID] = r.Month
+	}
+	return months, nil
+}
