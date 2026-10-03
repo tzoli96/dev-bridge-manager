@@ -354,9 +354,14 @@ export default function BillingPage() {
 
     return (
         <div className="p-6 max-w-6xl space-y-8">
-            <div>
-                <h1 className="text-2xl font-bold text-foreground mb-1">Számlázás</h1>
-                <p className="text-sm text-muted-foreground">Minden projekt számlái egy helyen, projektenkénti szűréssel.</p>
+            <div className="flex items-start justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-foreground mb-1">Számlázás</h1>
+                    <p className="text-sm text-muted-foreground">Minden projekt számlái egy helyen, projektenkénti szűréssel.</p>
+                </div>
+                <Button variant="secondary" icon={Receipt} onClick={() => router.push('/dashboard/billing/unbilled')}>
+                    Számlázatlan órák
+                </Button>
             </div>
 
             <RevenueAnalytics title="Havi bevétel jelentés" />
