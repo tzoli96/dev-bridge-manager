@@ -23,7 +23,7 @@ export default function DashboardHeader({ user, onLogout }: DashboardHeaderProps
                         </div>
                         <div className="hidden md:block">
                             <h1 className="text-base font-semibold text-foreground leading-tight">Dev Bridge Manager</h1>
-                            <p className="text-xs text-muted-foreground">Project management</p>
+                            <p className="text-xs text-muted-foreground">Projektkezelés</p>
                         </div>
                     </div>
 
@@ -44,10 +44,11 @@ export default function DashboardHeader({ user, onLogout }: DashboardHeaderProps
                         <ThemeToggle />
                         <button
                             onClick={onLogout}
+                            aria-label="Kijelentkezés"
                             className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-destructive px-3 py-2 rounded-lg hover:bg-destructive/10 transition-colors"
                         >
                             <LogOut size={16} />
-                            <span className="hidden sm:inline">Logout</span>
+                            <span className="hidden sm:inline">Kijelentkezés</span>
                         </button>
                     </div>
                 </div>
