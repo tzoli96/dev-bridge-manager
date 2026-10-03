@@ -87,6 +87,36 @@ func (h *ProjectHandler) GetAllProjects(c *fiber.Ctx) error {
 		})
 	}
 
+	// Egyetlen lekérdezés az összes projekt ügyfeleihez (nem projektenként), hogy
+	// a lista ügyfél szerint csoportosítható legyen.
+	projectIDs := make([]uint, 0, len(projects))
+	for _, project := range projects {
+		projectIDs = append(projectIDs, project.ID)
+	}
+	clientsByProject := make(map[uint][]models.ProjectClientResponse, len(projects))
+	if len(projectIDs) > 0 {
+		var links []models.ProjectClientResponse
+		err = database.GetDB().Table("project_clients").
+			Select(`project_clients.id, project_clients.project_id, project_clients.client_id,
+				clients.name as client_name, clients.type as client_type,
+				project_clients.assigned_at, project_clients.assigned_by,
+				users.name as assigned_by_name`).
+			Joins("LEFT JOIN clients ON project_clients.client_id = clients.id").
+			Joins("LEFT JOIN users ON project_clients.assigned_by = users.id").
+			Where("project_clients.project_id IN ?", projectIDs).
+			Order("clients.name ASC, project_clients.id ASC").
+			Scan(&links).Error
+		if err != nil {
+			return c.Status(500).JSON(models.ProjectListResponse{
+				Success: false,
+				Message: "Error fetching project clients",
+			})
+		}
+		for _, link := range links {
+			clientsByProject[link.ProjectID] = append(clientsByProject[link.ProjectID], link)
+		}
+	}
+
 	// Convert to response format
 	var response []models.ProjectResponse
 	for _, project := range projects {
@@ -106,6 +136,7 @@ func (h *ProjectHandler) GetAllProjects(c *fiber.Ctx) error {
 			CreatedByName:          project.CreatedByName,
 			CreatedAt:              project.CreatedAt,
 			UpdatedAt:              project.UpdatedAt,
+			Clients:                clientsByProject[project.ID],
 		})
 	}
 
