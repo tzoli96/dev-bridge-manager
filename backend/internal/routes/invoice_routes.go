@@ -76,4 +76,12 @@ func SetupInvoiceRoutes(api fiber.Router) {
 	api.Post("/invoice-reminders/:id/approve", middleware.JWTMiddleware(), reminderHandler.Approve)
 	// POST /api/v1/invoice-reminders/:id/dismiss - Emlékeztető kihagyása ebben a körben
 	api.Post("/invoice-reminders/:id/dismiss", middleware.JWTMiddleware(), reminderHandler.Dismiss)
+
+	// A kiszámlázatlan órák összesítője (projektenként és ügyfelenként)
+	unbilledHandler := handlers.NewUnbilledHoursHandler()
+	billing := api.Group("/billing")
+	billing.Use(middleware.JWTMiddleware())
+
+	// GET /api/v1/billing/unbilled-hours - Számlázatlan és számlázandó órák
+	billing.Get("/unbilled-hours", unbilledHandler.GetUnbilledHours)
 }
