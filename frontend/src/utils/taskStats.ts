@@ -13,6 +13,13 @@ export function isTaskDone(t: Task): boolean {
     return t.status === 'done' || t.isDoneColumn === true
 }
 
+// The kanban card's overdue flag: a finished task is never overdue, whatever
+// its due date. (The card counts a task as overdue from the start of its due
+// day, unlike the date-key based lists above; that timing is unchanged.)
+export function isTaskOverdue(t: Task, now: Date): boolean {
+    return !!t.dueDate && !isTaskDone(t) && new Date(t.dueDate) < now
+}
+
 export function computeDueTasks(tasks: Task[], limit = 5): { overdue: DueTask[]; upcoming: DueTask[] } {
     const todayKey = new Date().toISOString().slice(0, 10)
     const dueTasks = tasks

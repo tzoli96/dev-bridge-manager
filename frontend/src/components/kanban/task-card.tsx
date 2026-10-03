@@ -23,6 +23,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { hu } from 'date-fns/locale';
 import type { Task, KanbanPermissions, TaskPriority, TagLevel } from '@/types/kanban';
 import { cn } from '@/lib/utils';
+import { isTaskOverdue } from '@/utils/taskStats';
 
 const TAG_LEVEL_ALPHA: Record<TagLevel, string> = { low: '15', medium: '28', high: '45' };
 
@@ -70,7 +71,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
         ? (task.loggedHours / task.estimatedHours) * 100
         : 0;
 
-    const isOverdue = task.dueDate && new Date(task.dueDate) < new Date();
+    const isOverdue = isTaskOverdue(task, new Date());
 
     const handleDragStart = (e: React.DragEvent) => {
         if (!permissions.canMoveTasks || task.source === 'jira') {

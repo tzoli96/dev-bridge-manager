@@ -479,6 +479,7 @@ func loadBoardTaskDTOs(boardID uint) ([]models.TaskDTO, error) {
 		projectIDs = append(projectIDs, id)
 	}
 	invoicedPeriodsByProject, _ := services.InvoicedPeriodsByProject(projectIDs)
+	doneSet := tasksInDoneColumn(taskIDs)
 
 	dtos := make([]models.TaskDTO, 0, len(tasks))
 	for _, t := range tasks {
@@ -493,7 +494,9 @@ func loadBoardTaskDTOs(boardID uint) ([]models.TaskDTO, error) {
 				parentRef = &ref
 			}
 		}
-		dtos = append(dtos, buildTaskDTO(t, &p, commentsByTask[t.ID], entriesByTask[t.ID], taskAttachmentsByTask[t.ID], commentAttachmentsByComment, users, progress, parentRef, invoicedPeriodsByProject[t.ProjectID]))
+		dto := buildTaskDTO(t, &p, commentsByTask[t.ID], entriesByTask[t.ID], taskAttachmentsByTask[t.ID], commentAttachmentsByComment, users, progress, parentRef, invoicedPeriodsByProject[t.ProjectID])
+		dto.IsDoneColumn = doneSet[t.ID]
+		dtos = append(dtos, dto)
 	}
 	return dtos, nil
 }
